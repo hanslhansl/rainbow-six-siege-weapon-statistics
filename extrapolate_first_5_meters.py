@@ -1,12 +1,18 @@
-import os
+import os, sys, traceback
+
+def show_exception_and_exit(exc_type, exc_value, tb):
+    traceback.print_exception(exc_type, exc_value, tb)
+    input()
+    sys.exit(-1)
+sys.excepthook = show_exception_and_exit
 
 delimiter = ";"
 extrapolated_dir = "extrapolated_data"
 extrapolated_dir_with_5 = "extrapolated_data_with_first_5_meters"
 
-if not os.path.exists(extrapolated_dir):
+if not os.path.isdir(extrapolated_dir):
 	raise Exception(f"Folder '{extrapolated_dir}' is missing in '{os.getcwd()}'.")
-if not os.path.exists(extrapolated_dir_with_5):
+if not os.path.isdir(extrapolated_dir_with_5):
 	raise Exception(f"Folder '{extrapolated_dir_with_5}' is missing in '{os.getcwd()}'.")
 
 file_names = [file_name for file_name in os.listdir(extrapolated_dir) if os.path.splitext(file_name)[1] == ".csv"]
@@ -38,7 +44,7 @@ for file_name in file_names:
 	index_7m = extrapolated_with_5_distance.index(7)
 
 	if index_5m != 5 or index_6m != index_5m + 1 or index_7m != index_6m + 1:
-		raise Exception(f"Falsly aligned distance values in {extrapolated_file_path}.")
+		raise Exception(f"Falsly aligned distance values in '{extrapolated_file_path}'.")
 
 	if extrapolated_with_5_damage[index_5m] == extrapolated_with_5_damage[index_6m] == extrapolated_with_5_damage[index_7m]:
 		extrapolated_with_5_damage[0] = extrapolated_with_5_damage[index_5m]
@@ -47,7 +53,7 @@ for file_name in file_names:
 		extrapolated_with_5_damage[3] = extrapolated_with_5_damage[index_5m]
 		extrapolated_with_5_damage[4] = extrapolated_with_5_damage[index_5m]
 	else:
-		print(f"Warning: Can't extrapolate first 5 meters for {extrapolated_file_path}.")
+		print(f"Warning: Can't extrapolate first 5 meters for '{extrapolated_file_path}'.")
 
 	extrapolated_with_5_content = ""
 	for i in range(n):
@@ -61,3 +67,5 @@ for file_name in file_names:
 		extrapolated_with_5_file.write(extrapolated_with_5_content)
 
 	pass
+
+input("Completed!")

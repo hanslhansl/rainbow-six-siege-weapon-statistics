@@ -1,12 +1,18 @@
-import os
+import os, sys, traceback
+
+def show_exception_and_exit(exc_type, exc_value, tb):
+    traceback.print_exception(exc_type, exc_value, tb)
+    input()
+    sys.exit(-1)
+sys.excepthook = show_exception_and_exit
 
 delimiter = ";"
 original_dir = "original_data"
 extrapolated_dir = "extrapolated_data"
 
-if not os.path.exists(original_dir):
+if not os.path.isdir(original_dir):
 	raise Exception(f"Folder '{original_dir}' is missing in '{os.getcwd()}'.")
-if not os.path.exists(extrapolated_dir):
+if not os.path.isdir(extrapolated_dir):
 	raise Exception(f"Folder '{extrapolated_dir}' is missing in '{os.getcwd()}'.")
 
 
@@ -31,8 +37,12 @@ for file_name in file_names:
 	
 	n = len(original_distance)
 
-	extrapolated_distance = [int(distance) for distance in original_distance]
-	extrapolated_damage = [int(damage) for damage in original_damage]
+	try:
+		extrapolated_distance = [int(distance) for distance in original_distance]
+		extrapolated_damage = [int(damage) for damage in original_damage]
+	except ValueError as err:
+		print(f"Error in '{original_file_path}'.")
+		raise err
 	
 	previous_damage = 0
 	previous_was_extrapolated = False
@@ -69,5 +79,4 @@ for file_name in file_names:
 	pass
 
 
-
-    
+input("Completed!")
