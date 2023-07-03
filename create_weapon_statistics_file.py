@@ -6,6 +6,8 @@
 
 # the delimiter used in the csv files
 csv_delimiter = ";"
+# lines starting with this sign are ignored
+comment_sign = "#"
 
 # the file containing all weapon names
 weapon_names_file_name = "weapon_names.csv"
@@ -31,7 +33,7 @@ last_distance = 40
 
 
 #imports
-import os, sys, traceback
+import os, sys, traceback, numpy as np
 
 # install exception catcher
 def show_exception_and_exit(exc_type, exc_value, tb):
@@ -78,14 +80,15 @@ class Weapon:
 
 def get_weapon_types(weapons : dict[str, Weapon], file_name : str):
 	with open(file_name, "r") as file:
-		weapon_types_lines = file.read().splitlines()
+		content = file.read()
+	weapon_types_lines = [line for line in content.splitlines() if not line.startswith(comment_sign)]
 
 	if not len(weapon_types_lines) >= 1:
-		raise Exception(f"{file_name} must have at least one line.")
+		raise Exception(f"'{file_name}' must have at least one line.")
 
 	header_line = weapon_types_lines[0]
 	if header_line[0] != csv_delimiter:
-		raise Exception(f"{file_name} is of wrong format.")
+		raise Exception(f"'{file_name}' is of wrong format.")
 	Weapon.types = header_line.strip(csv_delimiter).split(csv_delimiter)
 
 	content_splitted = [line.split(csv_delimiter) for line in weapon_types_lines[1:]]
@@ -94,31 +97,31 @@ def get_weapon_types(weapons : dict[str, Weapon], file_name : str):
 	for weapon_name in weapons:
 		try:
 			type_list = content_dict[weapon_name]
-		except KeyError as err:
-			print(f"'{file_name}' is missing '{weapon_name}'.")
-			raise err
-
-		if len(type_list) > len(Weapon.types):
-			raise Exception(f"Too many columns for '{weapon_name}' in '{file_name}'")
+		except KeyError:
+			raise Exception(f"File '{file_name}' is missing '{weapon_name}'.") from None
 
 		try:
 			index = type_list.index("x")
 		except ValueError as err:
-			print(f"No weapon type for '{weapon_name}' in '{file_name}'.")
-			raise err
+			raise Exception(f"No weapon type for weapon '{weapon_name}' in file '{file_name}'.") from None
+
+		if index >= len(Weapon.types):
+			raise Exception(f"Can't resolve type for weapon '{weapon_name}' in file '{file_name}'")
 
 		weapons[weapon_name].typeIndex = index
 
 	return
 
 def get_weapon_firerates(weapons : dict[str, Weapon], file_name : str):
-	for weapon_name in weapons:
+
+	"""for weapon_name in weapons:
 		weapons[weapon_name].firerate = -1
+	return"""
+	
 
-	"""with open(file_name, "r") as file:
-		weapon_firerates_lines = file.read().splitlines()
-
-	print(weapon_firerates_lines)
+	with open(file_name, "r") as file:
+		content = file.read()
+	weapon_firerates_lines = [line for line in content.splitlines() if not line.startswith(comment_sign)]
 
 	content_splitted = [line.split(csv_delimiter) for line in weapon_firerates_lines]
 	content_dict = {splitted[0] : splitted[1] for splitted in content_splitted}
@@ -126,29 +129,27 @@ def get_weapon_firerates(weapons : dict[str, Weapon], file_name : str):
 	for weapon_name in weapons:
 		try:
 			firerate = content_dict[weapon_name]
-		except KeyError as err:
-			print(f"'{file_name}' is missing '{weapon_name}'.")
-			raise err
+		except KeyError:
+			raise Exception(f"File '{file_name}' is missing weapon '{weapon_name}'.") from None
 
 		try:
-			firerate = int(firerate)
-		except ValueError as err:
-			print(f"Error in '{file_name}'.")
-			raise err
-
-		weapons[weapon_name].firerate = firerate"""
+			firerate_int = int(firerate)
+		except ValueError:
+			raise Exception(f"Can't convert firerate '{firerate}' to int for weapon '{weapon_name}' in '{file_name}'.") from None
+		weapons[weapon_name].firerate = firerate_int
 
 	return
 
 def get_operator_weapons(weapons : dict[str, Weapon], file_name : str):
 	with open(file_name, "r") as file:
-		operator_weapons_lines = file.read().splitlines()
+		content = file.read()
+	operator_weapons_lines = [line for line in content.splitlines() if not line.startswith(comment_sign)]
 
-	operator_weapons_entries = [x.split(csv_delimiter) for x in operator_weapons_lines]
+	operator_weapons_cells = [line.split(csv_delimiter) for line in operator_weapons_lines]
 
 	all_operators : list[str] = []
-	for line in operator_weapons_lines:
-		operator = line.split(csv_delimiter)[0]
+	for splitted_line in operator_weapons_cells:
+		operator = splitted_line[0]
 		if operator != "":
 			all_operators.append(operator)
 	Weapon.operators = sorted(all_operators)
@@ -180,9 +181,8 @@ def get_operator_weapons(weapons : dict[str, Weapon], file_name : str):
 	for weapon_name in weapons:
 		try:
 			operatorIndices = weapon_operatorIndex_dict[weapon_name]
-		except KeyError as err:
-			print(f"'{file_name}' is missing '{weapon_name}'.")
-			raise err
+		except KeyError:
+			raise Exception(f"File '{file_name}' is missing weapon '{weapon_name}'.") from None
 
 		weapons[weapon_name].operatorIndices = operatorIndices
 		
@@ -203,21 +203,20 @@ def get_damages_per_weapon(weapons : dict[str, Weapon], data_dir : str, distance
 
 		lines = data.splitlines()
 		if len(lines) != 2:
-			raise Exception(f"'{data_file_path}' must have exactly 2 lines but has {len(lines)}.")
+			raise Exception(f"File '{data_file_path}' must have exactly 2 lines but has {len(lines)}.")
 	
 		distanceStrings = lines[0].strip(csv_delimiter).split(csv_delimiter)
 		if distances != [int(distance) for distance in distanceStrings]:
-			raise Exception(f"The distance values in '{data_file_path}' are not correct.")
+			raise Exception(f"The distance values in file '{data_file_path}' are not correct.")
 
 		damageStrings = lines[1].strip(csv_delimiter).split(csv_delimiter)
 		if len(damageStrings) != N:
-			raise Exception(f"'{data_file_path}' must have {N} damage values but has {len(damageStrings)}.")
+			raise Exception(f"File '{data_file_path}' must have {N} damage values but has {len(damageStrings)}.")
 	
 		try:
 			damages = [int(damage) for damage in damageStrings]
-		except ValueError as err:
-			print(f"Error in '{data_file_path}'.")
-			raise err
+		except ValueError:
+			raise Exception(f"Can't convert damage values to int in '{data_file_path}'.") from None
 	
 		# interpolate gaps. damages will be continuous in [5;40]
 		previous_damage = 0
@@ -269,7 +268,7 @@ def main():
 
 	weapons : dict[str, Weapon]= {}
 	for weapon_name in weapon_names:
-		if weapon_name.startswith("#"):
+		if weapon_name.startswith(comment_sign):
 			print(f"Warning: Excluding weapon '{weapon_name}' because of #.")
 		else:
 			weapons[weapon_name] = Weapon(weapon_name)
