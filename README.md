@@ -1,5 +1,5 @@
 #  R6S Weapon Statistics
-Provides detailed information for all weapons in R6S. This includes the weapon base damage at distances up to 40 meters, fire rate, damage per second and shots to down or kill.
+Provides detailed statistics for all weapons in Rainbow Six: Siege. This includes the weapon's damage at distances up to 40 meters, fire rate, damage per second, shots to down or kill, reload time and ADS time.
 
 # About how the data is collected
 Generally speaking I am trying to collect as much of the data myself and by hand because Ubisoft has proven to be an unreliable source for statistics. At the same time I am trying cut corners where possible.
@@ -19,7 +19,10 @@ At some point I will measure all fully automatic weapon's fire rates as well. Ju
 
 ## Reload time
 soon (tm)
-## ADS time
+## Aim down sight (ADS) time
 soon (tm)
-## Damage per second
+## Damage per second (DPS)
+soon (tm)
 The damage per second calculates as $DPS = Damage * RPS = Damage * RPM / 60$. No measuring necessary.
+## Shots to down or kill (STDOK)
+soon (tm)
