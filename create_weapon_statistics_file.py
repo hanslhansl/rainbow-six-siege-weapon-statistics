@@ -17,6 +17,12 @@ weapon_types_file_name = "weapon_types.csv"
 weapon_firerates_file_name = "weapon_firerates.csv"
 # the file containing the weapons each operator has access to
 operator_weapons_file_name = "operator_weapons.csv"
+# the file containing the pellet count for every weapon
+weapon_pellet_counts_file_name = "weapon_pellet_counts.csv"
+# the file containing the ads time for every weapon
+weapon_ads_times_file_name = "weapon_ads_times.csv"
+# the file containing the reload times for every weapon
+weapon_reload_times_file_name = "weapon_reload_times.csv"
 
 # the directory containing the weapon damage files
 damage_data_dir = "damage_data"
@@ -65,17 +71,38 @@ if not first_distance <= last_distance:
 
 
 class Weapon:
-	types : list[str] = []
-	operators : list[str] = []
-	distances : list[int] = [i for i in range(first_distance, last_distance+1)]
+	types : tuple[str,...]
+	operators : tuple[str,...]
+	distances = np.array([i for i in range(first_distance, last_distance+1)], np.int32)
 
 	def __init__(self, name : str):
-		self.name = name
+		self.name : str = name
 
 		self.typeIndex : int
-		self.firerate : int
-		self.operatorIndices : list[int]
-		self.damages : list[int]
+		self.operatorIndices : tuple[int,...]
+
+		self.firerate : int	#rpm
+		self.damages : np.ndarray
+		self.reloadTime : tuple[float, float]
+		self.adsTime : float
+		self.pelletCount : int
+		
+
+	def getRPM(self):
+		return self.firerate
+	def getRPS(self):
+		return float(self.firerate) / 60.
+	def getRPMS(self):
+		return float(self.firerate) / 60000.
+
+	def getDPS(self):
+		return self.damages * self.getRPS()
+
+	def getSTDOK(self, hp : int):
+		return np.ceil(hp / self.damages).astype(np.int32)
+
+	def getTTDOK(self, hp : int):
+		return self.getSTDOK(hp) / self.getRPS()
 
 
 def get_weapon_types(weapons : dict[str, Weapon], file_name : str):
@@ -89,7 +116,7 @@ def get_weapon_types(weapons : dict[str, Weapon], file_name : str):
 	header_line = weapon_types_lines[0]
 	if header_line[0] != csv_delimiter:
 		raise Exception(f"'{file_name}' is of wrong format.")
-	Weapon.types = header_line.strip(csv_delimiter).split(csv_delimiter)
+	Weapon.types = tuple(header_line.strip(csv_delimiter).split(csv_delimiter))
 
 	content_splitted = [line.split(csv_delimiter) for line in weapon_types_lines[1:]]
 	content_dict = {splitted[0] : splitted[1:] for splitted in content_splitted}
@@ -140,6 +167,50 @@ def get_weapon_firerates(weapons : dict[str, Weapon], file_name : str):
 
 	return
 
+def get_weapon_pellet_counts(weapons : dict[str, Weapon], file_name : str):
+	with open(file_name, "r") as file:
+		content = file.read()
+	weapon_pellet_count_lines = [line for line in content.splitlines() if not line.startswith(comment_sign)]
+
+	content_splitted = [line.split(csv_delimiter) for line in weapon_pellet_count_lines]
+	content_dict = {splitted[0] : splitted[1] for splitted in content_splitted}
+
+	for weapon_name in weapons:
+		try:
+			pelletCount = content_dict[weapon_name]
+		except KeyError:
+			raise Exception(f"File '{file_name}' is missing weapon '{weapon_name}'.") from None
+
+		try:
+			pelletCount_int = int(pelletCount)
+		except ValueError:
+			raise Exception(f"Can't convert pellet count '{pelletCount}' to int for weapon '{weapon_name}' in '{file_name}'.") from None
+		weapons[weapon_name].pelletCount = pelletCount_int
+
+	return
+
+def get_weapon_ads_times(weapons : dict[str, Weapon], file_name : str):
+	with open(file_name, "r") as file:
+		content = file.read()
+	weapon_ads_times_lines = [line for line in content.splitlines() if not line.startswith(comment_sign)]
+
+	content_splitted = [line.split(csv_delimiter) for line in weapon_ads_times_lines]
+	content_dict = {splitted[0] : splitted[1] for splitted in content_splitted}
+
+	for weapon_name in weapons:
+		try:
+			adsTime = content_dict[weapon_name]
+		except KeyError:
+			raise Exception(f"File '{file_name}' is missing weapon '{weapon_name}'.") from None
+
+		try:
+			adsTime_float = float(adsTime)
+		except ValueError:
+			raise Exception(f"Can't convert ads time '{adsTime}' to float for weapon '{weapon_name}' in '{file_name}'.") from None
+		weapons[weapon_name].adsTime = adsTime_float
+
+	return
+
 def get_operator_weapons(weapons : dict[str, Weapon], file_name : str):
 	with open(file_name, "r") as file:
 		content = file.read()
@@ -152,7 +223,7 @@ def get_operator_weapons(weapons : dict[str, Weapon], file_name : str):
 		operator = splitted_line[0]
 		if operator != "":
 			all_operators.append(operator)
-	Weapon.operators = sorted(all_operators)
+	Weapon.operators = tuple(sorted(all_operators))
 
 	weapon_operatorIndex_dict : dict[str, list[int]] = {}
 	current_operator = ""
@@ -184,11 +255,11 @@ def get_operator_weapons(weapons : dict[str, Weapon], file_name : str):
 		except KeyError:
 			raise Exception(f"File '{file_name}' is missing weapon '{weapon_name}'.") from None
 
-		weapons[weapon_name].operatorIndices = operatorIndices
+		weapons[weapon_name].operatorIndices = tuple(operatorIndices)
 		
 	return
 
-def get_damages_per_weapon(weapons : dict[str, Weapon], data_dir : str, distances : list[int]):
+def get_weapon_damages(weapons : dict[str, Weapon], data_dir : str, distances : list[int]):
 	N = len(distances)
 
 	for weapon_name in weapons:
@@ -236,14 +307,13 @@ def get_damages_per_weapon(weapons : dict[str, Weapon], data_dir : str, distance
 				damages[i] = previous_damage
 			
 		# extrapolate first 5 meters. damages will be continuous in [0;4]
-		first_nonzero_index = next((i for i, damage in enumerate(damages) if damage != 0), None)
+		first_nonzero_index = next((i for i, damage in enumerate(damages) if damage != 0), -1)
 
 		if first_nonzero_index == 0:
 			pass	# no extrapolation needed
-		elif first_nonzero_index == None:
+		elif first_nonzero_index == -1:
 			raise Exception(f"This exception should not be triggerd. '{data_file_path}' has to be corrupted in a strange way.")
 		else:
-
 			if damages[first_nonzero_index] == damages[first_nonzero_index+1] == damages[first_nonzero_index+2]:
 				for i in range(first_nonzero_index):
 					damages[i] = damages[first_nonzero_index]
@@ -251,7 +321,7 @@ def get_damages_per_weapon(weapons : dict[str, Weapon], data_dir : str, distance
 				print(f"Warning: Can't extrapolate first {first_nonzero_index} meters for '{data_file_path}'.")
 
 		# write this weapons stats to the weapons dict
-		weapons[weapon_name].damages = damages
+		weapons[weapon_name].damages = np.array(damages)
 
 		pass
 
@@ -266,12 +336,9 @@ def main():
 	with open(weapon_names_file_name, "r") as file:
 		weapon_names = file.read().splitlines()
 
-	weapons : dict[str, Weapon]= {}
-	for weapon_name in weapon_names:
-		if weapon_name.startswith(comment_sign):
-			print(f"Warning: Excluding weapon '{weapon_name}' because of #.")
-		else:
-			weapons[weapon_name] = Weapon(weapon_name)
+	new_weapon_names = [weapon_name for weapon_name in weapon_names if not weapon_name.startswith(comment_sign) or print(f"Warning: Excluding weapon '{weapon_name}' because of #.")]
+
+	weapons = {weapon_name : Weapon(weapon_name) for weapon_name in new_weapon_names}
 
 
 	# get all weapon types
@@ -280,11 +347,21 @@ def main():
 	# get all weapon fire rates
 	get_weapon_firerates(weapons, weapon_firerates_file_name)
 
+	# get all weapon pellet counts
+	get_weapon_pellet_counts(weapons, weapon_pellet_counts_file_name)
+
+	# get all weapon ads times
+	get_weapon_ads_times(weapons, weapon_ads_times_file_name)
+
+	# get all weapon reload times
+	get_weapon_reload_times(weapons, weapon_reload_times_file_name)
+
 	# get all operator weapons
 	get_operator_weapons(weapons, operator_weapons_file_name)
 
 	# get all weapon damages
-	get_damages_per_weapon(weapons, damage_data_dir, distances)
+	get_weapon_damages(weapons, damage_data_dir, distances)
+	
 
 
 	"""# combine the weapon stats into a single string
