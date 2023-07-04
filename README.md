@@ -23,13 +23,10 @@ soon (tm)
 ## Aim down sight time - ADS time
 soon (tm)
 ## Damage per second - DPS
-soon (tm)
 The damage per second calculates as $DPS = Damage * RPS = Damage * RPM / 60$. No measuring necessary.
 ## Shots to down or kill - STDOK
-soon (tm)
 For a target with $x$ hp the STDOK calculate as $\lceil {x \over Damage} \rceil$. No measuring necessary.
 ## Time to down or kill - TTDOK
-soon (tm)
 For a target with $x$ hp the TTDOK in seconds calculate as ${STDOK \over rps}$. No measuring necessary.
 ## Bullets per shot - Pellet count
-In the case of multiple bullets per shot this metric is also called pellet count. The shooting range displays the bullets per shot. Most weapons shoot exactly one bullet per shot. The only exception are shotguns, most of which have a pellet count of 8.
+The shooting range displays the bullets per shot. Most weapons shoot exactly one bullet per shot. The only exception are shotguns, most of which 8 bullets per shot. For weapons that shoot multiple bullets per shot this metric is also called pellet count. 
