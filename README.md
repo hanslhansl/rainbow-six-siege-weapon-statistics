@@ -29,5 +29,5 @@ For a target with $x$ hp the STDOK calculate as $\lceil {x \over Damage} \rceil$
 ## Time to down or kill - TTDOK
 soon (tm)
 For a target with $x$ hp the TTDOK in seconds calculate as ${STDOK \over rps}$. No measuring necessary.
-## Bullet per shot - Pellet count
+## Bullets per shot - Pellet count
 In the case of multiple bullets per shot this metric is also called pellet count. The shooting range displays the bullets per shot. Most weapons shoot exactly one bullet per shot. The only exception are shotguns, most of which have a pellet count of 8.
