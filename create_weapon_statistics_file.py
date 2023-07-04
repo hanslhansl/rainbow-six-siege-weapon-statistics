@@ -6,23 +6,21 @@
 
 # the delimiter used in the csv files
 csv_delimiter = ";"
-# lines starting with this sign are ignored
-comment_sign = "#"
 
 # the file containing all weapon names
-weapon_names_file_name = "weapon_names.csv"
+weapon_names_file_name = "weapon_names.json"
 # the file containing the type of every weapon
-weapon_types_file_name = "weapon_types.csv"
+weapon_types_file_name = "weapon_types.json"
 # the file containing the fire rate of every weapon
-weapon_firerates_file_name = "weapon_firerates.csv"
+weapon_firerates_file_name = "weapon_firerates.json"
 # the file containing the weapons each operator has access to
-operator_weapons_file_name = "operator_weapons.csv"
+operator_weapons_file_name = "operator_weapons.json"
 # the file containing the pellet count for every weapon
-weapon_pellet_counts_file_name = "weapon_pellet_counts.csv"
+weapon_pellet_counts_file_name = "weapon_pellet_counts.json"
 # the file containing the ads time for every weapon
-weapon_ads_times_file_name = "weapon_ads_times.csv"
+weapon_ads_times_file_name = "weapon_ads_times.json"
 # the file containing the reload times for every weapon
-weapon_reload_times_file_name = "weapon_reload_times.csv"
+weapon_reload_times_file_name = "weapon_reload_times.json"
 
 # the directory containing the weapon damage files
 damage_data_dir = "damage_data"
@@ -39,7 +37,7 @@ last_distance = 40
 
 
 #imports
-import os, sys, traceback, numpy as np
+import os, sys, traceback, numpy as np, json, typing
 
 # install exception catcher
 def show_exception_and_exit(exc_type, exc_value, tb):
@@ -58,6 +56,13 @@ if not os.path.isfile(weapon_firerates_file_name):
 	raise Exception(f"'{weapon_firerates_file_name}' is not a valid file path.")
 if not os.path.isfile(operator_weapons_file_name):
 	raise Exception(f"'{operator_weapons_file_name}' is not a valid file path.")
+if not os.path.isfile(weapon_pellet_counts_file_name):
+	raise Exception(f"'{weapon_pellet_counts_file_name}' is not a valid file path.")
+if not os.path.isfile(weapon_ads_times_file_name):
+	raise Exception(f"'{weapon_ads_times_file_name}' is not a valid file path.")
+if not os.path.isfile(weapon_reload_times_file_name):
+	raise Exception(f"'{weapon_reload_times_file_name}' is not a valid file path.")
+
 
 if not os.path.isdir(damage_data_dir):
 	raise Exception(f"'{damage_data_dir}' is not a valid directory.")
@@ -66,8 +71,6 @@ if not 0 <= first_distance:
 	raise Exception(f"'first_distance' must be >=0 but is {first_distance}.")
 if not first_distance <= last_distance:
 	raise Exception(f"'last_distance' must be >='first_distance'={first_distance} but is {last_distance}.")
-
-
 
 
 class Weapon:
@@ -104,150 +107,186 @@ class Weapon:
 	def getTTDOK(self, hp : int):
 		return self.getSTDOK(hp) / self.getRPS()
 
+def deserialize_json(file_name : str):
+	with open(file_name, "r") as file:
+		try:
+			content = json.load(file)
+		except json.JSONDecodeError:
+			raise Exception(f"The json deserialization of file '{file_name}' failed.")
+	return content
 
 def get_weapon_types(weapons : dict[str, Weapon], file_name : str):
-	with open(file_name, "r") as file:
-		content = file.read()
-	weapon_types_lines = [line for line in content.splitlines() if not line.startswith(comment_sign)]
+	json_content = deserialize_json(file_name)
 
-	if not len(weapon_types_lines) >= 1:
-		raise Exception(f"'{file_name}' must have at least one line.")
+	if type(json_content) != dict:
+		raise Exception(f"File '{file_name}' doesn't deserialize to a weapon type list and weapon type indices.")
 
-	header_line = weapon_types_lines[0]
-	if header_line[0] != csv_delimiter:
-		raise Exception(f"'{file_name}' is of wrong format.")
-	Weapon.types = tuple(header_line.strip(csv_delimiter).split(csv_delimiter))
+	try:
+		weapon_type_list = json_content["types"]
+	except KeyError:
+		raise Exception(f"File '{file_name}' is missing the weapon type list.") from None
+	if type(weapon_type_list) != list:
+		raise Exception(f"File '{file_name}' is missing the weapon type list.")
+	if not all(isinstance(name, str) for name in weapon_type_list):
+		raise Exception(f"The weapon type list in file '{file_name}' doesn't deserialize to a list of strings.")
+	weapon_type_list = typing.cast(list[str], weapon_type_list)
 
-	content_splitted = [line.split(csv_delimiter) for line in weapon_types_lines[1:]]
-	content_dict = {splitted[0] : splitted[1:] for splitted in content_splitted}
+	try:
+		weapon_type_indices = json_content["indices"]
+	except KeyError:
+		raise Exception(f"File '{file_name}' is missing the weapon type indices.") from None
+	if type(weapon_type_indices) != dict:
+		raise Exception(f"File '{file_name}' is missing the weapon type indices.")
+	if not all(isinstance(weapon, str) for weapon in weapon_type_indices):
+		raise Exception(f"The weapons in file '{file_name}' don't deserialize to strings.")
+	if not all(isinstance(type_index, int) for type_index in weapon_type_indices.values()):
+		raise Exception(f"The weapons type indices in file '{file_name}' don't deserialize integers.")
+	weapon_type_indices = typing.cast(dict[str, int], weapon_type_indices)
+
+	Weapon.types = tuple(weapon_type_list)
 
 	for weapon_name in weapons:
 		try:
-			type_list = content_dict[weapon_name]
+			type_index = weapon_type_indices[weapon_name]
 		except KeyError:
-			raise Exception(f"File '{file_name}' is missing '{weapon_name}'.") from None
+			raise Exception(f"File '{file_name}' is missing weapon '{weapon_name}'.") from None
 
-		try:
-			index = type_list.index("x")
-		except ValueError as err:
-			raise Exception(f"No weapon type for weapon '{weapon_name}' in file '{file_name}'.") from None
+		if not 0 <= type_index < len(Weapon.types):
+			raise Exception(f"Weapon type index for weapon '{weapon_name}' is out of bounds in file '{file_name}'.")
 
-		if index >= len(Weapon.types):
-			raise Exception(f"Can't resolve type for weapon '{weapon_name}' in file '{file_name}'")
+		weapons[weapon_name].typeIndex = type_index
 
-		weapons[weapon_name].typeIndex = index
+	for fake_weapon_name in weapon_type_indices.keys() - weapons.keys():
+		print(f"Warning: Weapon '{fake_weapon_name}' found in file '{file_name}' is not an actual weapon.")
 
 	return
 
 def get_weapon_firerates(weapons : dict[str, Weapon], file_name : str):
+	json_content = deserialize_json(file_name)
+	if type(json_content) != dict:
+		raise Exception(f"File '{file_name}' doesn't deserialize to a dict of weapons and fire rates.")
 
-	"""for weapon_name in weapons:
-		weapons[weapon_name].firerate = -1
-	return"""
+	if not all(isinstance(weapon, str) for weapon in json_content):
+		raise Exception(f"The weapons in file '{file_name}' don't deserialize to strings.")
+	if not all(isinstance(firerate, int) for firerate in json_content.values()):
+		raise Exception(f"The fire rates in file '{file_name}' don't deserialize to integers.")
+	weapon_firerates = typing.cast(dict[str, int], json_content)
 	
-
-	with open(file_name, "r") as file:
-		content = file.read()
-	weapon_firerates_lines = [line for line in content.splitlines() if not line.startswith(comment_sign)]
-
-	content_splitted = [line.split(csv_delimiter) for line in weapon_firerates_lines]
-	content_dict = {splitted[0] : splitted[1] for splitted in content_splitted}
-
 	for weapon_name in weapons:
 		try:
-			firerate = content_dict[weapon_name]
+			firerate = weapon_firerates[weapon_name]
 		except KeyError:
 			raise Exception(f"File '{file_name}' is missing weapon '{weapon_name}'.") from None
 
-		try:
-			firerate_int = int(firerate)
-		except ValueError:
-			raise Exception(f"Can't convert firerate '{firerate}' to int for weapon '{weapon_name}' in '{file_name}'.") from None
-		weapons[weapon_name].firerate = firerate_int
+		weapons[weapon_name].firerate = firerate
+
+	for fake_weapon_name in weapon_firerates.keys() - weapons.keys():
+		print(f"Warning: Weapon '{fake_weapon_name}' found in file '{file_name}' is not an actual weapon.")
 
 	return
 
 def get_weapon_pellet_counts(weapons : dict[str, Weapon], file_name : str):
-	with open(file_name, "r") as file:
-		content = file.read()
-	weapon_pellet_count_lines = [line for line in content.splitlines() if not line.startswith(comment_sign)]
+	json_content = deserialize_json(file_name)
+	if type(json_content) != dict:
+		raise Exception(f"File '{file_name}' doesn't deserialize to a dict of weapons and pellet counts.")
 
-	content_splitted = [line.split(csv_delimiter) for line in weapon_pellet_count_lines]
-	content_dict = {splitted[0] : splitted[1] for splitted in content_splitted}
+	if not all(isinstance(weapon, str) for weapon in json_content):
+		raise Exception(f"The weapons in file '{file_name}' don't deserialize to strings.")
+	if not all(isinstance(pellet_count, int) for pellet_count in json_content.values()):
+		raise Exception(f"The pellet counts in file '{file_name}' don't deserialize to integers.")
+	weapon_pellet_counts = typing.cast(dict[str, int], json_content)
 
 	for weapon_name in weapons:
 		try:
-			pelletCount = content_dict[weapon_name]
+			pelletCount = weapon_pellet_counts[weapon_name]
 		except KeyError:
 			raise Exception(f"File '{file_name}' is missing weapon '{weapon_name}'.") from None
 
-		try:
-			pelletCount_int = int(pelletCount)
-		except ValueError:
-			raise Exception(f"Can't convert pellet count '{pelletCount}' to int for weapon '{weapon_name}' in '{file_name}'.") from None
-		weapons[weapon_name].pelletCount = pelletCount_int
+		weapons[weapon_name].pelletCount = pelletCount
+
+	for fake_weapon_name in weapon_pellet_counts.keys() - weapons.keys():
+		print(f"Warning: Weapon '{fake_weapon_name}' found in file '{file_name}' is not an actual weapon.")
 
 	return
 
 def get_weapon_ads_times(weapons : dict[str, Weapon], file_name : str):
-	with open(file_name, "r") as file:
-		content = file.read()
-	weapon_ads_times_lines = [line for line in content.splitlines() if not line.startswith(comment_sign)]
+	json_content = deserialize_json(file_name)
+	if type(json_content) != dict:
+		raise Exception(f"File '{file_name}' doesn't deserialize to a dict of weapons and ads times.")
 
-	content_splitted = [line.split(csv_delimiter) for line in weapon_ads_times_lines]
-	content_dict = {splitted[0] : splitted[1] for splitted in content_splitted}
+	if not all(isinstance(weapon, str) for weapon in json_content):
+		raise Exception(f"The weapons in file '{file_name}' don't deserialize to strings.")
+	if not all(isinstance(ads_time, float) for ads_time in json_content.values()):
+		raise Exception(f"The ads times in file '{file_name}' don't deserialize to floats.")
+	weapon_ads_times = typing.cast(dict[str, float], json_content)
 
 	for weapon_name in weapons:
 		try:
-			adsTime = content_dict[weapon_name]
+			ads_time = weapon_ads_times[weapon_name]
 		except KeyError:
 			raise Exception(f"File '{file_name}' is missing weapon '{weapon_name}'.") from None
 
+		weapons[weapon_name].adsTime = ads_time
+
+	for fake_weapon_name in weapon_ads_times.keys() - weapons.keys():
+		print(f"Warning: Weapon '{fake_weapon_name}' found in file '{file_name}' is not an actual weapon.")
+
+	return
+
+def get_weapon_reload_times(weapons : dict[str, Weapon], file_name : str):
+	json_content = deserialize_json(file_name)
+	if type(json_content) != dict:
+		raise Exception(f"File '{file_name}' doesn't deserialize to a dict of weapons and ads times.")
+
+	if not all(isinstance(weapon, str) for weapon in json_content):
+		raise Exception(f"The weapons and in file '{file_name}' don't deserialize to strings.")
+	if not all(isinstance(reload_times, list) for reload_times in json_content.values()):
+		raise Exception(f"The reload times in file '{file_name}' don't deserialize to lists.")
+	if not all(len(reload_times) == 2 and all(isinstance(reload_time, float) for reload_time in reload_times) for reload_times in json_content.values()):
+		raise Exception(f"The reload times in file '{file_name}' don't deserialize to lists of two floats.")
+	json_content = typing.cast(dict[str, list[float]], json_content)
+	weapon_reload_times = {weapon : (reload_times[0], reload_times[0]) for weapon, reload_times in json_content.items()}
+
+	for weapon_name in weapons:
 		try:
-			adsTime_float = float(adsTime)
-		except ValueError:
-			raise Exception(f"Can't convert ads time '{adsTime}' to float for weapon '{weapon_name}' in '{file_name}'.") from None
-		weapons[weapon_name].adsTime = adsTime_float
+			reload_times = weapon_reload_times[weapon_name]
+		except KeyError:
+			raise Exception(f"File '{file_name}' is missing weapon '{weapon_name}'.") from None
+
+		weapons[weapon_name].reloadTime = reload_times
+
+	for fake_weapon_name in weapon_reload_times.keys() - weapons.keys():
+		print(f"Warning: Weapon '{fake_weapon_name}' found in file '{file_name}' is not an actual weapon.")
 
 	return
 
 def get_operator_weapons(weapons : dict[str, Weapon], file_name : str):
-	with open(file_name, "r") as file:
-		content = file.read()
-	operator_weapons_lines = [line for line in content.splitlines() if not line.startswith(comment_sign)]
+	json_content = deserialize_json(file_name)
+	if type(json_content) != dict:
+		raise Exception(f"File '{file_name}' doesn't deserialize to a dict of operators and weapons lists.")
 
-	operator_weapons_cells = [line.split(csv_delimiter) for line in operator_weapons_lines]
+	if not all(isinstance(operator, str) for operator in json_content):
+		raise Exception(f"The operators in file '{file_name}' don't deserialize to strings.")
+	if not all(isinstance(weapon_list, list) for weapon_list in json_content.values()):
+		raise Exception(f"The weapon lists in file '{file_name}' don't deserialize to lists.")
+	if not all(all(isinstance(weapon, str) for weapon in weapon_list) for weapon_list in json_content.values()):
+		raise Exception(f"The weapon lists in file '{file_name}' don't deserialize to lists of strings.")
+	operator_weapons = typing.cast(dict[str, list[str]], json_content)
 
-	all_operators : list[str] = []
-	for splitted_line in operator_weapons_cells:
-		operator = splitted_line[0]
-		if operator != "":
-			all_operators.append(operator)
-	Weapon.operators = tuple(sorted(all_operators))
+	Weapon.operators = tuple(sorted(operator_weapons.keys()))
 
 	weapon_operatorIndex_dict : dict[str, list[int]] = {}
-	current_operator = ""
-	for line in operator_weapons_lines:
-		try:
-			operator, weapon = line.split(csv_delimiter)
-		except ValueError as err:
-			print(f"Error in '{file_name}'.")
-			raise err
-
-		if operator == "":
-			if current_operator == "":
-				raise Exception(f"{file_name} is of wrong format.")
-			else:
-				operator = current_operator
-		else:
-			current_operator = operator
+	for operator, weapon_list in operator_weapons.items():
 
 		operatorIndex = Weapon.operators.index(operator)
 
-		if weapon in weapon_operatorIndex_dict:
-			weapon_operatorIndex_dict[weapon].append(operatorIndex)
-		else:
-			weapon_operatorIndex_dict[weapon] = [operatorIndex]
+		for weapon in weapon_list:
+			if weapon in weapon_operatorIndex_dict:
+				weapon_operatorIndex_dict[weapon].append(operatorIndex)
+			else:
+				weapon_operatorIndex_dict[weapon] = [operatorIndex]
+
+		pass
 
 	for weapon_name in weapons:
 		try:
@@ -256,90 +295,103 @@ def get_operator_weapons(weapons : dict[str, Weapon], file_name : str):
 			raise Exception(f"File '{file_name}' is missing weapon '{weapon_name}'.") from None
 
 		weapons[weapon_name].operatorIndices = tuple(operatorIndices)
+
+	for fake_weapon_name in weapon_operatorIndex_dict.keys() - weapons.keys():
+		print(f"Warning: Weapon '{fake_weapon_name}' found in file '{file_name}' is not an actual weapon.")
 		
 	return
 
-def get_weapon_damages(weapons : dict[str, Weapon], data_dir : str, distances : list[int]):
-	N = len(distances)
+def get_weapon_damages(weapons : dict[str, Weapon], data_dir : str):
+	weapon_damages : dict[str, list[int]]= {}
+
+	for data_file in os.listdir(data_dir):
+		if data_file.endswith(".json"):
+			file_name = os.path.join(data_dir, data_file)
+			weapon = os.path.splitext(data_file)[0]
+
+			json_content = deserialize_json(file_name)
+			if type(json_content) != dict:
+				raise Exception(f"File '{file_name}' doesn't deserialize to a dict of distance and damage values.")
+
+			if not all(isinstance(distance, str) for distance in json_content):
+				raise Exception(f"The distance values and in file '{file_name}' don't deserialize to strings.")
+			if not all(isinstance(damage, int) for damage in json_content.values()):
+				raise Exception(f"The distance values and in file '{file_name}' don't deserialize to strings.")
+			json_content = typing.cast(dict[str, int], json_content)
+
+			distances = [int(distance) for distance in json_content]
+			damages = [damage for damage in json_content.values()]
+
+			
+			#if Weapon.distances != distances:
+			if not np.array_equal(Weapon.distances, distances):
+				raise Exception(f"The distance values in file '{file_name}' are not correct.")
+			
+			# interpolate gaps. damages will be continuous in [5;40]
+			previous_real_damage = 0
+			previous_was_interpolated = False
+			for i in range(len(Weapon.distances)):
+				if damages[i] != 0:	# value is given
+
+					if previous_was_interpolated == True and damages[i] != previous_real_damage and previous_real_damage != 0:	# unequal damage values before and after missing damage data
+						raise Exception(f"Tried to interpolate between two unequal damage values '{previous_real_damage}' and '{damages[i]}' at {Weapon.distances[i]}m in '{data_file}'.")
+
+					if damages[i] > damages[i-1] and previous_real_damage != 0:	# detected damage increase. should have been decrease or stagnation
+						raise Exception(f"Detected damage increase from '{damages[i-1]}' to '{damages[i]}' at {Weapon.distances[i-1]}m-{Weapon.distances[i]}m in '{data_file}'.")
+
+					previous_was_interpolated = False
+					previous_real_damage = damages[i]
+
+				else:	# value needs to be interpolated
+					previous_was_interpolated = True
+					damages[i] = previous_real_damage
+
+			# get index to first non-zero damage
+			first_nonzero_index = next((i for i, damage in enumerate(damages) if damage != 0), -1)
+
+			# extrapolate first 5 meters. damages will be continuous in [0;4]
+			if first_nonzero_index == 0:
+				pass	# no extrapolation needed
+			elif first_nonzero_index == -1:
+				raise Exception(f"This exception should not be triggerd. '{file_name}' has to be corrupted in a strange way.")
+			else:
+				if damages[first_nonzero_index] == damages[first_nonzero_index+1] == damages[first_nonzero_index+2]:
+					for i in range(first_nonzero_index):
+						damages[i] = damages[first_nonzero_index]
+				else:
+					print(f"Warning: Can't extrapolate first {first_nonzero_index} meters for '{file_name}'.")
+
+			# write this weapons stats to the weapons dict
+			weapon_damages[weapon] = damages
 
 	for weapon_name in weapons:
-		data_file_name = weapon_name + ".csv"
-		data_file_path = os.path.join(data_dir, data_file_name)
-
-		if not os.path.isfile(data_file_path):
-			raise Exception(f"Directory '{data_dir}' is missing file '{weapon_name}.csv'.")
-
-		with open(data_file_path, "r") as data_file:
-			data = data_file.read()
-
-		lines = data.splitlines()
-		if len(lines) != 2:
-			raise Exception(f"File '{data_file_path}' must have exactly 2 lines but has {len(lines)}.")
-	
-		distanceStrings = lines[0].strip(csv_delimiter).split(csv_delimiter)
-		if distances != [int(distance) for distance in distanceStrings]:
-			raise Exception(f"The distance values in file '{data_file_path}' are not correct.")
-
-		damageStrings = lines[1].strip(csv_delimiter).split(csv_delimiter)
-		if len(damageStrings) != N:
-			raise Exception(f"File '{data_file_path}' must have {N} damage values but has {len(damageStrings)}.")
-	
 		try:
-			damages = [int(damage) for damage in damageStrings]
-		except ValueError:
-			raise Exception(f"Can't convert damage values to int in '{data_file_path}'.") from None
-	
-		# interpolate gaps. damages will be continuous in [5;40]
-		previous_damage = 0
-		previous_was_interpolated = False
-		for i in range(N):
-			if damages[i] != 0:
-				if previous_was_interpolated == True and damages[i] != previous_damage:	# unequal damage values before and after missing damage data
-					raise Exception(f"Tried to interpolate between two unequal damage values in '{data_file_path}'.")
+			damages = weapon_damages[weapon_name]
+		except KeyError:
+			raise Exception(f"Directory '{data_dir}' is missing weapon '{weapon_name}'.") from None
 
-				if damages[i] > damages[i-1] and damages[i-1] != 0:	# detected damage increase. should have been decrease or stagnation
-					raise Exception(f"Detected damage increase from '{damages[i-1]}' to '{damages[i]}' at {distances[i-1]}m-{distances[i]}m in '{data_file_path}'.")
-
-				previous_was_interpolated = False
-				previous_damage = damages[i]
-
-			else:
-				damages[i] = previous_damage
-			
-		# extrapolate first 5 meters. damages will be continuous in [0;4]
-		first_nonzero_index = next((i for i, damage in enumerate(damages) if damage != 0), -1)
-
-		if first_nonzero_index == 0:
-			pass	# no extrapolation needed
-		elif first_nonzero_index == -1:
-			raise Exception(f"This exception should not be triggerd. '{data_file_path}' has to be corrupted in a strange way.")
-		else:
-			if damages[first_nonzero_index] == damages[first_nonzero_index+1] == damages[first_nonzero_index+2]:
-				for i in range(first_nonzero_index):
-					damages[i] = damages[first_nonzero_index]
-			else:
-				print(f"Warning: Can't extrapolate first {first_nonzero_index} meters for '{data_file_path}'.")
-
-		# write this weapons stats to the weapons dict
 		weapons[weapon_name].damages = np.array(damages)
 
-		pass
+	for fake_weapon_name in weapon_damages.keys() - weapons.keys():
+		print(f"Warning: Weapon '{fake_weapon_name}' found in directory '{data_dir}' is not an actual weapon.")
 
 	return
 
-def main():
-	
-	# get all distances
-	distances = [i for i in range(first_distance, last_distance+1)]
-
+def main() -> None:
 	# get all weapon names
 	with open(weapon_names_file_name, "r") as file:
-		weapon_names = file.read().splitlines()
+		try:
+			weapon_names = json.load(file)
+		except json.JSONDecodeError:
+			raise Exception(f"The json deserialization of file '{weapon_names_file_name}' failed.")
+	if type(weapon_names) != list:
+		raise Exception(f"File '{weapon_names_file_name}' doesn't deserialize to a list of weapon names.")
+	if not all(isinstance(name, str) for name in weapon_names):
+		raise Exception(f"File '{weapon_names_file_name}' doesn't deserialize to a list of weapon names.")
+	weapon_names = typing.cast(list[str], weapon_names)
 
-	new_weapon_names = [weapon_name for weapon_name in weapon_names if not weapon_name.startswith(comment_sign) or print(f"Warning: Excluding weapon '{weapon_name}' because of #.")]
-
-	weapons = {weapon_name : Weapon(weapon_name) for weapon_name in new_weapon_names}
-
+	# create the dict containing all weapon object
+	weapons = {weapon_name : Weapon(weapon_name) for weapon_name in weapon_names if not weapon_name.startswith("#") or print(f"Warning: Excluding weapon '{weapon_name}' because of #.")}
 
 	# get all weapon types
 	get_weapon_types(weapons, weapon_types_file_name)
@@ -360,7 +412,7 @@ def main():
 	get_operator_weapons(weapons, operator_weapons_file_name)
 
 	# get all weapon damages
-	get_weapon_damages(weapons, damage_data_dir, distances)
+	get_weapon_damages(weapons, damage_data_dir)
 	
 
 
@@ -389,7 +441,6 @@ def main():
 		target_file.write(content)"""
 
 	return
-
 
 
 
