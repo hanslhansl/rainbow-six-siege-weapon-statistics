@@ -1,9 +1,5 @@
 #  R6S Weapon Statistics
 Provides detailed statistics for all weapons in Rainbow Six: Siege. This includes the weapon's damage at distances up to 40 meters, fire rate, damage per second, shots to down or kill, reload time and ADS time.
-
-$\lceil x \rceil$
-$\lfloor x \rfloor$
-
 # About how the data is collected
 Generally speaking I am trying to collect as much of the data myself and by hand because Ubisoft has proven to be an unreliable source for statistics. At the same time I am trying cut corners where possible.
 ## Damage stats
@@ -20,7 +16,6 @@ Currently, for all fully automatic weapons the fire rates are the ones listed in
 My measurements are taken at 60 fps meaning they can deviate up to ${1\over60}s\approx0.0167s=16.7ms$ from the actual values. The actual fire rates are therefor in the interval defined by $60000{n-1 \over t \pm 16.7}rpm$. For example a measured fire rate of 800 rpm for a weapon with 31 bullets per magazine would mean an actual fire rate of something inbetween 794 to 806 rpm. Because of this innaccuracy I am usually rounding the fire rate to a reasonable integer within said interval (e.g. measured 433.47 rpm become 430 rpm).
 
 At some point I will measure all fully automatic weapon's fire rates as well. Just to be sure. soon (tm).
-
 ## Reload time
 soon (tm)
 ## Aim down sight time - ADS time
