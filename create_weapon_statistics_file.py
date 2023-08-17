@@ -18,6 +18,12 @@ first_distance = 0
 # the distance the weapon damage stats end at (usually 40 because the of the Shooting Range limit)
 last_distance = 40 
 
+# weapon types
+weapon_types = ("AR", "SMG", "LMG", "DMR", "SG", "Pistol", "MP", "Else")
+
+# weapon type background colors
+background_colors = ("A4C2F4", "D5A6BD", "B4A7D6", "B6D7A8", "D0E0E3", "FFE599", "EA9999", "B7B7B7")
+
 ###################################################
 # settings end
 # don't edit from here on
@@ -25,7 +31,10 @@ last_distance = 40
 
 
 #imports
-import os, sys, traceback, numpy as np, json, typing
+from calendar import c
+import os, sys, traceback, numpy, json, typing
+from openpyxl import Workbook
+from openpyxl.styles import PatternFill, Border, Alignment, NamedStyle, Side
 
 # install exception catcher
 def show_exception_and_exit(exc_type, exc_value, tb):
@@ -49,20 +58,33 @@ if not first_distance <= last_distance:
 
 
 class Weapon:
-	types = ("AR", "SMG", "LMG", "DMR", "SG", "Pistol", "MP", "Else")
+	types = weapon_types
 	operators : tuple[str,...]
-	distances = np.array([i for i in range(first_distance, last_distance+1)], np.int32)
+	distances = numpy.array([i for i in range(first_distance, last_distance+1)], numpy.int32)
+	
+	alignment = Alignment("center", "center")
+	border = Border(left=Side(border_style='thin',
+                          color='FF8CA5D0'),
+                right=Side(border_style='thin',
+                           color='FF8CA5D0'),
+                top=Side(border_style='thin',
+                         color='FF8CA5D0'),
+                bottom=Side(border_style='thin',
+                            color='FF8CA5D0'))
+	fills = [PatternFill(fgColor=background_colors[i], fill_type = "solid") for i in range(len(types))]
+	stylesAlign = (lambda t=types, a=alignment, b=border, f=fills: [NamedStyle(name=t[i] + " aligned", alignment = a, border=b, fill=f[i]) for i in range(len(t))])()
+	stylesNoAlign = (lambda t=types, b=border, f=fills: [NamedStyle(name=t[i] + " unaligned", border=b, fill=f[i]) for i in range(len(t))])()
 
 	def __init__(self, name_ : str, json_content):
 		self.name = name_
 
 		self.operator_indices : tuple[int,...]
 
-		self.__type : int
-		self.__rpm : int
-		self.damages : np.ndarray
-		self.reloadTimes : tuple[float, float]
-		self.ads : float
+		self.type_index : int
+		self.rpm : int	# rounds per minute
+		self.damages : numpy.ndarray
+		self.reloadTimes : tuple[float, float]	# time in seconds
+		self.ads : float	# time in seconds
 		self.pellets : int
 		
 		if type(json_content) != dict:
@@ -75,14 +97,14 @@ class Weapon:
 			raise Exception(f"Weapon '{self.name}' has a type that doesn't deserialize to a string.") from None
 		if json_content["type"] not in self.types:
 			raise Exception(f"Weapon '{self.name}' has an invalid type.") from None
-		self.__type = self.types.index(json_content["type"])
+		self.type_index = self.types.index(json_content["type"])
 		
 		# get weapon fire rate
 		if "rpm" not in json_content:
 			raise Exception(f"Weapon '{self.name}' is missing a fire rate.") from None
 		if type(json_content["rpm"]) != int:
 			raise Exception(f"Weapon '{self.name}' has a fire rate that doesn't deserialize to an int.") from None
-		self.__rpm = json_content["rpm"]
+		self.rpm = json_content["rpm"]
 		
 		# get weapon ads time
 		if "ads" not in json_content:
@@ -132,7 +154,7 @@ class Weapon:
 		damages = list(distance_damage_dict.values())
 		
 		#if Weapon.distances != distances:
-		if not np.array_equal(Weapon.distances, distances):
+		if not numpy.array_equal(Weapon.distances, distances):
 			raise Exception(f"Weapon '{self.name}' has distance values that are not correct.")
 
 		# make sure damages only stagnates or decreases and zeros are surrounded by equal non-zero damages
@@ -169,31 +191,35 @@ class Weapon:
 				print(f"Warning: Can't extrapolate first {first_nonzero_index} meters for weapon '{self.name}'.")
 
 		# save the damage stats
-		self.damages = np.array(damages)
+		self.damages = numpy.array(damages)
 		return
 
 	def getOperators(self):
 		return tuple([self.operators[opIndex] for opIndex in self.operator_indices])
 
 	def getType(self):
-		return self.types[self.__type]
+		return self.types[self.type_index]
 
 	def getRPM(self):
-		return self.__rpm
+		return self.rpm
 	def getRPS(self):
-		return float(self.__rpm) / 60.
+		return float(self.rpm) / 60.
 	def getRPMS(self):
-		return float(self.__rpm) / 60000.
+		return float(self.rpm) / 60000.
 
 	def getDPS(self):
 		return self.damages * self.getRPS()
 
 	def getSTDOK(self, hp : int):
-		return np.ceil(hp / self.damages).astype(np.int32)
+		return numpy.ceil(hp / self.damages).astype(numpy.int32)
 
 	def getTTDOK(self, hp : int):
 		return self.getSTDOK(hp) / self.getRPMS()
 	
+	def getStyleAlign(self):
+	    return self.stylesAlign[self.type_index]
+	def getStyleNoAlign(self):
+	    return self.stylesNoAlign[self.type_index]
 
 def deserialize_json(file_name : str):
 	with open(file_name, "r") as file:
@@ -203,7 +229,7 @@ def deserialize_json(file_name : str):
 			raise Exception(f"The json deserialization of file '{file_name}' failed.") from None
 	return content
 
-def get_operator_weapons(weapons : dict[str, Weapon], file_name : str):
+def get_operator_weapons(weapons : list[Weapon], file_name : str) -> None:
 	json_content = deserialize_json(file_name)
 	if type(json_content) != dict:
 		raise Exception(f"File '{file_name}' doesn't deserialize to a dict of operators and weapons lists.")
@@ -222,28 +248,29 @@ def get_operator_weapons(weapons : dict[str, Weapon], file_name : str):
 	for operator, weapon_list in operator_weapons.items():
 		operatorIndex = Weapon.operators.index(operator)
 
-		for weapon in weapon_list:
-			if weapon in weapon_operatorIndex_dict:
-				weapon_operatorIndex_dict[weapon].append(operatorIndex)
+		for weapon_name in weapon_list:
+			if weapon_name in weapon_operatorIndex_dict:
+				weapon_operatorIndex_dict[weapon_name].append(operatorIndex)
 			else:
-				weapon_operatorIndex_dict[weapon] = [operatorIndex]
+				weapon_operatorIndex_dict[weapon_name] = [operatorIndex]
 		pass
 
-	for weapon_name in weapons:
+	for weapon in weapons:
 		try:
-			operatorIndices = weapon_operatorIndex_dict[weapon_name]
+			operator_indices = weapon_operatorIndex_dict[weapon.name]
 		except KeyError:
-			raise Exception(f"File '{file_name}' is missing weapon '{weapon_name}'.") from None
+			raise Exception(f"File '{file_name}' is missing weapon '{weapon.name}'.") from None
 
-		weapons[weapon_name].operator_indices = tuple(sorted(operatorIndices))
+		weapon.operator_indices = tuple(sorted(operator_indices))
+		del weapon_operatorIndex_dict[weapon.name]
 
-	for fake_weapon_name in weapon_operatorIndex_dict.keys() - weapons.keys():
+	for fake_weapon_name in weapon_operatorIndex_dict:
 		print(f"Warning: Weapon '{fake_weapon_name}' found in file '{file_name}' is not an actual weapon.")
 		
 	return
 
-def get_weapons_dict():
-	weapons : dict[str, Weapon] = {}	
+def get_weapons_dict() -> list[Weapon]:
+	weapons : list[Weapon] = []
 
 	for file_name in os.listdir(weapon_data_dir):
 		file_path = os.path.join(weapon_data_dir, file_name)		
@@ -255,16 +282,15 @@ def get_weapons_dict():
 			print(f"Warning: Excluding weapon '{name}' because of _.")
 			continue
 		
-		weapons[name] = Weapon(name, deserialize_json(file_path))
+		weapons.append(Weapon(name, deserialize_json(file_path)))
 		
 	# get all operator weapons
 	get_operator_weapons(weapons, operator_weapons_file_name)
 	
 	return weapons
 
-def safe_to_csv_file(weapons : dict[str, Weapon]):
-	""" https://openpyxl.readthedocs.io/en/stable/ """
-	weapons_list = sorted(weapons.values(), key=lambda x: x.getType(), reverse=False)
+def safe_to_csv_file(weapons : list[Weapon]) -> None:
+	weapons_list = sorted(weapons, key=lambda x: x.getType(), reverse=False)
 
 	# combine the weapon stats into a single string
 	content : str = "Damage over distance\n"
@@ -284,8 +310,56 @@ def safe_to_csv_file(weapons : dict[str, Weapon]):
 
 	return
 
+def safe_to_xlsx_file(weapons : list[Weapon]):
+	""" https://openpyxl.readthedocs.io/en/stable/ """
+
+	weapons = sorted(weapons, key=lambda x: x.getType(), reverse=False)	
+
+	# create the workbook
+	workbook = Workbook()
+
+	# get active the
+	worksheet = workbook.active
+	
+	# set the worksheet title
+	worksheet.title = "Operation Dread Factor"
+	workbook.create_sheet("Charts")
+	
+	worksheet.cell(row=1, column=1).value = "created by hanslhansl"
+	worksheet.cell(row=2, column=1).value = "For a detailed explanation see https://github.com/hanslhansl/R6S-Weapon-Statistics"
+
+	worksheet.cell(row=4, column=1).value = "Damage over distance"
+	
+	worksheet.cell(row=5, column=1).value = "Distance"
+	for col in range(len(Weapon.distances)):
+		c = worksheet.cell(row=5, column=col + 2)
+		c.value = Weapon.distances[col]
+		c.alignment = Weapon.alignment
+	c = worksheet.cell(row=5, column=col + 4)
+	c.value = "RPM"
+	c.alignment = Weapon.alignment
+
+	for i in range(len(weapons)):
+		weapon = weapons[i]
+		damages = weapon.damages
+		row = 6 + i
+		c = worksheet.cell(row=row, column=1)
+		c.value = weapon.name
+		c.style = weapon.getStyleNoAlign()
+		for col in range(len(damages)):
+			c = worksheet.cell(row=row, column=col + 2)
+			c.value = damages[col]
+			c.style = weapon.getStyleAlign()
+		c = worksheet.cell(row=row, column=col + 4)
+		c.value = weapon.getRPM()
+		c.style = weapon.getStyleAlign()
+		
+
+	# save to file
+	workbook.save("R6S-Weapon-Statistics.xlsx")
+	return
 
 weapons = get_weapons_dict()
-safe_to_csv_file(weapons)
+safe_to_xlsx_file(weapons)
 
 input("\nCompleted!")
