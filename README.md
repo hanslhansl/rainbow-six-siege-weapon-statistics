@@ -1,7 +1,7 @@
 #  R6S Weapon Statistics
 Provides detailed statistics for all weapons in Tom Clancy's Rainbow Six Siege. This includes the weapon's damage at distances up to 40 meters, fire rate, damage per second, shots to down or kill, reload time and ADS time. All data was collected during operation Dread Factor. A spreadsheet of the important stats can be found [here](https://docs.google.com/spreadsheets/d/e/2PACX-1vQ1KitQsZksdVP9YPDInxK3xE2gtu1mpUxV5_PNyE8sSm-vFINdbiL8vo9RA2CRSIbIUePLVA1GCTWZ/pubhtml).
 
-Currently a few damage stats are still missing. I am waiting for the release of operation Heavy Mettle to measure the missing stats as shotgun damage will change drastically with that patch.
+Currently a few damage stats are still missing. I am waiting for the release of operation Heavy Mettle to collect the missing stats as shotgun damage will change drastically with that patch.
 # About how the data is collected
 Generally speaking I am trying to collect as much of the data myself and by hand because Ubisoft has proven to be an unreliable source for statistics. At the same time I am trying cut corners where possible.
 ## Time measuring
