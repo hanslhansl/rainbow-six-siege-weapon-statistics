@@ -67,58 +67,58 @@ class Weapon:
 		self.pellets : int
 		
 		if type(json_content) != dict:
-			raise Exception(f"Weapon '{self.name}' doesn't deserialize to a dict.")
+			raise Exception(f"Weapon '{self.name}' doesn't deserialize to a dict.") from None
 		
 		# get weapon type
 		if "type" not in json_content:
-			raise Exception(f"Weapon '{self.name}' is missing a type.")
+			raise Exception(f"Weapon '{self.name}' is missing a type.") from None
 		if type(json_content["type"]) != str:
-			raise Exception(f"Weapon '{self.name}' has a type that doesn't deserialize to a string.")
+			raise Exception(f"Weapon '{self.name}' has a type that doesn't deserialize to a string.") from None
 		if json_content["type"] not in self.types:
-			raise Exception(f"Weapon '{self.name}' has an invalid type.")
+			raise Exception(f"Weapon '{self.name}' has an invalid type.") from None
 		self.__type = self.types.index(json_content["type"])
 		
 		# get weapon fire rate
 		if "rpm" not in json_content:
-			raise Exception(f"Weapon '{self.name}' is missing a fire rate.")
+			raise Exception(f"Weapon '{self.name}' is missing a fire rate.") from None
 		if type(json_content["rpm"]) != int:
-			raise Exception(f"Weapon '{self.name}' has a fire rate that doesn't deserialize to an int.")
+			raise Exception(f"Weapon '{self.name}' has a fire rate that doesn't deserialize to an int.") from None
 		self.__rpm = json_content["rpm"]
 		
 		# get weapon ads time
 		if "ads" not in json_content:
-			raise Exception(f"Weapon '{self.name}' is missing an ads time.")
+			raise Exception(f"Weapon '{self.name}' is missing an ads time.") from None
 		if type(json_content["ads"]) != float:
-			raise Exception(f"Weapon '{self.name}' has an ads time that doesn't deserialize to a float.")
+			raise Exception(f"Weapon '{self.name}' has an ads time that doesn't deserialize to a float.") from None
 		self.ads = json_content["ads"]
 
 		# get weapon pellet count
 		if "pellets" not in json_content:
-			raise Exception(f"Weapon '{self.name}' is missing a pellet count.")
+			raise Exception(f"Weapon '{self.name}' is missing a pellet count.") from None
 		if type(json_content["pellets"]) != int:
-			raise Exception(f"Weapon '{self.name}' has a pellet count that doesn't deserialize to an int.")
+			raise Exception(f"Weapon '{self.name}' has a pellet count that doesn't deserialize to an int.") from None
 		self.pellets = json_content["pellets"]
 		
 		# get weapon reload times
 		if "reloadTimes" not in json_content:
-			raise Exception(f"Weapon '{self.name}' is missing reload times.")
+			raise Exception(f"Weapon '{self.name}' is missing reload times.") from None
 		if type(json_content["reloadTimes"]) != list:
-			raise Exception(f"Weapon '{self.name}' has reload times that don't deserialize to a list.")
+			raise Exception(f"Weapon '{self.name}' has reload times that don't deserialize to a list.") from None
 		if len(json_content["reloadTimes"]) != 2:
-			raise Exception(f"Weapon '{self.name}' doesn't have exactly 2 reload times.")
+			raise Exception(f"Weapon '{self.name}' doesn't have exactly 2 reload times.") from None
 		if type(json_content["reloadTimes"][0]) != float or type(json_content["reloadTimes"][1]) != float:
-			raise Exception(f"Weapon '{self.name}' has reload times that don't deserialize to floats.")
+			raise Exception(f"Weapon '{self.name}' has reload times that don't deserialize to floats.") from None
 		self.reloadTimes = (json_content["reloadTimes"][0], json_content["reloadTimes"][1])
 		
 		# get weapon damages
 		if "damages" not in json_content:
-			raise Exception(f"Weapon '{self.name}' is missing damage values.")
+			raise Exception(f"Weapon '{self.name}' is missing damage values.") from None
 		if type(json_content["damages"]) != dict:
-			raise Exception(f"Weapon '{self.name}' has damage values that don't deserialize to a dict.")
+			raise Exception(f"Weapon '{self.name}' has damage values that don't deserialize to a dict.") from None
 		if not all(isinstance(distance, str) for distance in json_content["damages"]):
-			raise Exception(f"Weapon '{self.name}' has distance values that don't deserialize to strings.")
+			raise Exception(f"Weapon '{self.name}' has distance values that don't deserialize to strings.") from None
 		if not all(isinstance(damage, int) for damage in json_content["damages"].values()):
-			raise Exception(f"Weapon '{self.name}' has damage values that don't deserialize to integers.")
+			raise Exception(f"Weapon '{self.name}' has damage values that don't deserialize to integers.") from None
 		dist_dam_dict = typing.cast(dict[str, int], json_content["damages"])	
 
 		for distance in self.distances:
@@ -139,10 +139,10 @@ class Weapon:
 			if damages[i] != 0:	# value is given
 
 				if previous_was_interpolated == True and damages[i] != previous_real_damage and previous_real_damage != 0:	# unequal damage values before and after missing damage data
-					raise Exception(f"Tried to interpolate between two unequal damage values '{previous_real_damage}' and '{damages[i]}' at {Weapon.distances[i]}m for weapon '{self.name}'.")
+					raise Exception(f"Tried to interpolate between two unequal damage values '{previous_real_damage}' and '{damages[i]}' at {Weapon.distances[i]}m for weapon '{self.name}'.") from None
 
 				if damages[i] > damages[i-1] and previous_real_damage != 0:	# detected damage increase. should have been decrease or stagnation
-					raise Exception(f"Detected damage increase from '{damages[i-1]}' to '{damages[i]}' at {Weapon.distances[i-1]}m-{Weapon.distances[i]}m for weapon '{self.name}'.")
+					raise Exception(f"Detected damage increase from '{damages[i-1]}' to '{damages[i]}' at {Weapon.distances[i-1]}m-{Weapon.distances[i]}m for weapon '{self.name}'.") from None
 
 				previous_was_interpolated = False
 				previous_real_damage = damages[i]
@@ -158,7 +158,7 @@ class Weapon:
 		if first_nonzero_index == 0:
 			pass	# no extrapolation needed
 		elif first_nonzero_index == -1:
-			raise Exception(f"This exception should not be triggerd. '{self.name}' has to be corrupted in a strange way.")
+			raise Exception(f"This exception should not be triggerd. '{self.name}' has to be corrupted in a strange way.") from None
 		else:
 			if damages[first_nonzero_index] == damages[first_nonzero_index+1] == damages[first_nonzero_index+2]:
 				for i in range(first_nonzero_index):
@@ -198,7 +198,7 @@ def deserialize_json(file_name : str):
 		try:
 			content = json.load(file)
 		except json.JSONDecodeError:
-			raise Exception(f"The json deserialization of file '{file_name}' failed.")
+			raise Exception(f"The json deserialization of file '{file_name}' failed.") from None
 	return content
 
 def get_operator_weapons(weapons : dict[str, Weapon], file_name : str):
@@ -207,11 +207,11 @@ def get_operator_weapons(weapons : dict[str, Weapon], file_name : str):
 		raise Exception(f"File '{file_name}' doesn't deserialize to a dict of operators and weapons lists.")
 
 	if not all(isinstance(operator, str) for operator in json_content):
-		raise Exception(f"The operators in file '{file_name}' don't deserialize to strings.")
+		raise Exception(f"The operators in file '{file_name}' don't deserialize to strings.") from None
 	if not all(isinstance(weapon_list, list) for weapon_list in json_content.values()):
-		raise Exception(f"The weapon lists in file '{file_name}' don't deserialize to lists.")
+		raise Exception(f"The weapon lists in file '{file_name}' don't deserialize to lists.") from None
 	if not all(all(isinstance(weapon, str) for weapon in weapon_list) for weapon_list in json_content.values()):
-		raise Exception(f"The weapon lists in file '{file_name}' don't deserialize to lists of strings.")
+		raise Exception(f"The weapon lists in file '{file_name}' don't deserialize to lists of strings.") from None
 	operator_weapons = typing.cast(dict[str, list[str]], json_content)
 
 	Weapon.operators = tuple(sorted(operator_weapons.keys()))
@@ -275,14 +275,14 @@ def safe_to_csv_file(weapons : dict[str, Weapon]):
 		content += weapon.name + csv_delimiter + csv_delimiter.join([str(round(dps)) for dps in weapon.getDPS()]) + csv_delimiter + csv_delimiter + str(weapon.getRPM()) + "\n"
 		
 	# write the string to file
-	target_file_name = f"merged.csv"
+	target_file_name = f"R6S-Weapon-Statistics.csv"
 	with open(target_file_name, "x") as target_file:
 		target_file.write(content)
 
 	return
 
 
-weapons = get_operator_weapons()
+weapons = get_weapons_dict()
 safe_to_csv_file(weapons)
 
 input("\nCompleted!")
