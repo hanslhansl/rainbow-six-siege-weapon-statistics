@@ -57,9 +57,10 @@ class Weapon:
 	def __init__(self, name_ : str, json_content):
 		self.name = name_
 
-		self.operatorIndices : tuple[int,...]
+		self.operator_indices : tuple[int,...]
 
-		self.rpm : int
+		self.__type : int
+		self.__rpm : int
 		self.damages : np.ndarray
 		self.reloadTimes : tuple[float, float]
 		self.ads : float
@@ -75,14 +76,14 @@ class Weapon:
 			raise Exception(f"Weapon '{self.name}' has a type that doesn't deserialize to a string.")
 		if json_content["type"] not in self.types:
 			raise Exception(f"Weapon '{self.name}' has an invalid type.")
-		self.type = self.types.index(json_content["type"])
+		self.__type = self.types.index(json_content["type"])
 		
 		# get weapon fire rate
 		if "rpm" not in json_content:
 			raise Exception(f"Weapon '{self.name}' is missing a fire rate.")
 		if type(json_content["rpm"]) != int:
 			raise Exception(f"Weapon '{self.name}' has a fire rate that doesn't deserialize to an int.")
-		self.rpm = json_content["rpm"]
+		self.__rpm = json_content["rpm"]
 		
 		# get weapon ads time
 		if "ads" not in json_content:
@@ -170,17 +171,17 @@ class Weapon:
 		return
 
 	def getOperators(self):
-		return tuple([self.operators[opIndex] for opIndex in self.operatorIndices])
+		return tuple([self.operators[opIndex] for opIndex in self.operator_indices])
 
 	def getType(self):
-		return self.types[self.type]
+		return self.types[self.__type]
 
 	def getRPM(self):
-		return self.rpm
+		return self.__rpm
 	def getRPS(self):
-		return float(self.rpm) / 60.
+		return float(self.__rpm) / 60.
 	def getRPMS(self):
-		return float(self.rpm) / 60000.
+		return float(self.__rpm) / 60000.
 
 	def getDPS(self):
 		return self.damages * self.getRPS()
@@ -189,7 +190,7 @@ class Weapon:
 		return np.ceil(hp / self.damages).astype(np.int32)
 
 	def getTTDOK(self, hp : int):
-		return self.getSTDOK(hp) / self.getRPS()
+		return self.getSTDOK(hp) / self.getRPMS()
 	
 
 def deserialize_json(file_name : str):
@@ -232,15 +233,14 @@ def get_operator_weapons(weapons : dict[str, Weapon], file_name : str):
 		except KeyError:
 			raise Exception(f"File '{file_name}' is missing weapon '{weapon_name}'.") from None
 
-		weapons[weapon_name].operatorIndices = tuple(sorted(operatorIndices))
+		weapons[weapon_name].operator_indices = tuple(sorted(operatorIndices))
 
 	for fake_weapon_name in weapon_operatorIndex_dict.keys() - weapons.keys():
 		print(f"Warning: Weapon '{fake_weapon_name}' found in file '{file_name}' is not an actual weapon.")
 		
 	return
 
-
-def main() -> None:
+def get_weapons_dict():
 	weapons : dict[str, Weapon] = {}	
 
 	for file_name in os.listdir(weapon_data_dir):
@@ -257,39 +257,32 @@ def main() -> None:
 		
 	# get all operator weapons
 	get_operator_weapons(weapons, operator_weapons_file_name)
-
-
-		
-	print(weapons["417"].getOperators())
-
-	"""# combine the weapon stats into a single string
-	content : str = "m" + csv_delimiter
-
-	for distance in distances:
-		content += str(distance) + csv_delimiter
-	content += "\n"
-
-	weapon_names = sorted(damages_per_weapon.keys())
-	for weapon_name in weapon_names:
-		content += weapon_name + csv_delimiter
 	
-		if len(damages_per_weapon[weapon_name]) != N:
-			raise Exception("how??")
-		for damage in damages_per_weapon[weapon_name]:
-			content += str(damage) + csv_delimiter
+	return weapons
 
-		content += "\n"
+def safe_to_csv_file(weapons : dict[str, Weapon]):
+	weapons_list = sorted(weapons.values(), key=lambda x: x.getType(), reverse=False)
 
-
+	# combine the weapon stats into a single string
+	content : str = "Damage over distance\n"
+	content += "Distance" + csv_delimiter + csv_delimiter.join([str(distance) for distance in Weapon.distances]) + csv_delimiter + csv_delimiter + "RPM" + "\n"
+	for weapon in weapons_list:
+		content += weapon.name + csv_delimiter + csv_delimiter.join([str(damage) for damage in  weapon.damages]) + csv_delimiter + csv_delimiter + str(weapon.getRPM()) + "\n"
+		
+	content += "\nDamage per second\n"
+	content += "Distance" + csv_delimiter + csv_delimiter.join([str(distance) for distance in Weapon.distances]) + csv_delimiter + csv_delimiter + "RPM" + "\n"
+	for weapon in weapons_list:
+		content += weapon.name + csv_delimiter + csv_delimiter.join([str(round(dps)) for dps in weapon.getDPS()]) + csv_delimiter + csv_delimiter + str(weapon.getRPM()) + "\n"
+		
 	# write the string to file
-	target_file_name = f"merged_{os.path.basename(damage_data_dir)}.csv"
+	target_file_name = f"merged.csv"
 	with open(target_file_name, "x") as target_file:
-		target_file.write(content)"""
+		target_file.write(content)
 
 	return
 
 
+weapons = get_operator_weapons()
+safe_to_csv_file(weapons)
 
-main()
-
-input("Completed!")
+input("\nCompleted!")
