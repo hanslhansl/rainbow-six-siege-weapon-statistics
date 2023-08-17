@@ -31,4 +31,4 @@ For a target with $x$ hp the STDOK calculate as $\lceil {x \over Damage} \rceil$
 ## Time to down or kill - TTDOK
 For a target with $x$ hp the TTDOK in milliseconds calculate as ${STDOK \over rpms}$. No measuring necessary.
 ## Bullets per shot - Pellet count
-The shooting range displays the bullets per shot. Most weapons shoot exactly one bullet per shot. The only exception are shotguns, most of which 8 bullets per shot. For weapons that shoot multiple bullets per shot this metric is also called pellet count. 
+The shooting range displays the bullets per shot. Most weapons shoot exactly one bullet per shot. The only exception are shotguns, most of which shoot 8 bullets per shot. For weapons that shoot multiple bullets per shot this metric is also called pellet count.
