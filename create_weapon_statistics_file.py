@@ -26,7 +26,6 @@ last_distance = 40
 
 #imports
 import os, sys, traceback, numpy as np, json, typing
-from re import S
 
 # install exception catcher
 def show_exception_and_exit(exc_type, exc_value, tb):
@@ -119,37 +118,40 @@ class Weapon:
 			raise Exception(f"Weapon '{self.name}' has distance values that don't deserialize to strings.") from None
 		if not all(isinstance(damage, int) for damage in json_content["damages"].values()):
 			raise Exception(f"Weapon '{self.name}' has damage values that don't deserialize to integers.") from None
-		dist_dam_dict = typing.cast(dict[str, int], json_content["damages"])	
+		distance_damage_dict = {int(distance) : int(damage) for distance, damage in json_content["damages"].items()}
 
-		for distance in self.distances:
-			if str(distance) not in dist_dam_dict:
-				dist_dam_dict[str(distance)] = 0
-			
-		distances = [int(distance) for distance in dist_dam_dict]
-		damages = [damage for damage in dist_dam_dict.values()]
+		# insert missing distances with damage = 0
+		for distance in Weapon.distances:
+			if distance not in distance_damage_dict:
+				distance_damage_dict[distance] = 0
+				
+		# sort distance_damage_dict in ascending order by distance
+		distance_damage_dict = dict(sorted(distance_damage_dict.items()))
+
+		distances = list(distance_damage_dict.keys())
+		damages = list(distance_damage_dict.values())
 		
 		#if Weapon.distances != distances:
 		if not np.array_equal(Weapon.distances, distances):
 			raise Exception(f"Weapon '{self.name}' has distance values that are not correct.")
 
+		# make sure damages only stagnates or decreases and zeros are surrounded by equal non-zero damages
 		# interpolate gaps. damages will be continuous in [5;40]
 		previous_real_damage = 0
 		previous_was_interpolated = False
 		for i in range(len(Weapon.distances)):
-			if damages[i] != 0:	# value is given
-
-				if previous_was_interpolated == True and damages[i] != previous_real_damage and previous_real_damage != 0:	# unequal damage values before and after missing damage data
-					raise Exception(f"Tried to interpolate between two unequal damage values '{previous_real_damage}' and '{damages[i]}' at {Weapon.distances[i]}m for weapon '{self.name}'.") from None
-
-				if damages[i] > damages[i-1] and previous_real_damage != 0:	# detected damage increase. should have been decrease or stagnation
-					raise Exception(f"Detected damage increase from '{damages[i-1]}' to '{damages[i]}' at {Weapon.distances[i-1]}m-{Weapon.distances[i]}m for weapon '{self.name}'.") from None
-
-				previous_was_interpolated = False
-				previous_real_damage = damages[i]
-
-			else:	# value needs to be interpolated
-				previous_was_interpolated = True
+			if damages[i] == 0:	# this damage value needs to be interpolated
 				damages[i] = previous_real_damage
+				previous_was_interpolated = True
+				
+			else:	# this damage value is given
+				if damages[i] > previous_real_damage and previous_real_damage != 0:
+					raise Exception(f"Weapon '{self.name}' has a damage increase from '{previous_real_damage}' to '{damages[i]}' at {Weapon.distances[i]}m.")
+				if previous_real_damage != 0 and previous_was_interpolated == True and damages[i] != previous_real_damage:
+					raise Exception(f"Tried to interpolate between two unequal damage values '{previous_real_damage}' and '{damages[i]}' at {Weapon.distances[i]}m for weapon '{self.name}'.") from None
+				
+				previous_real_damage = damages[i]
+				previous_was_interpolated = False
 
 		# get index to first non-zero damage
 		first_nonzero_index = next((i for i, damage in enumerate(damages) if damage != 0), -1)
@@ -261,6 +263,7 @@ def get_weapons_dict():
 	return weapons
 
 def safe_to_csv_file(weapons : dict[str, Weapon]):
+	""" https://openpyxl.readthedocs.io/en/stable/ """
 	weapons_list = sorted(weapons.values(), key=lambda x: x.getType(), reverse=False)
 
 	# combine the weapon stats into a single string
