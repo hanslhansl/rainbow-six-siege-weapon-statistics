@@ -29,20 +29,22 @@ background_colors = ("A4C2F4", "D5A6BD", "B4A7D6", "B6D7A8", "D0E0E3", "FFE599",
 # don't edit from here on
 ###################################################
 
-
-#imports
-from calendar import c
-import os, sys, traceback, numpy, json, typing
-from openpyxl import Workbook
-from openpyxl.styles import PatternFill, Border, Alignment, NamedStyle, Side
-
 # install exception catcher
+import sys, traceback
+
 def show_exception_and_exit(exc_type, exc_value, tb):
     traceback.print_exception(exc_type, exc_value, tb)
-    input()
+    input("\nAbort")
     sys.exit(-1)
 sys.excepthook = show_exception_and_exit
 
+#imports
+from calendar import c
+import os, numpy, json, typing, math
+from openpyxl import Workbook
+from openpyxl.styles import PatternFill, Border, Alignment, NamedStyle, Side
+from openpyxl.utils import get_column_letter
+from win32com.client import Dispatch
 
 # check if the settings are correct
 if not os.path.isfile(operator_weapons_file_name):
@@ -72,8 +74,9 @@ class Weapon:
                 bottom=Side(border_style='thin',
                             color='FF8CA5D0'))
 	fills = [PatternFill(fgColor=background_colors[i], fill_type = "solid") for i in range(len(types))]
-	stylesAlign = (lambda t=types, a=alignment, b=border, f=fills: [NamedStyle(name=t[i] + " aligned", alignment = a, border=b, fill=f[i]) for i in range(len(t))])()
-	stylesNoAlign = (lambda t=types, b=border, f=fills: [NamedStyle(name=t[i] + " unaligned", border=b, fill=f[i]) for i in range(len(t))])()
+	stylesABF = (lambda t=types, a=alignment, b=border, f=fills: [NamedStyle(name=t[i] + " ABF", alignment = a, border=b, fill=f[i]) for i in range(len(t))])()
+	stylesBF = (lambda t=types, b=border, f=fills: [NamedStyle(name=t[i] + " BF", border=b, fill=f[i]) for i in range(len(t))])()
+	stylesAB = (lambda t=types, a=alignment, b=border: [NamedStyle(name=t[i] + " AB", alignment = a, border=b) for i in range(len(t))])()
 
 	def __init__(self, name_ : str, json_content):
 		self.name = name_
@@ -82,11 +85,11 @@ class Weapon:
 
 		self.type_index : int
 		self.rpm : int	# rounds per minute
-		self.damages : numpy.ndarray
+		self.damages : tuple[int,...]
 		self.reloadTimes : tuple[float, float]	# time in seconds
 		self.ads : float	# time in seconds
 		self.pellets : int
-		
+
 		if type(json_content) != dict:
 			raise Exception(f"Weapon '{self.name}' doesn't deserialize to a dict.") from None
 		
@@ -191,35 +194,79 @@ class Weapon:
 				print(f"Warning: Can't extrapolate first {first_nonzero_index} meters for weapon '{self.name}'.")
 
 		# save the damage stats
-		self.damages = numpy.array(damages)
+		self.damages = tuple(damages)
 		return
 
+
+	def getName(self):
+		return self.name, self.getStyleBF()
+	def getType(self):
+		return self.types[self.type_index]
+	def getRPM(self):
+		style = self.getStyleABF()
+		if self.rpm == 0:
+			return "", style
+		else:
+			return str(self.rpm), style
+	def getRPS(self):
+		style = self.getStyleABF()
+		if self.rpm == 0:
+			return "", style
+		else:
+			return str(self.rpm / 60.), style
+	def getRPMS(self):
+		style = self.getStyleABF()
+		if self.rpm == 0:
+			return "", style
+		else:
+			return str(self.rpm / 60000.), style
+	def getDamage(self, index : int):
+		style = self.getStyle(index)
+		if self.damages[index] == 0:
+			return "", style
+		else:
+			return str(self.damages[index]), style
+	def getDPS(self, index : int):
+		style = self.getStyle(index)
+		if self.damages[index] == 0 or self.rpm == 0:
+			return "", style
+		else:
+			return str(round(self.damages[index] * self.rpm / 60.)), style
+	def getSTDOK(self, index : int, hp : int):
+		return math.ceil(hp / self.damages[index])
+	def getTTDOK(self, index : int, hp : int):
+		return self.getSTDOK(index, hp) / self.getRPMS()[0]
+	
 	def getOperators(self):
 		return tuple([self.operators[opIndex] for opIndex in self.operator_indices])
 
-	def getType(self):
-		return self.types[self.type_index]
+	def getDamageDropoffBorders(self):
+		lastInitialDamageIndex = -1
+		firstEndDamageIndex = -1
+		
+		for i in range(len(self.damages)):
+			if self.damages[i] == self.damages[0]:
+				lastInitialDamageIndex = i
+			elif self.damages[i] == self.damages[-1]:
+				firstEndDamageIndex = i
+				break
 
-	def getRPM(self):
-		return self.rpm
-	def getRPS(self):
-		return float(self.rpm) / 60.
-	def getRPMS(self):
-		return float(self.rpm) / 60000.
+		return (lastInitialDamageIndex, firstEndDamageIndex)
 
-	def getDPS(self):
-		return self.damages * self.getRPS()
-
-	def getSTDOK(self, hp : int):
-		return numpy.ceil(hp / self.damages).astype(numpy.int32)
-
-	def getTTDOK(self, hp : int):
-		return self.getSTDOK(hp) / self.getRPMS()
-	
-	def getStyleAlign(self):
-	    return self.stylesAlign[self.type_index]
-	def getStyleNoAlign(self):
-	    return self.stylesNoAlign[self.type_index]
+	def getStyle(self, index : int):
+		lastInitialDamageIndex, firstEndDamageIndex = self.getDamageDropoffBorders()
+		if index <= lastInitialDamageIndex:
+			return self.getStyleABF()
+		elif index >= firstEndDamageIndex:
+			return self.getStyleABF()
+		else:
+			return self.getStyleAB()
+	def getStyleABF(self):
+	    return self.stylesABF[self.type_index]
+	def getStyleBF(self):
+	    return self.stylesBF[self.type_index]
+	def getStyleAB(self):
+	    return self.stylesAB[self.type_index]
 
 def deserialize_json(file_name : str):
 	with open(file_name, "r") as file:
@@ -312,6 +359,8 @@ def safe_to_csv_file(weapons : list[Weapon]) -> None:
 
 def safe_to_xlsx_file(weapons : list[Weapon]):
 	""" https://openpyxl.readthedocs.io/en/stable/ """
+	file_path = os.path.join(os.path.dirname(os.path.realpath(__file__)), "R6S-Weapon-Statistics.xlsx")
+	worksheet_title = "Operation Dread Factor"
 
 	weapons = sorted(weapons, key=lambda x: x.getType(), reverse=False)	
 
@@ -322,42 +371,83 @@ def safe_to_xlsx_file(weapons : list[Weapon]):
 	worksheet = workbook.active
 	
 	# set the worksheet title
-	worksheet.title = "Operation Dread Factor"
-	workbook.create_sheet("Charts")
-	
-	worksheet.cell(row=1, column=1).value = "created by hanslhansl"
-	worksheet.cell(row=2, column=1).value = "For a detailed explanation see https://github.com/hanslhansl/R6S-Weapon-Statistics"
+	worksheet.title = worksheet_title
+	#workbook.create_sheet("Charts")
 
-	worksheet.cell(row=4, column=1).value = "Damage over distance"
+	row = 1
+	worksheet.merge_cells(start_row=row, end_row=row, start_column=1, end_column=1 + len(Weapon.distances) + 2)
+	worksheet.cell(row=row, column=1).value = "created by hanslhansl"
 	
-	worksheet.cell(row=5, column=1).value = "Distance"
+	row += 1
+	worksheet.merge_cells(start_row=row, end_row=row, start_column=1, end_column=1 + len(Weapon.distances) + 2)
+	worksheet.cell(row=row, column=1).value = "For a detailed explanation see https://github.com/hanslhansl/R6S-Weapon-Statistics"
+
+	row += 2
+	worksheet.merge_cells(start_row=row, end_row=row, start_column=1, end_column=1 + len(Weapon.distances) + 2)
+	worksheet.cell(row=row, column=1).value = "Damage over distance"
+	row += 1
+	worksheet.cell(row=row, column=1).value = "Distance"
 	for col in range(len(Weapon.distances)):
-		c = worksheet.cell(row=5, column=col + 2)
+		c = worksheet.cell(row=row, column=col + 2)
 		c.value = Weapon.distances[col]
 		c.alignment = Weapon.alignment
-	c = worksheet.cell(row=5, column=col + 4)
+	c = worksheet.cell(row=row, column=col + 4)
 	c.value = "RPM"
 	c.alignment = Weapon.alignment
-
-	for i in range(len(weapons)):
-		weapon = weapons[i]
+	for weapon in weapons:
 		damages = weapon.damages
-		row = 6 + i
+		row += 1
 		c = worksheet.cell(row=row, column=1)
-		c.value = weapon.name
-		c.style = weapon.getStyleNoAlign()
+		c.value, c.style = weapon.getName()
 		for col in range(len(damages)):
 			c = worksheet.cell(row=row, column=col + 2)
-			c.value = damages[col]
-			c.style = weapon.getStyleAlign()
-		c = worksheet.cell(row=row, column=col + 4)
-		c.value = weapon.getRPM()
-		c.style = weapon.getStyleAlign()
-		
+			c.value, c.style = weapon.getDamage(col)			
 
+		c = worksheet.cell(row=row, column=col + 4)
+		c.value, c.style = weapon.getRPM()
+
+	row += 2
+	worksheet.merge_cells(start_row=row, end_row=row, start_column=1, end_column=1 + len(Weapon.distances) + 2)
+	worksheet.cell(row=row, column=1).value = "Damage per second"
+	row += 1
+	worksheet.cell(row=row, column=1).value = "Distance"
+	for col in range(len(Weapon.distances)):
+		c = worksheet.cell(row=row, column=col + 2)
+		c.value = Weapon.distances[col]
+		c.alignment = Weapon.alignment
+	c = worksheet.cell(row=row, column=col + 4)
+	c.value = "RPM"
+	c.alignment = Weapon.alignment
+	for weapon in weapons:
+		row += 1
+		c = worksheet.cell(row=row, column=1)
+		c.value, c.style = weapon.getName()
+		for col in range(len(Weapon.distances)):
+			c = worksheet.cell(row=row, column=col + 2)
+			c.value, c.style = weapon.getDPS(col)
+		c = worksheet.cell(row=row, column=col + 4)
+		c.value, c.style = weapon.getRPM()
+
+	# resize columns
+	worksheet.column_dimensions[get_column_letter(1)].width = 18
+	for i in range(2, len(Weapon.distances) + 4):
+		worksheet.column_dimensions[get_column_letter(i)].width = 5
+	#worksheet.column_dimensions[get_column_letter(len(Weapon.distances) + 3)].width = 18
+		
 	# save to file
-	workbook.save("R6S-Weapon-Statistics.xlsx")
+	workbook.save(file_path)
+	
+	# resize columns
+	"""excel = Dispatch('Excel.Application')
+	wb = excel.Workbooks.Open(file_path)
+	excel.Worksheets(1).Activate()
+	excel.ActiveSheet.Columns.AutoFit()
+	wb.Save()
+	wb.Close()
+	excel.Quit()"""
+
 	return
+
 
 weapons = get_weapons_dict()
 safe_to_xlsx_file(weapons)
