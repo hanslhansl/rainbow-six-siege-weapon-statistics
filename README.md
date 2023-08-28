@@ -33,4 +33,4 @@ For a target with $x$ hp the TTDOK in milliseconds calculate as ${STDOK \over rp
 ## Bullets per shot - Pellet count
 The shooting range displays the bullets per shot. Most weapons shoot exactly one bullet per shot. The only exception are shotguns, most of which shoot 8 bullets per shot. For weapons that shoot multiple bullets per shot this metric is also called pellet count.
 ## Magazine capacity
-Most weapons have one bullet loaded in the chamber. For those this value is displayed as $Capacity+1$ (e.g. $30+1$, $20+1$, etc.). For all other weapons it is displayed as $Capacity+0$ (e.g. $100+0$, $80+0$). soon (tm)
+Most weapons have, in addition to the bullets loaded in the magazine, one bullet loaded in the chamber. For those this value is displayed as $Capacity+1$ (e.g. $30+1$, $20+1$, etc.). For all other weapons it is displayed as $Capacity+0$ (e.g. $100+0$, $80+0$). soon (tm)
