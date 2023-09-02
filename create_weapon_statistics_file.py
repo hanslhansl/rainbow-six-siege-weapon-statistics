@@ -207,31 +207,31 @@ class Weapon:
 		if self.rpm == 0:
 			return "", style
 		else:
-			return str(self.rpm), style
+			return self.rpm, style
 	def getRPS(self):
 		style = self.getStyleABF()
 		if self.rpm == 0:
 			return "", style
 		else:
-			return str(self.rpm / 60.), style
+			return self.rpm / 60., style
 	def getRPMS(self):
 		style = self.getStyleABF()
 		if self.rpm == 0:
 			return "", style
 		else:
-			return str(self.rpm / 60000.), style
+			return self.rpm / 60000., style
 	def getDamage(self, index : int):
 		style = self.getStyle(index)
 		if self.damages[index] == 0:
 			return "", style
 		else:
-			return str(self.damages[index]), style
+			return self.damages[index], style
 	def getDPS(self, index : int):
 		style = self.getStyle(index)
 		if self.damages[index] == 0 or self.rpm == 0:
 			return "", style
 		else:
-			return str(round(self.damages[index] * self.rpm / 60.)), style
+			return round(self.damages[index] * self.rpm / 60.), style
 	def getSTDOK(self, index : int, hp : int):
 		return math.ceil(hp / self.damages[index])
 	def getTTDOK(self, index : int, hp : int):
@@ -262,11 +262,11 @@ class Weapon:
 		else:
 			return self.getStyleAB()
 	def getStyleABF(self):
-	    return self.stylesABF[self.type_index]
+		return self.stylesABF[self.type_index]
 	def getStyleBF(self):
-	    return self.stylesBF[self.type_index]
+		return self.stylesBF[self.type_index]
 	def getStyleAB(self):
-	    return self.stylesAB[self.type_index]
+		return self.stylesAB[self.type_index]
 
 def deserialize_json(file_name : str):
 	with open(file_name, "r") as file:
@@ -429,22 +429,13 @@ def safe_to_xlsx_file(weapons : list[Weapon]):
 		c.value, c.style = weapon.getRPM()
 
 	# resize columns
-	worksheet.column_dimensions[get_column_letter(1)].width = 18
-	for i in range(2, len(Weapon.distances) + 4):
-		worksheet.column_dimensions[get_column_letter(i)].width = 5
+	#worksheet.column_dimensions[get_column_letter(1)].width = 18
+	#for i in range(2, len(Weapon.distances) + 4):
+	#	worksheet.column_dimensions[get_column_letter(i)].width = 5
 	#worksheet.column_dimensions[get_column_letter(len(Weapon.distances) + 3)].width = 18
 		
 	# save to file
 	workbook.save(file_path)
-	
-	# resize columns
-	"""excel = Dispatch('Excel.Application')
-	wb = excel.Workbooks.Open(file_path)
-	excel.Worksheets(1).Activate()
-	excel.ActiveSheet.Columns.AutoFit()
-	wb.Save()
-	wb.Close()
-	excel.Quit()"""
 
 	return
 
