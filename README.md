@@ -31,6 +31,8 @@ For a target with $x$ hp the STDOK calculate as $\lceil {x \over Damage} \rceil$
 ## Time to down or kill - TTDOK
 For a target with $x$ hp the TTDOK in milliseconds calculate as ${STDOK \over rpms}$. No measuring necessary.
 ## Bullets per shot - Pellet count
-The shooting range displays the bullets per shot. Most weapons shoot exactly one bullet per shot. The only exception are shotguns, most of which shoot 8 bullets per shot. For weapons that shoot multiple bullets per shot this metric is also called pellet count. All other statistics are per pellet. This means that for a shotgun that deals 50 damage and has 8 pellets the actual damage per shot is $50 * 8 = 400$.
+This value is displayed in the shooting range. Most weapons shoot exactly one bullet per shot. The only exception are shotguns, most of which shoot 8 bullets per shot. For shotguns this metric is also called pellet count.
+
+It should be noted that all other statistics are per pellet. This means that for a shotgun that deals 50 damage and shoots 8 pellets per shot the actual damage per shot is $50 * 8 = 400$.
 ## Magazine capacity
-Most weapons have, in addition to the bullets loaded in the magazine, one bullet loaded in the chamber. For those weapons this value is displayed as $Capacity+1$ (e.g. $30+1$, $20+1$, etc.). For all other weapons without a bullet loaded in the chamber this value is displayed as $Capacity+0$ (e.g. $100+0$, $80+0$). soon (tm)
+Most weapons have, in addition to the bullets loaded in the magazine, one bullet loaded in the chamber. For those weapons this value is displayed as $Capacity+1$ (e.g. $30+1$, $20+1$, etc.). For all other weapons without a bullet loaded in the chamber this value is displayed as $Capacity+0$ (e.g. $100+0$, $80+0$).
