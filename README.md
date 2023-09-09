@@ -1,7 +1,5 @@
 #  R6S Weapon Statistics
-Provides detailed statistics for all weapons in Tom Clancy's Rainbow Six Siege. This includes the weapon's damage at distances up to 40 meters, fire rate, damage per second, shots to down or kill, reload time and ADS time. All data was collected during operation Dread Factor. A spreadsheet of the important stats can be found [here](https://docs.google.com/spreadsheets/d/1QgbGALNZGLlvf6YyPLtywZnvgIHkstCwGl1tvCt875Q/edit?usp=sharing).
-
-Currently a few damage stats are still missing. I am waiting for the release of operation Heavy Mettle to collect the missing stats as shotgun damage will change drastically with that patch.
+Provides detailed statistics for all weapons in Tom Clancy's Rainbow Six Siege. This includes the weapon's damage at distances up to 40 meters, fire rate, damage per second, shots to down or kill, reload time and ADS time. All data was collected during operation Dread Factor and Heavy Mettle. A spreadsheet of the important stats can be found [here](https://docs.google.com/spreadsheets/d/1QgbGALNZGLlvf6YyPLtywZnvgIHkstCwGl1tvCt875Q/edit?usp=sharing).
 # About how the data is collected
 Generally speaking I am trying to collect as much of the data myself and by hand because Ubisoft has proven to be an unreliable source for statistics. At the same time I am trying cut corners where possible.
 ## Time measuring
@@ -31,6 +29,8 @@ For a target with $x$ hp the STDOK calculate as $\lceil {x \over Damage} \rceil$
 ## Time to down or kill - TTDOK
 For a target with $x$ hp the TTDOK in milliseconds calculate as ${STDOK \over rpms}$. No measuring necessary.
 ## Bullets per shot - Pellet count
-The shooting range displays the bullets per shot. Most weapons shoot exactly one bullet per shot. The only exception are shotguns, most of which shoot 8 bullets per shot. For weapons that shoot multiple bullets per shot this metric is also called pellet count.
+This value is displayed in the shooting range. Most weapons shoot exactly one bullet per shot. The only exception are shotguns, most of which shoot 8 bullets per shot. For shotguns this metric is also called pellet count.
+
+It should be noted that all other statistics are per pellet. This means that for a shotgun that deals 50 damage and shoots 8 pellets per shot the actual damage per shot is $50 * 8 = 400$.
 ## Magazine capacity
-Most weapons have, in addition to the bullets loaded in the magazine, one bullet loaded in the chamber. For those weapons this value is displayed as $Capacity+1$ (e.g. $30+1$, $20+1$, etc.). For all other weapons without a bullet loaded in the chamber this value is displayed as $Capacity+0$ (e.g. $100+0$, $80+0$). soon (tm)
+Most weapons have, in addition to the bullets loaded in the magazine, one bullet loaded in the chamber. For those weapons this value is displayed as $Capacity+1$ (e.g. $30+1$, $20+1$, etc.). For all other weapons without a bullet loaded in the chamber this value is displayed as $Capacity+0$ (e.g. $100+0$, $80+0$).
