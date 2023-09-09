@@ -22,7 +22,7 @@ last_distance = 40
 weapon_types = ("AR", "SMG", "LMG", "DMR", "SG", "Pistol", "MP", "Else")
 
 # weapon type background colors
-background_colors = ("A4C2F4", "D5A6BD", "D0E0E3", "B4A7D6", "B6D7A8", "FFE599", "CDCDCD", "FABF8F")
+background_colors = ("84ADF0", "C482A3", "8EB4BC", "A08FCB", "94C37F", "FFD45B", "B8B8B8", "F79F57")
 
 
 ###################################################
@@ -43,6 +43,7 @@ sys.excepthook = show_exception_and_exit
 import os, numpy, json, typing, math, ctypes
 from openpyxl import Workbook
 from openpyxl.styles import PatternFill, Border, Alignment, NamedStyle, Side
+from openpyxl.formatting.rule import ColorScaleRule
 from openpyxl.utils import get_column_letter
 from win32com.client import Dispatch
 
@@ -96,15 +97,7 @@ class Weapon:
 	
 	alignment = Alignment("center", "center")
 	border_color = "FF8CA5D0"
-	
-	border = Border(left=Side(border_style=border_style,
-                          color=border_color),
-                right=Side(border_style=border_style,
-                           color=border_color),
-                top=Side(border_style=border_style,
-                         color=border_color),
-                bottom=Side(border_style=border_style,
-                            color=border_color))
+
 	borders = [Border(
 				left = Side(border_style=border_style, color=color_to_border_color(background_colors[i])),
                 right=Side(border_style=border_style, color=color_to_border_color(background_colors[i])),
@@ -113,10 +106,14 @@ class Weapon:
 				) for i in range(len(types))]
 	fills = [PatternFill(fgColor=background_colors[i], fill_type = "solid") for i in range(len(types))]
 	
-	stylesABF = (lambda t=types, a=alignment, b=borders, f=fills: [NamedStyle(name=t[i] + " ABF", alignment = a, border=b[i], fill=f[i]) for i in range(len(t))])()
+	stylesABF = (lambda t=types, a=alignment, b=borders, f=fills: [NamedStyle(name=t[i] + " ABF", alignment=a, border=b[i], fill=f[i]) for i in range(len(t))])()
 	stylesBF = (lambda t=types, b=borders, f=fills: [NamedStyle(name=t[i] + " BF", border=b[i], fill=f[i]) for i in range(len(t))])()
-	stylesAB = NamedStyle(name="AB", alignment=alignment)#, border=border
+	stylesAB = (lambda t=types, a=alignment, b=borders: [NamedStyle(name=t[i] + " AB", alignment=a, border=b[i]) for i in range(len(t))])()
+	stylesA = NamedStyle(name="AB", alignment=alignment)
 	
+	start_values : dict[int, dict[str, typing.Any]] = {}
+	end_values : dict[int, dict[str, typing.Any]] = {}
+
 	default_rpm = 0
 	default_ads = 0.
 	default_pellets = 0
@@ -269,6 +266,55 @@ class Weapon:
 
 		# save the damage stats
 		self.damages = tuple(damages)
+		
+		if self.type_index not in Weapon.start_values:
+			Weapon.start_values[self.type_index] = {}
+		if self.type_index not in Weapon.end_values:
+			Weapon.end_values[self.type_index] = {}
+
+		stat_name = "Damage per bullet"
+		if stat_name not in Weapon.start_values[self.type_index]:
+			Weapon.start_values[self.type_index][stat_name] = min(self.damages)
+		else:
+			Weapon.start_values[self.type_index][stat_name] = min(Weapon.start_values[self.type_index][stat_name], min(self.damages))
+		if stat_name not in Weapon.end_values[self.type_index]:
+			Weapon.end_values[self.type_index][stat_name] = max(self.damages)
+		else:
+			Weapon.end_values[self.type_index][stat_name] = max(Weapon.end_values[self.type_index][stat_name], max(self.damages))
+			
+		stat_name = "Damage per bullet per second"
+		DPS = tuple([self.getDPS(i)[0] for i in range(len(Weapon.distances))])
+		if stat_name not in Weapon.start_values[self.type_index]:
+			Weapon.start_values[self.type_index][stat_name] = min(DPS)
+		else:
+			Weapon.start_values[self.type_index][stat_name] = min(Weapon.start_values[self.type_index][stat_name], min(DPS))
+		if stat_name not in Weapon.end_values[self.type_index]:
+			Weapon.end_values[self.type_index][stat_name] = max(DPS)
+		else:
+			Weapon.end_values[self.type_index][stat_name] = max(Weapon.end_values[self.type_index][stat_name], max(DPS))
+			
+		stat_name = "Damage per shot (relevant for shotguns)"
+		DamagePerShot = tuple([self.getDamagePerShot(i)[0] for i in range(len(Weapon.distances))])
+		if stat_name not in Weapon.start_values[self.type_index]:
+			Weapon.start_values[self.type_index][stat_name] = min(DamagePerShot)
+		else:
+			Weapon.start_values[self.type_index][stat_name] = min(Weapon.start_values[self.type_index][stat_name], min(DamagePerShot))
+		if stat_name not in Weapon.end_values[self.type_index]:
+			Weapon.end_values[self.type_index][stat_name] = max(DamagePerShot)
+		else:
+			Weapon.end_values[self.type_index][stat_name] = max(Weapon.end_values[self.type_index][stat_name], max(DamagePerShot))
+			
+		stat_name = "Damage per shot per second (relevant for shotguns)"
+		DamagePerShotPerSecond = tuple([self.getDamagePerShotPerSecond(i)[0] for i in range(len(Weapon.distances))])
+		if stat_name not in Weapon.start_values[self.type_index]:
+			Weapon.start_values[self.type_index][stat_name] = min(DamagePerShotPerSecond)
+		else:
+			Weapon.start_values[self.type_index][stat_name] = min(Weapon.start_values[self.type_index][stat_name], min(DamagePerShotPerSecond))
+		if stat_name not in Weapon.end_values[self.type_index]:
+			Weapon.end_values[self.type_index][stat_name] = max(DamagePerShotPerSecond)
+		else:
+			Weapon.end_values[self.type_index][stat_name] = max(Weapon.end_values[self.type_index][stat_name], max(DamagePerShotPerSecond))
+		
 		return
 
 
@@ -285,7 +331,7 @@ class Weapon:
 	def getDamage(self, index : int):
 		return self.damages[index], self.getStyle(index)
 	def getDPS(self, index : int):
-		return round(self.damages[index] * self.rpm / 60.), self.getStyle(index)
+		return round(self.damages[index] * self.rpm / 60.), self.getStyleAB()
 	def getSTDOK(self, index : int, hp : int):
 		return math.ceil(hp / self.damages[index])
 	def getTTDOK(self, index : int, hp : int):
@@ -296,14 +342,14 @@ class Weapon:
 		return str(self.reloadTimes[0]), str(self.reloadTimes[1]), self.getStyleABF()
 	def getPellets(self):
 		if self.pellets == 1:
-			return "", self.getStyleAB()
+			return "", self.getStyleA()
 		else:
 			return self.pellets, self.getStyleABF()
 	def getDamagePerShot(self, index : int):
 		return self.damages[index] * self.pellets, self.getStyle(index)
 	def getDamagePerShotPerSecond(self, index : int):
-		dps, style = self.getDPS(index)
-		return dps * self.pellets, style
+		dps, _ = self.getDPS(index)
+		return dps * self.pellets, self.getStyleAB()
 	def getADSTime(self):
 		return str(self.ads), self.getStyleABF()
 
@@ -330,13 +376,16 @@ class Weapon:
 		elif index >= firstEndDamageIndex:
 			return self.getStyleABF()
 		else:
-			return self.getStyleAB()
+			return self.getStyleA()
 	def getStyleABF(self):
 		return self.stylesABF[self.type_index]
+	def getStyleAB(self):
+		return self.stylesAB[self.type_index]
 	def getStyleBF(self):
 		return self.stylesBF[self.type_index]
-	def getStyleAB(self):
-		return self.stylesAB
+	def getStyleA(self):
+		return self.stylesA
+
 
 def deserialize_json(file_name : str):
 	with open(file_name, "r") as file:
@@ -406,9 +455,9 @@ def get_weapons_dict() -> list[Weapon]:
 	
 	return weapons
 
-def add_stat_to_worksheet(worksheet, weapons : list[Weapon], stats_name, stat_method, row):
+def add_stat_to_worksheet(worksheet, weapons : list[Weapon], stat_name, stat_method, row):
 	worksheet.merge_cells(start_row=row, end_row=row, start_column=1, end_column=1 + len(Weapon.distances))
-	worksheet.cell(row=row, column=1).value = stats_name
+	worksheet.cell(row=row, column=1).value = stat_name
 	row += 1
 	worksheet.cell(row=row, column=1).value = "Distance"
 	for col in range(2, len(Weapon.distances) + 2):
@@ -456,7 +505,7 @@ def add_stat_to_worksheet(worksheet, weapons : list[Weapon], stats_name, stat_me
 	# c.alignment = Weapon.alignment
 	
 	for weapon in weapons:
-		row += 1	
+		row += 1
 
 		c = worksheet.cell(row=row, column=1)
 		c.value, c.style = weapon.getName()
@@ -464,6 +513,17 @@ def add_stat_to_worksheet(worksheet, weapons : list[Weapon], stats_name, stat_me
 		for col in range(2, len(Weapon.distances) + 2):
 			c = worksheet.cell(row=row, column=col)
 			c.value, c.style = stat_method(weapon, col - 2)
+
+		if stat_name in ("Damage per bullet per second", "Damage per shot per second (relevant for shotguns)"):
+			end_color = background_colors[weapon.type_index]
+			start_color = "FFFFFF"
+
+			start_value = Weapon.start_values[weapon.type_index][stat_name]
+			end_value = Weapon.end_values[weapon.type_index][stat_name]
+			mid_value = (start_value + end_value) / 2
+			color_rule = ColorScaleRule(start_type="num", start_value=start_value, start_color=start_color,
+										end_type="num", end_value=end_value, end_color=end_color)
+			worksheet.conditional_formatting.add(f"{get_column_letter(2)}{row}:{get_column_letter(len(Weapon.distances)+2)}{row}", color_rule)
 
 		col += 2
 		c = worksheet.cell(row=row, column=col)
@@ -524,7 +584,7 @@ def safe_to_xlsx_file(weapons):
 
 	row += 2
 	row = add_stat_to_worksheet(worksheet, weapons, "Damage per bullet per second", Weapon.getDPS, row)
-	
+
 	row += 2
 	row = add_stat_to_worksheet(worksheet, weapons, "Damage per shot (relevant for shotguns)", Weapon.getDamagePerShot, row)
 
