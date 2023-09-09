@@ -22,7 +22,8 @@ last_distance = 40
 weapon_types = ("AR", "SMG", "LMG", "DMR", "SG", "Pistol", "MP", "Else")
 
 # weapon type background colors
-background_colors = ("A4C2F4", "D5A6BD", "B4A7D6", "B6D7A8", "D0E0E3", "FFE599", "EA9999", "B7B7B7")
+background_colors = ("A4C2F4", "D5A6BD", "D0E0E3", "B4A7D6", "B6D7A8", "FFE599", "CDCDCD", "FABF8F")
+
 
 ###################################################
 # settings end
@@ -39,8 +40,7 @@ def show_exception_and_exit(exc_type, exc_value, tb):
 sys.excepthook = show_exception_and_exit
 
 #imports
-from calendar import c
-import os, numpy, json, typing, math
+import os, numpy, json, typing, math, ctypes
 from openpyxl import Workbook
 from openpyxl.styles import PatternFill, Border, Alignment, NamedStyle, Side
 from openpyxl.utils import get_column_letter
@@ -58,6 +58,36 @@ if not 0 <= first_distance:
 if not first_distance <= last_distance:
 	raise Exception(f"'last_distance' must be >='first_distance'={first_distance} but is {last_distance}.")
 
+kernel32 = ctypes.windll.kernel32
+kernel32.SetConsoleMode(kernel32.GetStdHandle(-11), 7)
+message = "\x1b[38;2;83;141;213mMessage:\033[0m"
+warning = "\x1b[38;2;255;255;0mWarning:\033[0m"
+exception = "\x1b[38;2;255;0;0mException:\033[0m"
+
+def color_to_border_color(s : str):
+	r, g, b = int(s[0:2], 16) / 0xFF, int(s[2:4], 16) / 0xFF, int(s[4:6], 16) / 0xFF
+    
+	r = pow(r, 2.2)
+	g = pow(g, 2.2)
+	b = pow(b, 2.2)
+
+	mult = 0.65
+
+	r = r * mult
+	g = g * mult
+	b = b * mult
+
+	r = pow(r, 1/2.2)
+	g = pow(g, 1/2.2)
+	b = pow(b, 1/2.2)
+
+	r = int(r * 0xFF)
+	g = int(g * 0xFF)
+	b = int(b * 0xFF)
+
+	return hex(r)[2:] + hex(g)[2:] + hex(b)[2:]
+
+border_style = "thin"
 
 class Weapon:
 	types = weapon_types
@@ -65,18 +95,33 @@ class Weapon:
 	distances = numpy.array([i for i in range(first_distance, last_distance+1)], numpy.int32)
 	
 	alignment = Alignment("center", "center")
-	border = Border(left=Side(border_style='thin',
-                          color='FF8CA5D0'),
-                right=Side(border_style='thin',
-                           color='FF8CA5D0'),
-                top=Side(border_style='thin',
-                         color='FF8CA5D0'),
-                bottom=Side(border_style='thin',
-                            color='FF8CA5D0'))
+	border_color = "FF8CA5D0"
+	
+	border = Border(left=Side(border_style=border_style,
+                          color=border_color),
+                right=Side(border_style=border_style,
+                           color=border_color),
+                top=Side(border_style=border_style,
+                         color=border_color),
+                bottom=Side(border_style=border_style,
+                            color=border_color))
+	borders = [Border(
+				left = Side(border_style=border_style, color=color_to_border_color(background_colors[i])),
+                right=Side(border_style=border_style, color=color_to_border_color(background_colors[i])),
+                top=Side(border_style=border_style, color=color_to_border_color(background_colors[i])),
+                bottom=Side(border_style=border_style, color=color_to_border_color(background_colors[i]))
+				) for i in range(len(types))]
 	fills = [PatternFill(fgColor=background_colors[i], fill_type = "solid") for i in range(len(types))]
-	stylesABF = (lambda t=types, a=alignment, b=border, f=fills: [NamedStyle(name=t[i] + " ABF", alignment = a, border=b, fill=f[i]) for i in range(len(t))])()
-	stylesBF = (lambda t=types, b=border, f=fills: [NamedStyle(name=t[i] + " BF", border=b, fill=f[i]) for i in range(len(t))])()
-	stylesAB = (lambda t=types, a=alignment, b=border: [NamedStyle(name=t[i] + " AB", alignment = a, border=b) for i in range(len(t))])()
+	
+	stylesABF = (lambda t=types, a=alignment, b=borders, f=fills: [NamedStyle(name=t[i] + " ABF", alignment = a, border=b[i], fill=f[i]) for i in range(len(t))])()
+	stylesBF = (lambda t=types, b=borders, f=fills: [NamedStyle(name=t[i] + " BF", border=b[i], fill=f[i]) for i in range(len(t))])()
+	stylesAB = NamedStyle(name="AB", alignment=alignment)#, border=border
+	
+	default_rpm = 0
+	default_ads = 0.
+	default_pellets = 0
+	default_reloadTimes = (0., 0.)
+	default_capacity = (0, 0)
 
 	def __init__(self, name_ : str, json_content):
 		self.name = name_
@@ -89,6 +134,7 @@ class Weapon:
 		self.reloadTimes : tuple[float, float]	# time in seconds
 		self.ads : float	# time in seconds
 		self.pellets : int
+		self.capacity : tuple[int, int]	# (magazine, chamber)
 
 		if type(json_content) != dict:
 			raise Exception(f"Weapon '{self.name}' doesn't deserialize to a dict.") from None
@@ -103,37 +149,58 @@ class Weapon:
 		self.type_index = self.types.index(json_content["type"])
 		
 		# get weapon fire rate
-		if "rpm" not in json_content:
-			raise Exception(f"Weapon '{self.name}' is missing a fire rate.") from None
-		if type(json_content["rpm"]) != int:
-			raise Exception(f"Weapon '{self.name}' has a fire rate that doesn't deserialize to an int.") from None
-		self.rpm = json_content["rpm"]
+		if "rpm" in json_content:
+			if type(json_content["rpm"]) != int:
+				raise Exception(f"Weapon '{self.name}' has a fire rate that doesn't deserialize to an int.") from None
+			self.rpm = json_content["rpm"]
+		else:
+			print(f"{warning} Weapon '{self.name}' is missing a fire rate. Using default value instead.")
+			self.rpm = self.default_rpm
 		
 		# get weapon ads time
-		if "ads" not in json_content:
-			raise Exception(f"Weapon '{self.name}' is missing an ads time.") from None
-		if type(json_content["ads"]) != float:
-			raise Exception(f"Weapon '{self.name}' has an ads time that doesn't deserialize to a float.") from None
-		self.ads = json_content["ads"]
+		if "ads" in json_content:
+			if type(json_content["ads"]) != float:
+				raise Exception(f"Weapon '{self.name}' has an ads time that doesn't deserialize to a float.") from None
+			self.ads = json_content["ads"]
+		else:
+			print(f"{warning} Weapon '{self.name}' is missing an ads time. Using default value instead.")
+			self.ads = self.default_ads
 
 		# get weapon pellet count
-		if "pellets" not in json_content:
-			raise Exception(f"Weapon '{self.name}' is missing a pellet count.") from None
-		if type(json_content["pellets"]) != int:
-			raise Exception(f"Weapon '{self.name}' has a pellet count that doesn't deserialize to an int.") from None
-		self.pellets = json_content["pellets"]
+		if "pellets" in json_content:
+			if type(json_content["pellets"]) != int:
+				raise Exception(f"Weapon '{self.name}' has a pellet count that doesn't deserialize to an integer.") from None
+			self.pellets = json_content["pellets"]
+		else:
+			print(f"{warning} Weapon '{self.name}' is missing a pellet count. Using default value instead.")
+			self.pellets = self.default_pellets
 		
 		# get weapon reload times
-		if "reloadTimes" not in json_content:
-			raise Exception(f"Weapon '{self.name}' is missing reload times.") from None
-		if type(json_content["reloadTimes"]) != list:
-			raise Exception(f"Weapon '{self.name}' has reload times that don't deserialize to a list.") from None
-		if len(json_content["reloadTimes"]) != 2:
-			raise Exception(f"Weapon '{self.name}' doesn't have exactly 2 reload times.") from None
-		if type(json_content["reloadTimes"][0]) != float or type(json_content["reloadTimes"][1]) != float:
-			raise Exception(f"Weapon '{self.name}' has reload times that don't deserialize to floats.") from None
-		self.reloadTimes = (json_content["reloadTimes"][0], json_content["reloadTimes"][1])
-		
+		if "reloadTimes" in json_content:
+			if type(json_content["reloadTimes"]) != list:
+				raise Exception(f"Weapon '{self.name}' has reload times that don't deserialize to a list.") from None
+			if len(json_content["reloadTimes"]) != 2:
+				raise Exception(f"Weapon '{self.name}' doesn't have exactly 2 reload times.") from None
+			if type(json_content["reloadTimes"][0]) != float or type(json_content["reloadTimes"][1]) != float:
+				raise Exception(f"Weapon '{self.name}' has reload times that don't deserialize to floats.") from None
+			self.reloadTimes = (json_content["reloadTimes"][0], json_content["reloadTimes"][1])
+		else:
+			print(f"{warning} Weapon '{self.name}' is missing the reload times. Using default value instead.")
+			self.reloadTimes = self.default_reloadTimes
+
+		# get weapon magazine capacity
+		if "capacity" in json_content:
+			if type(json_content["capacity"]) != list:
+				raise Exception(f"Weapon '{self.name}' has a magazine capacity that doesn't deserialize to a list.") from None
+			if len(json_content["capacity"]) != 2:
+				raise Exception(f"Weapon '{self.name}' doesn't have exactly 2 magazine capacity values.") from None
+			if type(json_content["capacity"][0]) != int or type(json_content["capacity"][1]) != int:
+				raise Exception(f"Weapon '{self.name}' has magazine capacities that don't deserialize to integers.") from None
+			self.capacity = (json_content["capacity"][0], json_content["capacity"][1])
+		else:
+			print(f"{warning} Weapon '{self.name}' is missing the magazine capacity. Using default value instead.")
+			self.capacity = self.default_capacity
+
 		# get weapon damages
 		if "damages" not in json_content:
 			raise Exception(f"Weapon '{self.name}' is missing damage values.") from None
@@ -158,7 +225,7 @@ class Weapon:
 		
 		#if Weapon.distances != distances:
 		if not numpy.array_equal(Weapon.distances, distances):
-			raise Exception(f"Weapon '{self.name}' has distance values that are not correct.")
+			raise Exception(f"Weapon '{self.name}' has incorrect distance values.")
 
 		# make sure damages only stagnates or decreases and zeros are surrounded by equal non-zero damages
 		# interpolate gaps. damages will be continuous in [5;40]
@@ -171,7 +238,7 @@ class Weapon:
 				
 			else:	# this damage value is given
 				if damages[i] > previous_real_damage and previous_real_damage != 0:
-					raise Exception(f"Weapon '{self.name}' has a damage increase from '{previous_real_damage}' to '{damages[i]}' at {Weapon.distances[i]}m.")
+					raise Exception(f"Weapon '{self.name}' has a damage increase from '{previous_real_damage}' to '{damages[i]}' at {Weapon.distances[i]}m.") from None
 				if previous_real_damage != 0 and previous_was_interpolated == True and damages[i] != previous_real_damage:
 					raise Exception(f"Tried to interpolate between two unequal damage values '{previous_real_damage}' and '{damages[i]}' at {Weapon.distances[i]}m for weapon '{self.name}'.") from None
 				
@@ -185,13 +252,20 @@ class Weapon:
 		if first_nonzero_index == 0:
 			pass	# no extrapolation needed
 		elif first_nonzero_index == -1:
-			raise Exception(f"This exception should not be triggerd. '{self.name}' has to be corrupted in a strange way.") from None
+			raise Exception(f"Weapon '{self.name}' has no damage values at all.") from None
 		else:
-			if damages[first_nonzero_index] == damages[first_nonzero_index+1] == damages[first_nonzero_index+2]:
-				for i in range(first_nonzero_index):
-					damages[i] = damages[first_nonzero_index]
+			if self.type_index == 4:	# special treatment for shotguns
+				if first_nonzero_index <= 5:
+					for i in range(first_nonzero_index):
+						damages[i] = damages[first_nonzero_index]
+				else:
+					raise Exception(f"Can't extrapolate first {first_nonzero_index} meters for shotgun '{self.name}'.") from None
 			else:
-				print(f"Warning: Can't extrapolate first {first_nonzero_index} meters for weapon '{self.name}'.")
+				if damages[first_nonzero_index] == damages[first_nonzero_index+1] == damages[first_nonzero_index+2]:
+					for i in range(first_nonzero_index):
+						damages[i] = damages[first_nonzero_index]
+				else:
+					raise Exception(f"Can't extrapolate first {first_nonzero_index} meters for weapon '{self.name}'.") from None
 
 		# save the damage stats
 		self.damages = tuple(damages)
@@ -201,42 +275,38 @@ class Weapon:
 	def getName(self):
 		return self.name, self.getStyleBF()
 	def getType(self):
-		return self.types[self.type_index]
+		return self.types[self.type_index], self.getStyleABF()
 	def getRPM(self):
-		style = self.getStyleABF()
-		if self.rpm == 0:
-			return "", style
-		else:
-			return self.rpm, style
+		return self.rpm, self.getStyleABF()
 	def getRPS(self):
-		style = self.getStyleABF()
-		if self.rpm == 0:
-			return "", style
-		else:
-			return self.rpm / 60., style
+		return self.rpm / 60., self.getStyleABF()
 	def getRPMS(self):
-		style = self.getStyleABF()
-		if self.rpm == 0:
-			return "", style
-		else:
-			return self.rpm / 60000., style
+		return self.rpm / 60000., self.getStyleABF()
 	def getDamage(self, index : int):
-		style = self.getStyle(index)
-		if self.damages[index] == 0:
-			return "", style
-		else:
-			return self.damages[index], style
+		return self.damages[index], self.getStyle(index)
 	def getDPS(self, index : int):
-		style = self.getStyle(index)
-		if self.damages[index] == 0 or self.rpm == 0:
-			return "", style
-		else:
-			return round(self.damages[index] * self.rpm / 60.), style
+		return round(self.damages[index] * self.rpm / 60.), self.getStyle(index)
 	def getSTDOK(self, index : int, hp : int):
 		return math.ceil(hp / self.damages[index])
 	def getTTDOK(self, index : int, hp : int):
 		return self.getSTDOK(index, hp) / self.getRPMS()[0]
-	
+	def getCapacity(self):
+		return str(self.capacity[0]) + "+" + str(self.capacity[1]), self.getStyleABF()
+	def getReloadTimes(self):
+		return str(self.reloadTimes[0]), str(self.reloadTimes[1]), self.getStyleABF()
+	def getPellets(self):
+		if self.pellets == 1:
+			return "", self.getStyleAB()
+		else:
+			return self.pellets, self.getStyleABF()
+	def getDamagePerShot(self, index : int):
+		return self.damages[index] * self.pellets, self.getStyle(index)
+	def getDamagePerShotPerSecond(self, index : int):
+		dps, style = self.getDPS(index)
+		return dps * self.pellets, style
+	def getADSTime(self):
+		return str(self.ads), self.getStyleABF()
+
 	def getOperators(self):
 		return tuple([self.operators[opIndex] for opIndex in self.operator_indices])
 
@@ -266,7 +336,7 @@ class Weapon:
 	def getStyleBF(self):
 		return self.stylesBF[self.type_index]
 	def getStyleAB(self):
-		return self.stylesAB[self.type_index]
+		return self.stylesAB
 
 def deserialize_json(file_name : str):
 	with open(file_name, "r") as file:
@@ -312,7 +382,7 @@ def get_operator_weapons(weapons : list[Weapon], file_name : str) -> None:
 		del weapon_operatorIndex_dict[weapon.name]
 
 	for fake_weapon_name in weapon_operatorIndex_dict:
-		print(f"Warning: Weapon '{fake_weapon_name}' found in file '{file_name}' is not an actual weapon.")
+		print(f"{warning} Weapon '{fake_weapon_name}' found in file '{file_name}' is not an actual weapon.")
 		
 	return
 
@@ -326,7 +396,7 @@ def get_weapons_dict() -> list[Weapon]:
 		if not extension == ".json":
 			continue
 		if name.startswith("_"):
-			print(f"Warning: Excluding weapon '{name}' because of _.")
+			print(f"{message} Excluding weapon '{name}' because of _.")
 			continue
 		
 		weapons.append(Weapon(name, deserialize_json(file_path)))
@@ -336,33 +406,100 @@ def get_weapons_dict() -> list[Weapon]:
 	
 	return weapons
 
-def safe_to_csv_file(weapons : list[Weapon]) -> None:
-	weapons_list = sorted(weapons, key=lambda x: x.getType(), reverse=False)
-
-	# combine the weapon stats into a single string
-	content : str = "Damage over distance\n"
-	content += "Distance" + csv_delimiter + csv_delimiter.join([str(distance) for distance in Weapon.distances]) + csv_delimiter + csv_delimiter + "RPM" + "\n"
-	for weapon in weapons_list:
-		content += weapon.name + csv_delimiter + csv_delimiter.join([str(damage) for damage in  weapon.damages]) + csv_delimiter + csv_delimiter + str(weapon.getRPM()) + "\n"
+def add_stat_to_worksheet(worksheet, weapons : list[Weapon], stats_name, stat_method, row):
+	worksheet.merge_cells(start_row=row, end_row=row, start_column=1, end_column=1 + len(Weapon.distances))
+	worksheet.cell(row=row, column=1).value = stats_name
+	row += 1
+	worksheet.cell(row=row, column=1).value = "Distance"
+	for col in range(2, len(Weapon.distances) + 2):
+		c = worksheet.cell(row=row, column=col)
+		c.value = Weapon.distances[col - 2]
+		c.alignment = Weapon.alignment
 		
-	content += "\nDamage per second\n"
-	content += "Distance" + csv_delimiter + csv_delimiter.join([str(distance) for distance in Weapon.distances]) + csv_delimiter + csv_delimiter + "RPM" + "\n"
-	for weapon in weapons_list:
-		content += weapon.name + csv_delimiter + csv_delimiter.join([str(round(dps)) for dps in weapon.getDPS()]) + csv_delimiter + csv_delimiter + str(weapon.getRPM()) + "\n"
+	col += 2
+	c = worksheet.cell(row=row, column=col)
+	c.value = "Type"
+	c.alignment = Weapon.alignment
+
+	col += 2
+	c = worksheet.cell(row=row, column=col)
+	c.value = "RPM"
+	c.alignment = Weapon.alignment
+
+	col += 1
+	c = worksheet.cell(row=row, column=col)
+	c.value = "Capacity"
+	c.alignment = Weapon.alignment
+	
+	col += 1
+	c = worksheet.cell(row=row, column=col)
+	c.value = "Pellets"
+	c.alignment = Weapon.alignment
+	
+	col += 2
+	c = worksheet.cell(row=row, column=col)
+	c.value = "ADS time"
+	c.alignment = Weapon.alignment	
+
+	# col += 1
+	# worksheet.merge_cells(start_row=row-1, end_row=row-1, start_column=col, end_column=col + 1)
+	# c = worksheet.cell(row=row-1, column=col)
+	# c.value = "Reload times"
+	# c.alignment = Weapon.alignment
+	
+	# c = worksheet.cell(row=row, column=col)
+	# c.value = "Tactical"
+	# c.alignment = Weapon.alignment
+	
+	# c = worksheet.cell(row=row, column=col + 1)
+	# c.value = "Full"
+	# c.alignment = Weapon.alignment
+	
+	for weapon in weapons:
+		row += 1	
+
+		c = worksheet.cell(row=row, column=1)
+		c.value, c.style = weapon.getName()
 		
-	# write the string to file
-	target_file_name = f"R6S-Weapon-Statistics.csv"
-	with open(target_file_name, "x") as target_file:
-		target_file.write(content)
+		for col in range(2, len(Weapon.distances) + 2):
+			c = worksheet.cell(row=row, column=col)
+			c.value, c.style = stat_method(weapon, col - 2)
 
-	return
+		col += 2
+		c = worksheet.cell(row=row, column=col)
+		c.value, c.style = weapon.getType()
+		
+		col += 2
+		c = worksheet.cell(row=row, column=col)
+		c.value, c.style = weapon.getRPM()
+		
+		col += 1
+		c = worksheet.cell(row=row, column=col)
+		c.value, c.style = weapon.getCapacity()
 
-def safe_to_xlsx_file(weapons : list[Weapon]):
+		col += 1
+		c = worksheet.cell(row=row, column=col)
+		c.value, c.style = weapon.getPellets()
+		
+		col += 2
+		c = worksheet.cell(row=row, column=col)
+		c.value, c.style = weapon.getADSTime()
+
+		# col += 1
+		# c1 = worksheet.cell(row=row, column=col)
+		# col += 1
+		# c2 = worksheet.cell(row=row, column=col)
+		# c1.value, c2.value, c1.style = weapon.getReloadTimes()
+		# c2.style = c1.style
+		
+	return row
+
+def safe_to_xlsx_file(weapons):
 	""" https://openpyxl.readthedocs.io/en/stable/ """
 	file_path = os.path.join(os.path.dirname(os.path.realpath(__file__)), "R6S-Weapon-Statistics.xlsx")
 	worksheet_title = "Operation Dread Factor"
 
-	weapons = sorted(weapons, key=lambda x: x.getType(), reverse=False)	
+	weapons : list[Weapon] = sorted(weapons, key=lambda x: x.type_index, reverse=False)	
 
 	# create the workbook
 	workbook = Workbook()
@@ -375,65 +512,25 @@ def safe_to_xlsx_file(weapons : list[Weapon]):
 	#workbook.create_sheet("Charts")
 
 	row = 1
-	worksheet.merge_cells(start_row=row, end_row=row, start_column=1, end_column=1 + len(Weapon.distances) + 2)
+	worksheet.merge_cells(start_row=row, end_row=row, start_column=1, end_column=1 + len(Weapon.distances))
 	worksheet.cell(row=row, column=1).value = "created by hanslhansl"
 	
 	row += 1
-	worksheet.merge_cells(start_row=row, end_row=row, start_column=1, end_column=1 + len(Weapon.distances) + 2)
+	worksheet.merge_cells(start_row=row, end_row=row, start_column=1, end_column=1 + len(Weapon.distances))
 	worksheet.cell(row=row, column=1).value = "For a detailed explanation see https://github.com/hanslhansl/R6S-Weapon-Statistics"
 
 	row += 2
-	worksheet.merge_cells(start_row=row, end_row=row, start_column=1, end_column=1 + len(Weapon.distances) + 2)
-	worksheet.cell(row=row, column=1).value = "Damage over distance"
-	row += 1
-	worksheet.cell(row=row, column=1).value = "Distance"
-	for col in range(len(Weapon.distances)):
-		c = worksheet.cell(row=row, column=col + 2)
-		c.value = Weapon.distances[col]
-		c.alignment = Weapon.alignment
-	c = worksheet.cell(row=row, column=col + 4)
-	c.value = "RPM"
-	c.alignment = Weapon.alignment
-	for weapon in weapons:
-		damages = weapon.damages
-		row += 1
-		c = worksheet.cell(row=row, column=1)
-		c.value, c.style = weapon.getName()
-		for col in range(len(damages)):
-			c = worksheet.cell(row=row, column=col + 2)
-			c.value, c.style = weapon.getDamage(col)			
-
-		c = worksheet.cell(row=row, column=col + 4)
-		c.value, c.style = weapon.getRPM()
+	row = add_stat_to_worksheet(worksheet, weapons, "Damage per bullet", Weapon.getDamage, row)
 
 	row += 2
-	worksheet.merge_cells(start_row=row, end_row=row, start_column=1, end_column=1 + len(Weapon.distances) + 2)
-	worksheet.cell(row=row, column=1).value = "Damage per second"
-	row += 1
-	worksheet.cell(row=row, column=1).value = "Distance"
-	for col in range(len(Weapon.distances)):
-		c = worksheet.cell(row=row, column=col + 2)
-		c.value = Weapon.distances[col]
-		c.alignment = Weapon.alignment
-	c = worksheet.cell(row=row, column=col + 4)
-	c.value = "RPM"
-	c.alignment = Weapon.alignment
-	for weapon in weapons:
-		row += 1
-		c = worksheet.cell(row=row, column=1)
-		c.value, c.style = weapon.getName()
-		for col in range(len(Weapon.distances)):
-			c = worksheet.cell(row=row, column=col + 2)
-			c.value, c.style = weapon.getDPS(col)
-		c = worksheet.cell(row=row, column=col + 4)
-		c.value, c.style = weapon.getRPM()
+	row = add_stat_to_worksheet(worksheet, weapons, "Damage per bullet per second", Weapon.getDPS, row)
+	
+	row += 2
+	row = add_stat_to_worksheet(worksheet, weapons, "Damage per shot (relevant for shotguns)", Weapon.getDamagePerShot, row)
 
-	# resize columns
-	#worksheet.column_dimensions[get_column_letter(1)].width = 18
-	#for i in range(2, len(Weapon.distances) + 4):
-	#	worksheet.column_dimensions[get_column_letter(i)].width = 5
-	#worksheet.column_dimensions[get_column_letter(len(Weapon.distances) + 3)].width = 18
-		
+	row += 2
+	row = add_stat_to_worksheet(worksheet, weapons, "Damage per shot per second (relevant for shotguns)", Weapon.getDamagePerShotPerSecond, row)
+	
 	# save to file
 	workbook.save(file_path)
 
@@ -443,4 +540,4 @@ def safe_to_xlsx_file(weapons : list[Weapon]):
 weapons = get_weapons_dict()
 safe_to_xlsx_file(weapons)
 
-input("\nCompleted!")
+print("\nCompleted!")

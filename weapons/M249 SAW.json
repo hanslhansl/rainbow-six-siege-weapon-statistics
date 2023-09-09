@@ -3,9 +3,9 @@
   "rpm": 650,
   "pellets": 1,
   "ads": 0.45,
-  "reloadTimes": [
-    0.0,
-    0.0
+  "capacity": [
+    60,
+    1
   ],
   "damages": {
     "0": 0,
