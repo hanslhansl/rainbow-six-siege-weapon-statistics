@@ -25,7 +25,7 @@ soon (tm)
 ## Aim down sight time - ADS time
 soon (tm)
 ## Damage per second - DPS
-The damage per second calculates as $DPS = Damage * RPS = Damage * RPM / 60$. No measuring necessary.
+The damage per second calculates as $DPS = DmgPerShot * RPS = DmgPerShot * RPM / 60$. No measuring necessary.
 ## Shots to down or kill - STDOK
 For a target with $x$ hp the STDOK calculate as $\lceil {x \over Damage} \rceil$. No measuring necessary.
 ## Time to down or kill - TTDOK
