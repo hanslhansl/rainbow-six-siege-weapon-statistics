@@ -19,11 +19,11 @@ first_distance = 0
 last_distance = 40 
 
 # weapon types
-weapon_types = ("AR", "SMG", "LMG", "DMR", "SG", "Pistol", "MP", "Else")
+weapon_types = ("AR", "SMG", "MP", "LMG", "DMR", "SG", "Pistol", "Else")
 
 # weapon type background colors
 background_colors = ("5083EA", "B6668E", "76A5AE", "8771BD", "7CB563", "FFBC01", "A3A3A3", "F48020")
-background_colors = ("5083EA", "B6668E", "76A5AE", "8771BD", "7CB563", "FFBC01", "A3A3A3", "F48020")
+background_colors = ("5083EA", "B6668E", "76A5AE", "8771BD", "7CB563", "FFD609", "A3A3A3", "F47220")
 
 
 ###################################################
@@ -144,7 +144,7 @@ class Weapon:
 		self._capacity = None	# (magazine, chamber)
 
 		if type(self.json_content) != dict:
-			raise Exception(f"Weapon '{self.name}' doesn't deserialize to a dict.") from None
+			raise Exception(f"Weapon '{self.name}' doesn't deserialize to a dict.")
 		
 		
 		if self.type_index not in Weapon.lowest_damage:
@@ -174,11 +174,11 @@ class Weapon:
 		if self._type_index == None:
 			# get weapon type
 			if "type" not in self.json_content:
-				raise Exception(f"Weapon '{self.name}' is missing a type.") from None
+				raise Exception(f"Weapon '{self.name}' is missing a type.")
 			if type(self.json_content["type"]) != str:
-				raise Exception(f"Weapon '{self.name}' has a type that doesn't deserialize to a string.") from None
+				raise Exception(f"Weapon '{self.name}' has a type that doesn't deserialize to a string.")
 			if self.json_content["type"] not in self.types:
-				raise Exception(f"Weapon '{self.name}' has an invalid type.") from None
+				raise Exception(f"Weapon '{self.name}' has an invalid type.")
 			self._type_index = self.types.index(self.json_content["type"])
 		
 		return self._type_index
@@ -188,7 +188,7 @@ class Weapon:
 			# get weapon fire rate
 			if "rpm" in self.json_content:
 				if type(self.json_content["rpm"]) != int:
-					raise Exception(f"Weapon '{self.name}' has a fire rate that doesn't deserialize to an int.") from None
+					raise Exception(f"Weapon '{self.name}' has a fire rate that doesn't deserialize to an int.")
 				self._rpm = self.json_content["rpm"]
 			else:
 				print(f"{warning('Warning:')} Weapon '{self.name}' is missing a {warning('fire rate')}. Using default value instead.")
@@ -201,7 +201,7 @@ class Weapon:
 			# get weapon ads time
 			if "ads" in self.json_content:
 				if type(self.json_content["ads"]) != float:
-					raise Exception(f"Weapon '{self.name}' has an ads time that doesn't deserialize to a float.") from None
+					raise Exception(f"Weapon '{self.name}' has an ads time that doesn't deserialize to a float.")
 				self._ads = self.json_content["ads"]
 			else:
 				print(f"{warning('Warning:')} Weapon '{self.name}' is missing an {warning('ads time')}. Using default value instead.")
@@ -214,7 +214,7 @@ class Weapon:
 			# get weapon pellet count
 			if "pellets" in self.json_content:
 				if type(self.json_content["pellets"]) != int:
-					raise Exception(f"Weapon '{self.name}' has a pellet count that doesn't deserialize to an integer.") from None
+					raise Exception(f"Weapon '{self.name}' has a pellet count that doesn't deserialize to an integer.")
 				self._pellets = self.json_content["pellets"]
 			else:
 				print(f"{warning('Warning:')} Weapon '{self.name}' is missing a {warning('pellet count')}. Using default value instead.")
@@ -227,11 +227,11 @@ class Weapon:
 			# get weapon reload times
 			if "reloadTimes" in self.json_content:
 				if type(self.json_content["reloadTimes"]) != list:
-					raise Exception(f"Weapon '{self.name}' has reload times that don't deserialize to a list.") from None
+					raise Exception(f"Weapon '{self.name}' has reload times that don't deserialize to a list.")
 				if len(self.json_content["reloadTimes"]) != 2:
-					raise Exception(f"Weapon '{self.name}' doesn't have exactly 2 reload times.") from None
+					raise Exception(f"Weapon '{self.name}' doesn't have exactly 2 reload times.")
 				if type(self.json_content["reloadTimes"][0]) != float or type(self.json_content["reloadTimes"][1]) != float:
-					raise Exception(f"Weapon '{self.name}' has reload times that don't deserialize to floats.") from None
+					raise Exception(f"Weapon '{self.name}' has reload times that don't deserialize to floats.")
 				self._reloadTimes = (self.json_content["reloadTimes"][0], self.json_content["reloadTimes"][1])
 			else:
 				print(f"{warning('Warning:')} Weapon '{self.name}' is missing the {warning('reload times')}. Using default value instead.")
@@ -244,11 +244,11 @@ class Weapon:
 			# get weapon magazine capacity
 			if "capacity" in self.json_content:
 				if type(self.json_content["capacity"]) != list:
-					raise Exception(f"Weapon '{self.name}' has a magazine capacity that doesn't deserialize to a list.") from None
+					raise Exception(f"Weapon '{self.name}' has a magazine capacity that doesn't deserialize to a list.")
 				if len(self.json_content["capacity"]) != 2:
-					raise Exception(f"Weapon '{self.name}' doesn't have exactly 2 magazine capacity values.") from None
+					raise Exception(f"Weapon '{self.name}' doesn't have exactly 2 magazine capacity values.")
 				if type(self.json_content["capacity"][0]) != int or type(self.json_content["capacity"][1]) != int:
-					raise Exception(f"Weapon '{self.name}' has magazine capacities that don't deserialize to integers.") from None
+					raise Exception(f"Weapon '{self.name}' has magazine capacities that don't deserialize to integers.")
 				self._capacity = (self.json_content["capacity"][0], self.json_content["capacity"][1])
 			else:
 				print(f"{warning('Warning:')} Weapon '{self.name}' is missing the {warning('magazine capacity')}. Using default value instead.")
@@ -260,13 +260,13 @@ class Weapon:
 		if self._damages == None:
 			# get weapon damages
 			if "damages" not in self.json_content:
-				raise Exception(f"Weapon '{self.name}' is missing damage values.") from None
+				raise Exception(f"Weapon '{self.name}' is missing damage values.")
 			if type(self.json_content["damages"]) != dict:
-				raise Exception(f"Weapon '{self.name}' has damage values that don't deserialize to a dict.") from None
+				raise Exception(f"Weapon '{self.name}' has damage values that don't deserialize to a dict.")
 			if not all(isinstance(distance, str) for distance in self.json_content["damages"]):
-				raise Exception(f"Weapon '{self.name}' has distance values that don't deserialize to strings.") from None
+				raise Exception(f"Weapon '{self.name}' has distance values that don't deserialize to strings.")
 			if not all(isinstance(damage, int) for damage in self.json_content["damages"].values()):
-				raise Exception(f"Weapon '{self.name}' has damage values that don't deserialize to integers.") from None
+				raise Exception(f"Weapon '{self.name}' has damage values that don't deserialize to integers.")
 			distance_damage_dict = {int(distance) : int(damage) for distance, damage in self.json_content["damages"].items()}
 
 			# insert missing distances with damage = 0
@@ -295,9 +295,9 @@ class Weapon:
 				
 				else:	# this damage value is given
 					if damages[i] > previous_real_damage and previous_real_damage != 0:
-						raise Exception(f"Weapon '{self.name}' has a damage increase from '{previous_real_damage}' to '{damages[i]}' at {Weapon.distances[i]}m.") from None
+						raise Exception(f"Weapon '{self.name}' has a damage increase from '{previous_real_damage}' to '{damages[i]}' at {Weapon.distances[i]}m.")
 					if previous_real_damage != 0 and previous_was_interpolated == True and damages[i] != previous_real_damage:
-						raise Exception(f"Tried to interpolate between two unequal damage values '{previous_real_damage}' and '{damages[i]}' at {Weapon.distances[i]}m for weapon '{self.name}'.") from None
+						raise Exception(f"Tried to interpolate between two unequal damage values '{previous_real_damage}' and '{damages[i]}' at {Weapon.distances[i]}m for weapon '{self.name}'.")
 				
 					previous_real_damage = damages[i]
 					previous_was_interpolated = False
@@ -309,20 +309,20 @@ class Weapon:
 			if first_nonzero_index == 0:
 				pass	# no extrapolation needed
 			elif first_nonzero_index == -1:
-				raise Exception(f"Weapon '{self.name}' has no damage values at all.") from None
+				raise Exception(f"Weapon '{self.name}' has no damage values at all.")
 			else:
-				if self.type_index == 4:	# special treatment for shotguns
+				if self.types[self.type_index] == "SG":	# special treatment for shotguns
 					if first_nonzero_index <= 5:
 						for i in range(first_nonzero_index):
 							damages[i] = damages[first_nonzero_index]
 					else:
-						raise Exception(f"Can't extrapolate first {first_nonzero_index} meters for shotgun '{self.name}'.") from None
+						raise Exception(f"Can't extrapolate first {first_nonzero_index} meters for shotgun '{self.name}'.")
 				else:
 					if damages[first_nonzero_index] == damages[first_nonzero_index+1] == damages[first_nonzero_index+2]:
 						for i in range(first_nonzero_index):
 							damages[i] = damages[first_nonzero_index]
 					else:
-						raise Exception(f"Can't extrapolate first {first_nonzero_index} meters for weapon '{self.name}'.") from None
+						raise Exception(f"Can't extrapolate first {first_nonzero_index} meters for weapon '{self.name}'.")
 
 			# save the damage stats
 			self._damages = tuple(damages)
@@ -414,7 +414,7 @@ def deserialize_json(file_name : str):
 		try:
 			content = json.load(file)
 		except json.JSONDecodeError:
-			raise Exception(f"The json deserialization of file '{file_name}' failed.") from None
+			raise Exception(f"The json deserialization of file '{file_name}' failed.")
 	return content
 
 def get_operator_weapons(weapons : list[Weapon], file_name : str) -> None:
@@ -423,11 +423,11 @@ def get_operator_weapons(weapons : list[Weapon], file_name : str) -> None:
 		raise Exception(f"File '{file_name}' doesn't deserialize to a dict of operators and weapons lists.")
 
 	if not all(isinstance(operator, str) for operator in json_content):
-		raise Exception(f"The operators in file '{file_name}' don't deserialize to strings.") from None
+		raise Exception(f"The operators in file '{file_name}' don't deserialize to strings.")
 	if not all(isinstance(weapon_list, list) for weapon_list in json_content.values()):
-		raise Exception(f"The weapon lists in file '{file_name}' don't deserialize to lists.") from None
+		raise Exception(f"The weapon lists in file '{file_name}' don't deserialize to lists.")
 	if not all(all(isinstance(weapon, str) for weapon in weapon_list) for weapon_list in json_content.values()):
-		raise Exception(f"The weapon lists in file '{file_name}' don't deserialize to lists of strings.") from None
+		raise Exception(f"The weapon lists in file '{file_name}' don't deserialize to lists of strings.")
 	operator_weapons = typing.cast(dict[str, list[str]], json_content)
 
 	Weapon.operators = tuple(sorted(operator_weapons.keys()))
@@ -447,7 +447,7 @@ def get_operator_weapons(weapons : list[Weapon], file_name : str) -> None:
 		try:
 			operator_indices = weapon_operatorIndex_dict[weapon.name]
 		except KeyError:
-			raise Exception(f"File '{file_name}' is missing weapon '{weapon.name}'.") from None
+			raise Exception(f"File '{file_name}' is missing weapon '{weapon.name}'.")
 
 		weapon.operator_indices = tuple(sorted(operator_indices))
 		del weapon_operatorIndex_dict[weapon.name]
@@ -490,7 +490,7 @@ def add_stat_to_worksheet(workbook, weapons : list[Weapon], stat_name, stat_disp
 	link = f"https://github.com/hanslhansl/R6S-Weapon-Statistics/#{stat_link}"
 	worksheet.cell(row=row, column=1).value = f'=HYPERLINK("{link}", "{text}")'
 	
-	row += 3
+	row += 2
 	worksheet.merge_cells(start_row=row, end_row=row, start_column=1, end_column=1 + len(Weapon.distances))
 	worksheet.cell(row=row, column=1).value = stat_display_name
 	
@@ -630,16 +630,16 @@ def safe_to_xlsx_file(weapons):
 	workbook.save(file_path)
 
 	# resize columns
-	import win32com.client
-	excel = win32com.client.Dispatch('Excel.Application')
-	wb = excel.Workbooks.Open(file_path)
-	for i in range(1, excel.Worksheets.Count + 1):
-		excel.Worksheets(i).Activate()
-		excel.ActiveSheet.Columns.AutoFit()
-	excel.Worksheets(1).Activate()
-	wb.Save()
-	wb.Close()
-	excel.Quit()
+	# import win32com.client
+	# excel = win32com.client.Dispatch('Excel.Application')
+	# wb = excel.Workbooks.Open(file_path)
+	# for i in range(1, excel.Worksheets.Count + 1):
+	# 	excel.Worksheets(i).Activate()
+	# 	excel.ActiveSheet.Columns.AutoFit()
+	# excel.Worksheets(1).Activate()
+	# wb.Save()
+	# wb.Close()
+	# excel.Quit()
 
 	return
 
