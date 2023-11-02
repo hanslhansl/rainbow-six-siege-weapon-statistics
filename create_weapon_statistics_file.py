@@ -41,7 +41,7 @@ def show_exception_and_exit(exc_type, exc_value, tb):
 sys.excepthook = show_exception_and_exit
 
 #imports
-import os, numpy, json, typing, math, ctypes
+import os, numpy, json, typing, math, ctypes, copy
 from openpyxl import Workbook
 from openpyxl.styles import PatternFill, Border, Alignment, NamedStyle, Side
 from openpyxl.formatting.rule import ColorScaleRule
@@ -114,7 +114,7 @@ class Weapon:
 	stylesABF = (lambda t=types, a=alignment, b=borders, f=fills: [NamedStyle(name=t[i] + " ABF", alignment=a, border=b[i], fill=f[i]) for i in range(len(t))])()
 	stylesBF = (lambda t=types, b=borders, f=fills: [NamedStyle(name=t[i] + " BF", border=b[i], fill=f[i]) for i in range(len(t))])()
 	stylesAB = (lambda t=types, a=alignment, b=borders: [NamedStyle(name=t[i] + " AB", alignment=a, border=b[i]) for i in range(len(t))])()
-	stylesA = NamedStyle(name="AB", alignment=alignment)
+	stylesA = NamedStyle(name="A", alignment=alignment)
 	
 	lowest_damage : dict[int, int] = {}
 	highest_damage : dict[int, int] = {}
@@ -125,9 +125,12 @@ class Weapon:
 	default_rpm = 0
 	default_ads = 0.
 	default_pellets = 0
-	default_reloadTimes = (0., 0.)
+	default_reload_times = (0., 0.)
 	default_capacity = (0, 0)
+	default_extended_barrel = False
 
+	extended_barrel_weapon_name = "+ extended barrel"
+	extended_barrel_damage_multiplier = 1.15
 
 	def __init__(self, name_ : str, json_content_):
 		self.name = name_
@@ -138,14 +141,14 @@ class Weapon:
 		self._damages = None
 		self._type_index = None
 		self._rpm = None	# rounds per minute
-		self._reloadTimes = None	# time in seconds
+		self._reload_times = None	# time in seconds
 		self._ads = None	# time in seconds
 		self._pellets = None	# number of pellets
 		self._capacity = None	# (magazine, chamber)
+		self._extended_barrel = None # whether the weapon has an extended barrel attachment
 
 		if type(self.json_content) != dict:
 			raise Exception(f"Weapon '{self.name}' doesn't deserialize to a dict.")
-		
 		
 		if self.type_index not in Weapon.lowest_damage:
 			Weapon.lowest_damage[self.type_index] = min(self.damages)
@@ -167,7 +170,6 @@ class Weapon:
 			Weapon.highest_dps[self.type_index] = max(Weapon.highest_dps[self.type_index], max(DPS))
 
 		return
-
 
 	@property
 	def type_index(self) -> int:
@@ -191,7 +193,7 @@ class Weapon:
 					raise Exception(f"Weapon '{self.name}' has a fire rate that doesn't deserialize to an int.")
 				self._rpm = self.json_content["rpm"]
 			else:
-				print(f"{warning('Warning:')} Weapon '{self.name}' is missing a {warning('fire rate')}. Using default value instead.")
+				print(f"{warning('Warning:')} Weapon '{warning(self.name)}' is missing a {warning('fire rate')}. Using default value ({self.default_rpm}) instead.")
 				self._rpm = self.default_rpm
 				
 		return self._rpm
@@ -204,7 +206,7 @@ class Weapon:
 					raise Exception(f"Weapon '{self.name}' has an ads time that doesn't deserialize to a float.")
 				self._ads = self.json_content["ads"]
 			else:
-				print(f"{warning('Warning:')} Weapon '{self.name}' is missing an {warning('ads time')}. Using default value instead.")
+				print(f"{warning('Warning:')} Weapon '{warning(self.name)}' is missing an {warning('ads time')}. Using default value ({self.default_ads}) instead.")
 				self._ads = self.default_ads
 			
 		return self._ads
@@ -217,27 +219,27 @@ class Weapon:
 					raise Exception(f"Weapon '{self.name}' has a pellet count that doesn't deserialize to an integer.")
 				self._pellets = self.json_content["pellets"]
 			else:
-				print(f"{warning('Warning:')} Weapon '{self.name}' is missing a {warning('pellet count')}. Using default value instead.")
+				print(f"{warning('Warning:')} Weapon '{warning(self.name)}' is missing a {warning('pellet count')}. Using default value ({self.default_pellets}) instead.")
 				self._pellets = self.default_pellets
 				
 		return self._pellets
 	@property
-	def reloadTimes(self) -> tuple[float, float]:
-		if self._reloadTimes == None:
+	def reload_times(self) -> tuple[float, float]:
+		if self._reload_times == None:
 			# get weapon reload times
-			if "reloadTimes" in self.json_content:
-				if type(self.json_content["reloadTimes"]) != list:
+			if "reload_times" in self.json_content:
+				if type(self.json_content["reload_times"]) != list:
 					raise Exception(f"Weapon '{self.name}' has reload times that don't deserialize to a list.")
-				if len(self.json_content["reloadTimes"]) != 2:
+				if len(self.json_content["reload_times"]) != 2:
 					raise Exception(f"Weapon '{self.name}' doesn't have exactly 2 reload times.")
-				if type(self.json_content["reloadTimes"][0]) != float or type(self.json_content["reloadTimes"][1]) != float:
+				if type(self.json_content["reload_times"][0]) != float or type(self.json_content["reload_times"][1]) != float:
 					raise Exception(f"Weapon '{self.name}' has reload times that don't deserialize to floats.")
-				self._reloadTimes = (self.json_content["reloadTimes"][0], self.json_content["reloadTimes"][1])
+				self._reload_times = (self.json_content["reload_times"][0], self.json_content["reload_times"][1])
 			else:
-				print(f"{warning('Warning:')} Weapon '{self.name}' is missing the {warning('reload times')}. Using default value instead.")
-				self._reloadTimes = self.default_reloadTimes
+				print(f"{warning('Warning:')} Weapon '{warning(self.name)}' is missing the {warning('reload times')}. Using default value ({self.default_reload_times}) instead.")
+				self._reload_times = self.default_reload_times
 				
-		return self._reloadTimes
+		return self._reload_times
 	@property
 	def capacity(self) -> tuple[int, int]:
 		if self._capacity == None:
@@ -251,7 +253,7 @@ class Weapon:
 					raise Exception(f"Weapon '{self.name}' has magazine capacities that don't deserialize to integers.")
 				self._capacity = (self.json_content["capacity"][0], self.json_content["capacity"][1])
 			else:
-				print(f"{warning('Warning:')} Weapon '{self.name}' is missing the {warning('magazine capacity')}. Using default value instead.")
+				print(f"{warning('Warning:')} Weapon '{warning(self.name)}' is missing the {warning('magazine capacity')}. Using default value ({self.default_capacity}) instead.")
 				self._capacity = self.default_capacity
 				
 		return self._capacity
@@ -328,6 +330,19 @@ class Weapon:
 			self._damages = tuple(damages)
 
 		return self._damages
+	@property
+	def extended_barrel(self) -> bool:
+		if self._extended_barrel == None:
+			# get weapon extended barrel
+			if "extended_barrel" in self.json_content:
+				if type(self.json_content["extended_barrel"]) != bool:
+					raise Exception(f"Weapon '{self.name}' has an extended barrel value that doesn't deserialize to a bool.")
+				self._extended_barrel = self.json_content["extended_barrel"]
+			else:
+				print(f"{warning('Warning:')} Weapon '{warning(self.name)}' is missing an {warning('extended barrel')} value. Using default value ({self.default_extended_barrel}) instead.")
+				self._extended_barrel = self.default_extended_barrel
+				
+		return self._extended_barrel
 
 	def getStartEndValue(self, statName : str):
 		if statName == "DPS":
@@ -336,7 +351,10 @@ class Weapon:
 			return min(self.damages) * self.pellets, max(self.damages) * self.pellets
 
 	def getName(self):
-		return self.name, self.getStyleBF()
+		if self.name == self.extended_barrel_weapon_name:
+			return self.name, "Normal"
+		else:
+			return self.name, self.getStyleBF()
 	def getType(self):
 		return self.types[self.type_index], self.getStyleABF()
 	def getRPM(self):
@@ -408,6 +426,21 @@ class Weapon:
 	def getStyleA(self):
 		return self.stylesA
 
+	def getExtendedBarrelWeapon(self):
+		retVar = copy.deepcopy(self)
+		
+		retVar.name = self.extended_barrel_weapon_name
+		retVar.json_content = None
+		
+		retVar._damages = tuple(dmg * self.extended_barrel_damage_multiplier for dmg in self.damages)
+		retVar._rpm = self.rpm
+		retVar._pellets = self.pellets
+		retVar._reload_times = None
+		retVar._ads = None
+		retVar._capacity = None
+		retVar._extended_barrel = False
+
+		return retVar
 
 def deserialize_json(file_name : str):
 	with open(file_name, "r") as file:
@@ -453,7 +486,7 @@ def get_operator_weapons(weapons : list[Weapon], file_name : str) -> None:
 		del weapon_operatorIndex_dict[weapon.name]
 
 	for fake_weapon_name in weapon_operatorIndex_dict:
-		print(f"{warning('Warning:')} Weapon '{fake_weapon_name}' found in file '{file_name}' is {warning('not an actual weapon')}.")
+		print(f"{warning('Warning:')} Weapon '{warning(fake_weapon_name)}' found in file '{file_name}' is {warning('not an actual weapon')}.")
 		
 	return
 
@@ -467,7 +500,7 @@ def get_weapons_dict() -> list[Weapon]:
 		if not extension == ".json":
 			continue
 		if name.startswith("_"):
-			print(f"{message('Message: Excluding')} weapon '{name}' because of _.")
+			print(f"{message('Message: Excluding')} weapon '{message(name)}' because of _.")
 			continue
 		
 		weapons.append(Weapon(name, deserialize_json(file_path)))
@@ -477,7 +510,53 @@ def get_weapons_dict() -> list[Weapon]:
 	
 	return weapons
 
-def add_stat_to_worksheet(workbook, weapons : list[Weapon], stat_name, stat_display_name, stat_link, description, stat_method):
+def add_weapon_to_stat_worksheet(worksheet, weapon : Weapon, stat_name : str, stat_method : str, row : int):
+	c = worksheet.cell(row=row, column=1)
+	c.value, c.style = weapon.getName()
+		
+	for col in range(2, len(Weapon.distances) + 2):
+		c = worksheet.cell(row=row, column=col)
+		c.value, c.style = stat_method(weapon, col - 2)
+
+	if stat_name in ("DPS", "DmgPerShot"):
+		end_color = background_colors[weapon.type_index]
+		start_color = "FFFFFF"
+		start_value, end_value = weapon.getStartEndValue(stat_name)
+
+		color_rule = ColorScaleRule(start_type="num", start_value=start_value, start_color=start_color,
+									end_type="num", end_value=end_value, end_color=end_color)
+		worksheet.conditional_formatting.add(f"{get_column_letter(2)}{row}:{get_column_letter(len(Weapon.distances)+2)}{row}", color_rule)
+
+	if weapon.getName()[0] != weapon.extended_barrel_weapon_name:
+		col += 2
+		c = worksheet.cell(row=row, column=col)
+		c.value, c.style = weapon.getType()
+		
+		col += 2
+		c = worksheet.cell(row=row, column=col)
+		c.value, c.style = weapon.getRPM()
+		
+		col += 1
+		c = worksheet.cell(row=row, column=col)
+		c.value, c.style = weapon.getCapacity()
+
+		col += 1
+		c = worksheet.cell(row=row, column=col)
+		c.value, c.style = weapon.getPellets()
+		
+		col += 2
+		c = worksheet.cell(row=row, column=col)
+		c.value, c.style = weapon.getADSTime()
+
+		# col += 1
+		# c1 = worksheet.cell(row=row, column=col)
+		# col += 1
+		# c2 = worksheet.cell(row=row, column=col)
+		# c1.value, c2.value, c1.style = weapon.getReloadTimes()
+		# c2.style = c1.style
+	return
+
+def add_stat_worksheet(workbook, weapons : list[Weapon], stat_name : str, stat_display_name : str, stat_link : str, description : str, stat_method):
 	worksheet = workbook.create_sheet(stat_display_name)
 
 	row = 1
@@ -486,13 +565,11 @@ def add_stat_to_worksheet(workbook, weapons : list[Weapon], stat_name, stat_disp
 	
 	row += 1
 	worksheet.merge_cells(start_row=row, end_row=row, start_column=1, end_column=1 + len(Weapon.distances))
-	text = "A detailed explanation can be found here"
-	link = f"https://github.com/hanslhansl/R6S-Weapon-Statistics/#{stat_link}"
-	worksheet.cell(row=row, column=1).value = f'=HYPERLINK("{link}", "{text}")'
+	worksheet.cell(row=row, column=1).value = '=HYPERLINK("https://github.com/hanslhansl/R6S-Weapon-Statistics/", "A detailed explanation can be found here")'
 	
 	row += 2
 	worksheet.merge_cells(start_row=row, end_row=row, start_column=1, end_column=1 + len(Weapon.distances))
-	worksheet.cell(row=row, column=1).value = stat_display_name
+	worksheet.cell(row=row, column=1).value = f'=HYPERLINK("https://github.com/hanslhansl/R6S-Weapon-Statistics/#{stat_link}", "{stat_display_name}")'
 	
 	row += 1
 	worksheet.merge_cells(start_row=row, end_row=row, start_column=1, end_column=1 + len(Weapon.distances))
@@ -544,102 +621,69 @@ def add_stat_to_worksheet(workbook, weapons : list[Weapon], stat_name, stat_disp
 	c.value = "ADS time"
 	c.alignment = Weapon.alignment	
 
-	# col += 1
-	# worksheet.merge_cells(start_row=row-1, end_row=row-1, start_column=col, end_column=col + 1)
-	# c = worksheet.cell(row=row-1, column=col)
-	# c.value = "Reload times"
-	# c.alignment = Weapon.alignment
+	col += 1
+	c = worksheet.cell(row=row, column=col)
+	c.value = " " * space_mult
+
+	col += 1
+	worksheet.merge_cells(start_row=row-1, end_row=row-1, start_column=col, end_column=col + 1)
+	c = worksheet.cell(row=row-1, column=col)
+	c.value = "Reload times"
+	c.alignment = Weapon.alignment
 	
-	# c = worksheet.cell(row=row, column=col)
-	# c.value = "Tactical"
-	# c.alignment = Weapon.alignment
+	c = worksheet.cell(row=row, column=col)
+	c.value = "Tactical"
+	c.alignment = Weapon.alignment
 	
-	# c = worksheet.cell(row=row, column=col + 1)
-	# c.value = "Full"
-	# c.alignment = Weapon.alignment
+	c = worksheet.cell(row=row, column=col + 1)
+	c.value = "Full"
+	c.alignment = Weapon.alignment
 	
 	for weapon in weapons:
 		row += 1
-
-		c = worksheet.cell(row=row, column=1)
-		c.value, c.style = weapon.getName()
+		add_weapon_to_stat_worksheet(worksheet, weapon, stat_name, stat_method, row)
 		
-		for col in range(2, len(Weapon.distances) + 2):
-			c = worksheet.cell(row=row, column=col)
-			c.value, c.style = stat_method(weapon, col - 2)
-
-		if stat_name in ("DPS", "DmgPerShot"):
-			end_color = background_colors[weapon.type_index]
-			start_color = "FFFFFF"
-			start_value, end_value = weapon.getStartEndValue(stat_name)
-
-			color_rule = ColorScaleRule(start_type="num", start_value=start_value, start_color=start_color,
-										end_type="num", end_value=end_value, end_color=end_color)
-			worksheet.conditional_formatting.add(f"{get_column_letter(2)}{row}:{get_column_letter(len(Weapon.distances)+2)}{row}", color_rule)
-
-		col += 2
-		c = worksheet.cell(row=row, column=col)
-		c.value, c.style = weapon.getType()
-		
-		col += 2
-		c = worksheet.cell(row=row, column=col)
-		c.value, c.style = weapon.getRPM()
-		
-		col += 1
-		c = worksheet.cell(row=row, column=col)
-		c.value, c.style = weapon.getCapacity()
-
-		col += 1
-		c = worksheet.cell(row=row, column=col)
-		c.value, c.style = weapon.getPellets()
-		
-		col += 2
-		c = worksheet.cell(row=row, column=col)
-		c.value, c.style = weapon.getADSTime()
-
-		# col += 1
-		# c1 = worksheet.cell(row=row, column=col)
-		# col += 1
-		# c2 = worksheet.cell(row=row, column=col)
-		# c1.value, c2.value, c1.style = weapon.getReloadTimes()
-		# c2.style = c1.style
+		if (weapon.extended_barrel):
+			row += 1
+			extended_barrel_weapon = weapon.getExtendedBarrelWeapon()
+			add_weapon_to_stat_worksheet(worksheet, extended_barrel_weapon, stat_name, stat_method, row)
 		
 	return
 
 def safe_to_xlsx_file(weapons):
 	""" https://openpyxl.readthedocs.io/en/stable/ """
-	file_path = os.path.join(os.path.dirname(os.path.realpath(__file__)), "R6S-Weapon-Statistics.xlsx")
+	file_path = os.path.join(os.path.dirname(os.path.realpath(__file__)), "Rainbow-Six-Siege-Weapon-Statistics.xlsx")
 
-	weapons : list[Weapon] = sorted(weapons, key=lambda x: (x.type_index, -max(x.damages)), reverse=False)
+	weapons : list[Weapon] = sorted(weapons, key=lambda x: x.type_index, reverse=False)
 
 	# create the workbook
 	workbook = Workbook()
 
 	workbook.remove(workbook.active)
 
-	add_stat_to_worksheet(workbook, weapons, "DMG", "Damage per bullet", "damage-per-bullet",
+	add_stat_worksheet(workbook, weapons, "DMG", "Damage per bullet", "damage-per-bullet",
 		       "The colored areas represent steady damage, the colorless areas represent decreasing damage.", Weapon.getDamage)
 
-	add_stat_to_worksheet(workbook, weapons, "DmgPerShot", "Damage per shot", "damage-per-shot",
+	add_stat_worksheet(workbook, weapons, "DmgPerShot", "Damage per shot", "damage-per-shot",
 		       "The color gradient illustrates the damage compared to the weapon's base damage.", Weapon.getDamagePerShot)
 
-	add_stat_to_worksheet(workbook, weapons, "DPS", "Damage per second", "damage-per-second---dps",
+	add_stat_worksheet(workbook, weapons, "DPS", "Damage per second", "damage-per-second---dps",
 		       "The color gradient illustrates the DPS compared to the highest DPS of the weapon's type.", Weapon.getDPS)
 
 	# save to file
 	workbook.save(file_path)
 
 	# resize columns
-	# import win32com.client
-	# excel = win32com.client.Dispatch('Excel.Application')
-	# wb = excel.Workbooks.Open(file_path)
-	# for i in range(1, excel.Worksheets.Count + 1):
-	# 	excel.Worksheets(i).Activate()
-	# 	excel.ActiveSheet.Columns.AutoFit()
-	# excel.Worksheets(1).Activate()
-	# wb.Save()
-	# wb.Close()
-	# excel.Quit()
+	import win32com.client
+	excel = win32com.client.Dispatch('Excel.Application')
+	wb = excel.Workbooks.Open(file_path)
+	for i in range(1, excel.Worksheets.Count + 1):
+		excel.Worksheets(i).Activate()
+		excel.ActiveSheet.Columns.AutoFit()
+	excel.Worksheets(1).Activate()
+	wb.Save()
+	wb.Close()
+	excel.Quit()
 
 	return
 
