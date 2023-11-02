@@ -13,7 +13,7 @@ Experience has also shown that all weapons have either one or two damage drop-of
 
 There are three body hit areas in R6S: the head, the torso and the limbs. The torso has a damage multiplier of 1 and therefor receives the base damage. This is the value I am measuring. Most weapons deal infinite damage to the head. The only exception are shotguns which deal 150% of the base damage to the head. Limb damage is a bit more complicated. As of now I believe most weapons deal 75% of the base damage to limbs. However, there exists at least one exception to this rule though, Kali's CSRX 300, which deals 60% to limbs. At some point I will test all weapon's limb damage multiplier. soon (tm).
 
-The only attachment that modifies the damage per bullet of a weapon is the extended barrel. It increases the damage by 10% at all distances. Therefor, the actual damage is calculated as $Damage=Damage*1.1$. No measuring necessary.
+The only attachment that modifies the damage per bullet of is the extended barrel. It increases the damage by 10% at all distances. In most cases the result is rounded up which is why I am using $Damage=\lceil {Damage*1.1} \rceil$. For some reason however, there are some instances where the result is rounded downThe actual damage with extended barrel is calculated as $Damage=Damage*1.1$. I am using this formula to calculate the extended barrel stats. I did not measure .
 ## Bullets per shot - Pellet count
 This value is displayed in the shooting range. Most weapons shoot exactly one bullet per shot. The only exception are shotguns, most of which shoot 8 bullets per shot. For shotguns this metric is also called pellet count.
 ## Damage per shot
