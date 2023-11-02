@@ -667,7 +667,7 @@ def safe_to_xlsx_file(weapons : list[Weapon]):
 		       "The color gradient illustrates the damage compared to the weapon's base damage.", Weapon.getDamagePerShot)
 
 	add_stat_worksheet(workbook, weapons, "DPS", "Damage per second", "damage-per-second---dps",
-		       "The color gradient illustrates the DPS compared to the highest DPS of the weapon's type.", Weapon.getDPS)
+		       "The color gradient illustrates the DPS compared to the highest DPS of the weapon's type (excluding extended barrel stats).", Weapon.getDPS)
 
 	# save to file
 	workbook.save(file_path)
