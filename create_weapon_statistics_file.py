@@ -130,7 +130,7 @@ class Weapon:
 	default_extended_barrel = False
 
 	extended_barrel_weapon_name = "+ extended barrel"
-	extended_barrel_damage_multiplier = 1.15
+	extended_barrel_damage_multiplier = 1.1
 
 	def __init__(self, name_ : str, json_content_):
 		self.name = name_
@@ -392,7 +392,6 @@ class Weapon:
 			return val, self.getStyleAB()
 			return str(val)[1:], self.getStyleAB()
 
-
 	def getOperators(self):
 		return tuple([self.operators[opIndex] for opIndex in self.operator_indices])
 
@@ -431,8 +430,8 @@ class Weapon:
 		
 		retVar.name = self.extended_barrel_weapon_name
 		retVar.json_content = None
-		
-		retVar._damages = tuple(dmg * self.extended_barrel_damage_multiplier for dmg in self.damages)
+
+		retVar._damages = tuple(math.ceil(dmg * self.extended_barrel_damage_multiplier) for dmg in self.damages)
 		retVar._rpm = self.rpm
 		retVar._pellets = self.pellets
 		retVar._reload_times = None
