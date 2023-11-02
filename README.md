@@ -22,10 +22,6 @@ Currently, for all fully automatic weapons the fire rates are the ones listed in
 As [already mentioned](#time-measuring) my time measurements can vary up to 16.7ms from the real values. The actual fire rates are therefor in the interval defined by $60000{n-1 \over t \pm 16.7}rpm$. For example a measured fire rate of 800 rpm for a weapon with 31 bullets per magazine would mean an actual fire rate of something inbetween 794 rpm and 806 rpm. Because of this innaccuracy I am usually rounding the fire rate to a reasonable integer within said interval (e.g. measured 433.47 rpm become 430 rpm).
 
 At some point I will measure all fully automatic weapon's fire rates as well. Just to be sure. soon (tm).
-## Reload time
-soon (tm)
-## Aim down sight time - ADS time
-soon (tm)
 ## Damage per second - DPS
 The damage per second calculates as $DPS = DmgPerShot * RPS = DmgPerShot * RPM / 60$. No measuring necessary.
 ## Shots to down or kill - STDOK
@@ -34,3 +30,7 @@ For a target with $x$ hp the STDOK calculate as $\lceil {x \over Damage} \rceil$
 For a target with $x$ hp the TTDOK in milliseconds calculate as ${STDOK \over rpms}$. No measuring necessary.
 ## Magazine capacity
 Most weapons have, in addition to the bullets loaded in the magazine, one bullet loaded in the chamber. For those weapons this value is displayed as $Capacity+1$ (e.g. $30+1$, $20+1$, etc.). For all other weapons without a bullet loaded in the chamber this value is displayed as $Capacity+0$ (e.g. $100+0$, $80+0$).
+## Reload time
+soon (tm)
+## Aim down sight time - ADS time
+soon (tm)
