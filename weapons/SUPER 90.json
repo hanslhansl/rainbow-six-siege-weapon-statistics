@@ -3,6 +3,7 @@
   "rpm": 220,
   "pellets": 8,
   "ads": 0.25,
+  "extended_barrel": false,
   "capacity": [
     8,
     0

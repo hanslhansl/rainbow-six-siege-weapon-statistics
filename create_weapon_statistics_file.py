@@ -649,11 +649,11 @@ def add_stat_worksheet(workbook, weapons : list[Weapon], stat_name : str, stat_d
 		
 	return
 
-def safe_to_xlsx_file(weapons):
+def safe_to_xlsx_file(weapons : list[Weapon]):
 	""" https://openpyxl.readthedocs.io/en/stable/ """
 	file_path = os.path.join(os.path.dirname(os.path.realpath(__file__)), "Rainbow-Six-Siege-Weapon-Statistics.xlsx")
 
-	weapons : list[Weapon] = sorted(weapons, key=lambda x: x.type_index, reverse=False)
+	weapons = sorted(weapons, key=lambda x: x.type_index, reverse=False)
 
 	# create the workbook
 	workbook = Workbook()
