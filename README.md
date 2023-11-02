@@ -12,6 +12,8 @@ Experience has shown that damage does not increase over distance. It only decrea
 Experience has also shown that all weapons have either one or two damage drop-off intervals. Up until drop-off start they deal the base damage. From drop-off start to drop-off end they progressively lose damage over distance and from drop-off end on they do the final damage. Because of this the damage up until 5 meters (which can't be measured in the shooting range) can be assumed to equal the damage at 5 meters. To prevent errors in case the damage drop-off interval reaches into the first 5 meters I am only applying this assumption if the measured damages at 5, 6 and 7 meters are equal. If that isn't the case I leave the damages up until 5 meters blank and test them in a custom game. It should be said that even with this precautionary measure it is still possible for me to overlook a damage drop within the first 5 meters. Those values should therefor be taken with a grain of salt.
 
 There are three body hit areas in R6S: the head, the torso and the limbs. The torso has a damage multiplier of 1 and therefor receives the base damage. This is the value I am measuring. Most weapons deal infinite damage to the head. The only exception are shotguns which deal 150% of the base damage to the head. Limb damage is a bit more complicated. As of now I believe most weapons deal 75% of the base damage to limbs. However, there exists at least one exception to this rule though, Kali's CSRX 300, which deals 60% to limbs. At some point I will test all weapon's limb damage multiplier. soon (tm).
+## Damage per bullet with extended barrel
+The extended barrel increases the damage by 15%. Therefor, the actual damage is calculated as $Damage=Damage*1.15$. No measuring necessary.
 ## Bullets per shot - Pellet count
 This value is displayed in the shooting range. Most weapons shoot exactly one bullet per shot. The only exception are shotguns, most of which shoot 8 bullets per shot. For shotguns this metric is also called pellet count.
 ## Damage per shot
@@ -34,5 +36,3 @@ Most weapons have, in addition to the bullets loaded in the magazine, one bullet
 soon (tm)
 ## Aim down sight time - ADS time
 soon (tm)
-## Extended barrel stats
-The extended barrel increases damage by 15%. Therefor, the new damage is calculated as $NewDamage=Damage*1.15$. No measuring necessary.
