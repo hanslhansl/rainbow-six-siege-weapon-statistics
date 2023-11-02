@@ -43,7 +43,7 @@ sys.excepthook = show_exception_and_exit
 #imports
 import os, numpy, json, typing, math, ctypes, copy
 from openpyxl import Workbook
-from openpyxl.styles import PatternFill, Border, Alignment, NamedStyle, Side
+from openpyxl.styles import PatternFill, Border, Alignment, NamedStyle, Side, Font
 from openpyxl.formatting.rule import ColorScaleRule
 from openpyxl.utils import get_column_letter
 
@@ -560,15 +560,20 @@ def add_stat_worksheet(workbook, weapons : list[Weapon], stat_name : str, stat_d
 
 	row = 1
 	worksheet.merge_cells(start_row=row, end_row=row, start_column=1, end_column=1 + len(Weapon.distances))
-	worksheet.cell(row=row, column=1).value = "created by hanslhansl"
+	c = worksheet.cell(row=row, column=1)
+	c.value = "created by hanslhansl"
 	
 	row += 1
 	worksheet.merge_cells(start_row=row, end_row=row, start_column=1, end_column=1 + len(Weapon.distances))
-	worksheet.cell(row=row, column=1).value = '=HYPERLINK("https://github.com/hanslhansl/R6S-Weapon-Statistics/", "A detailed explanation can be found here")'
+	c = worksheet.cell(row=row, column=1)
+	c.value = '=HYPERLINK("https://github.com/hanslhansl/R6S-Weapon-Statistics/", "A detailed explanation can be found here")'
+	c.font = Font(color = "FF0000FF")
 	
 	row += 2
 	worksheet.merge_cells(start_row=row, end_row=row, start_column=1, end_column=1 + len(Weapon.distances))
-	worksheet.cell(row=row, column=1).value = f'=HYPERLINK("https://github.com/hanslhansl/R6S-Weapon-Statistics/#{stat_link}", "{stat_display_name}")'
+	c = worksheet.cell(row=row, column=1)
+	c.value = f'=HYPERLINK("https://github.com/hanslhansl/R6S-Weapon-Statistics/#{stat_link}", "{stat_display_name}")'
+	c.font = Font(color = "FF0000FF")
 	
 	row += 1
 	worksheet.merge_cells(start_row=row, end_row=row, start_column=1, end_column=1 + len(Weapon.distances))
