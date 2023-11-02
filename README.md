@@ -34,3 +34,5 @@ Most weapons have, in addition to the bullets loaded in the magazine, one bullet
 soon (tm)
 ## Aim down sight time - ADS time
 soon (tm)
+## Extended barrel stats
+The extended barrel increases damage by 15%. Therefor, the new damage is calculated as $NewDamage=Damage*1.15$. No measuring necessary.
