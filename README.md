@@ -32,7 +32,7 @@ For a target with $x$ hp the STDOK calculate as $\lceil {x \over Damage} \rceil$
 For a target with $x$ hp the TTDOK in milliseconds calculate as ${STDOK \over rpms}$. No measuring necessary.
 ## Magazine capacity
 Most weapons have, in addition to the bullets loaded in the magazine, one bullet loaded in the chamber. For those weapons this value is displayed as $Capacity+1$ (e.g. $30+1$, $20+1$, etc.). For all other weapons without a bullet loaded in the chamber this value is displayed as $Capacity+0$ (e.g. $100+0$, $80+0$).
-## Reload time
-soon (tm)
 ## Aim down sight time - ADS time
+The time in seconds it takes to aim down sight while standing still.
+## Reload time
 soon (tm)
