@@ -171,6 +171,7 @@ class Weapon:
 
 		return
 
+	# primary properties
 	@property
 	def type_index(self) -> int:
 		if self._type_index == None:
@@ -343,13 +344,27 @@ class Weapon:
 				self._extended_barrel = self.default_extended_barrel
 				
 		return self._extended_barrel
+	@property
+	def operators(self):
+		return tuple([self.operators[opIndex] for opIndex in self.operator_indices])
 
-	def getStartEndValue(self, statName : str):
-		if statName == "DPS":
-			return self.lowest_dps[self.type_index], self.highest_dps[self.type_index]
-		elif statName == "DmgPerShot":
-			return min(self.damages) * self.pellets, max(self.damages) * self.pellets
+	# derived properties
+	@property
+	def rps(self):
+		return self.rpm / 60.
+	@property
+	def rpms(self):
+		return self.rpm / 60000.
+	def damage_per_shot(self, index : int):
+		return self.damages[index] * self.pellets
+	def dps(self, index : int):
+		return self.damages[index] * self.pellets * self.rps
+	def stdok(self, index : int, hp : int):
+		return math.ceil(hp / self.damages[index] / self.pellets)
+	def ttdok(self, index : int, hp : int):
+		return (self.stdok(index, hp) - 1) / self.rpms
 
+	# properties with excel styles
 	def getName(self):
 		if self.name == self.extended_barrel_weapon_name:
 			return self.name, "Normal"
@@ -360,17 +375,19 @@ class Weapon:
 	def getRPM(self):
 		return self.rpm, self.getStyleABF()
 	def getRPS(self):
-		return self.rpm / 60., self.getStyleABF()
+		return self.rps, self.getStyleABF()
 	def getRPMS(self):
-		return self.rpm / 60000., self.getStyleABF()
+		return self.rpms, self.getStyleABF()
 	def getDamage(self, index : int):
 		return self.damages[index], self.getStyle(index)
+	def getDamagePerShot(self, index : int):
+		return self.damage_per_shot(index), self.getStyleAB()
 	def getDPS(self, index : int):
-		return round(self.getDamagePerShot(index)[0] * self.rpm / 60.), self.getStyleAB()
+		return round(self.dps(index)), self.getStyleAB()
 	def getSTDOK(self, index : int, hp : int):
-		return math.ceil(hp / self.damages[index])
+		return self.stdok(index, hp), self.getStyle(index)
 	def getTTDOK(self, index : int, hp : int):
-		return self.getSTDOK(index, hp) / self.getRPMS()[0]
+		return round(self.ttdok(index, hp)), self.getStyle(index)
 	def getCapacity(self):
 		return str(self.capacity[0]) + "+" + str(self.capacity[1]), self.getStyleABF()
 	def getReloadTimes(self):
@@ -380,8 +397,6 @@ class Weapon:
 			return "", self.getStyleA()
 		else:
 			return self.pellets, self.getStyleABF()
-	def getDamagePerShot(self, index : int):
-		return self.damages[index] * self.pellets, self.getStyleAB()
 	def getADSTime(self):
 		return str(self.ads), self.getStyleABF()
 	def getDamageToBaseDamagePercentage(self, index : int):
@@ -392,22 +407,7 @@ class Weapon:
 			return val, self.getStyleAB()
 			return str(val)[1:], self.getStyleAB()
 
-	def getOperators(self):
-		return tuple([self.operators[opIndex] for opIndex in self.operator_indices])
-
-	def getDamageDropoffBorders(self):
-		lastInitialDamageIndex = -1
-		firstEndDamageIndex = -1
-		
-		for i in range(len(self.damages)):
-			if self.damages[i] == self.damages[0]:
-				lastInitialDamageIndex = i
-			elif self.damages[i] == self.damages[-1]:
-				firstEndDamageIndex = i
-				break
-
-		return (lastInitialDamageIndex, firstEndDamageIndex)
-
+	# excel styles
 	def getStyle(self, index : int):
 		lastInitialDamageIndex, firstEndDamageIndex = self.getDamageDropoffBorders()
 		if index <= lastInitialDamageIndex:
@@ -424,7 +424,28 @@ class Weapon:
 		return self.stylesBF[self.type_index]
 	def getStyleA(self):
 		return self.stylesA
+	
+	# other methods
+	def getStartEndValue(self, statName : str):
+		if statName == "Damage per second":
+			return self.lowest_dps[self.type_index], self.highest_dps[self.type_index]
+		elif statName == "Damage per shot":
+			return min(self.damages) * self.pellets, max(self.damages) * self.pellets
+		else:
+			raise Exception(f"Invalid stat name '{statName}'.")
+		return
+	def getDamageDropoffBorders(self):
+		lastInitialDamageIndex = -1
+		firstEndDamageIndex = -1
+		
+		for i in range(len(self.damages)):
+			if self.damages[i] == self.damages[0]:
+				lastInitialDamageIndex = i
+			elif self.damages[i] == self.damages[-1]:
+				firstEndDamageIndex = i
+				break
 
+		return (lastInitialDamageIndex, firstEndDamageIndex)
 	def getExtendedBarrelWeapon(self):
 		retVar = copy.deepcopy(self)
 		
@@ -440,6 +461,7 @@ class Weapon:
 		retVar._extended_barrel = False
 
 		return retVar
+
 
 def deserialize_json(file_name : str):
 	with open(file_name, "r") as file:
@@ -509,7 +531,7 @@ def get_weapons_dict() -> list[Weapon]:
 	
 	return weapons
 
-def add_weapon_to_stat_worksheet(worksheet, weapon : Weapon, stat_name : str, stat_method : str, row : int):
+def add_weapon_to_stat_worksheet(worksheet, weapon : Weapon, stat_name : str, stat_method : typing.Any, row : int):
 	c = worksheet.cell(row=row, column=1)
 	c.value, c.style = weapon.getName()
 		
@@ -517,7 +539,7 @@ def add_weapon_to_stat_worksheet(worksheet, weapon : Weapon, stat_name : str, st
 		c = worksheet.cell(row=row, column=col)
 		c.value, c.style = stat_method(weapon, col - 2)
 
-	if stat_name in ("DPS", "DmgPerShot"):
+	if stat_name in ("Damage per second", "Damage per shot"):
 		end_color = background_colors[weapon.type_index]
 		start_color = "FFFFFF"
 		start_value, end_value = weapon.getStartEndValue(stat_name)
@@ -555,93 +577,12 @@ def add_weapon_to_stat_worksheet(worksheet, weapon : Weapon, stat_name : str, st
 		# c2.style = c1.style
 	return
 
-def add_stat_worksheet(workbook, weapons : list[Weapon], stat_name : str, stat_display_name : str, stat_link : str, description : str, stat_method):
-	worksheet = workbook.create_sheet(stat_display_name)
-
-	row = 1
-	worksheet.merge_cells(start_row=row, end_row=row, start_column=1, end_column=1 + len(Weapon.distances))
-	c = worksheet.cell(row=row, column=1)
-	c.value = "created by hanslhansl"
-	
+def add_stat_to_worksheet(worksheet : typing.Any, weapons : list[Weapon], stat_name : str, description : str, stat_method : typing.Any, row : int):
 	row += 1
 	worksheet.merge_cells(start_row=row, end_row=row, start_column=1, end_column=1 + len(Weapon.distances))
 	c = worksheet.cell(row=row, column=1)
-	c.value = '=HYPERLINK("https://github.com/hanslhansl/R6S-Weapon-Statistics/", "A detailed explanation can be found here")'
-	c.font = Font(color = "FF0000FF")
-	
-	row += 2
-	worksheet.merge_cells(start_row=row, end_row=row, start_column=1, end_column=1 + len(Weapon.distances))
-	c = worksheet.cell(row=row, column=1)
-	c.value = f'=HYPERLINK("https://github.com/hanslhansl/R6S-Weapon-Statistics/#{stat_link}", "{stat_display_name}")'
-	c.font = Font(color = "FF0000FF")
-	
-	row += 1
-	worksheet.merge_cells(start_row=row, end_row=row, start_column=1, end_column=1 + len(Weapon.distances))
-	worksheet.cell(row=row, column=1).value = description
-
-	row += 1
-	worksheet.cell(row=row, column=1).value = "Distance"
-	for col in range(2, len(Weapon.distances) + 2):
-		c = worksheet.cell(row=row, column=col)
-		c.value = Weapon.distances[col - 2]
-		c.alignment = Weapon.alignment
-
-	space_mult = 6
-
-	col += 1
-	c = worksheet.cell(row=row, column=col)
-	c.value = " " * space_mult
-
-	col += 1
-	c = worksheet.cell(row=row, column=col)
-	c.value = "Type"
-	c.alignment = Weapon.alignment
-
-	col += 1
-	c = worksheet.cell(row=row, column=col)
-	c.value = " " * space_mult
-	
-	col += 1
-	c = worksheet.cell(row=row, column=col)
-	c.value = "RPM"
-	c.alignment = Weapon.alignment
-
-	col += 1
-	c = worksheet.cell(row=row, column=col)
-	c.value = "Capacity"
-	c.alignment = Weapon.alignment
-	
-	col += 1
-	c = worksheet.cell(row=row, column=col)
-	c.value = "Pellets"
-	c.alignment = Weapon.alignment
-	
-	col += 1
-	c = worksheet.cell(row=row, column=col)
-	c.value = " " * space_mult
-	
-	col += 1
-	c = worksheet.cell(row=row, column=col)
-	c.value = "ADS time"
-	c.alignment = Weapon.alignment	
-
-	col += 1
-	c = worksheet.cell(row=row, column=col)
-	c.value = " " * space_mult
-
-	col += 1
-	worksheet.merge_cells(start_row=row-1, end_row=row-1, start_column=col, end_column=col + 1)
-	c = worksheet.cell(row=row-1, column=col)
-	c.value = "Reload times"
-	c.alignment = Weapon.alignment
-	
-	c = worksheet.cell(row=row, column=col)
-	c.value = "Tactical"
-	c.alignment = Weapon.alignment
-	
-	c = worksheet.cell(row=row, column=col + 1)
-	c.value = "Full"
-	c.alignment = Weapon.alignment
+	c.value = description
+	c.font = Font(bold=True)
 	
 	for weapon in weapons:
 		row += 1
@@ -652,6 +593,119 @@ def add_stat_worksheet(workbook, weapons : list[Weapon], stat_name : str, stat_d
 			extended_barrel_weapon = weapon.getExtendedBarrelWeapon()
 			add_weapon_to_stat_worksheet(worksheet, extended_barrel_weapon, stat_name, stat_method, row)
 		
+	return row
+
+def add_stats_worksheet(workbook : typing.Any, weapons : list[Weapon], worksheet_name : str, stat_name : str, stat_link : str, descriptions : str | tuple[str,...], stat_methods : typing.Any | tuple[typing.Any]):
+	worksheet = workbook.create_sheet(worksheet_name)
+	
+	row = 1
+	worksheet.merge_cells(start_row=row, end_row=row, start_column=1, end_column=1 + len(Weapon.distances))
+	c = worksheet.cell(row=row, column=1)
+	c.value = "created by hanslhansl"
+	c.font = Font(bold=True)
+
+	row += 1
+	worksheet.merge_cells(start_row=row, end_row=row, start_column=1, end_column=1 + len(Weapon.distances))
+	c = worksheet.cell(row=row, column=1)
+	c.value = '=HYPERLINK("https://github.com/hanslhansl/R6S-Weapon-Statistics/", "A detailed explanation can be found here")'
+	c.font = Font(color = "FF0000FF")
+	
+	row += 2
+	worksheet.merge_cells(start_row=row, end_row=row, start_column=1, end_column=1 + len(Weapon.distances))
+	c = worksheet.cell(row=row, column=1)
+	c.value = f'=HYPERLINK("https://github.com/hanslhansl/R6S-Weapon-Statistics/#{stat_link}", "{stat_name}")'
+	c.font = Font(color = "FF0000FF")
+	c.font = Font(bold=True)
+
+	col = 1
+	row += 1
+	c = worksheet.cell(row=row, column=col)
+	c.value = "Distance"
+	worksheet.column_dimensions[get_column_letter(col)].width = 18
+	
+	for col in range(2, len(Weapon.distances) + 2):
+		c = worksheet.cell(row=row, column=col)
+		c.value = Weapon.distances[col - 2]
+		c.alignment = Weapon.alignment
+		worksheet.column_dimensions[get_column_letter(col)].width = 4.8
+
+	space_mult = 6
+
+	col += 1
+	worksheet.column_dimensions[get_column_letter(col)].width = 3
+
+	col += 1
+	c = worksheet.cell(row=row, column=col)
+	c.value = "Type"
+	c.alignment = Weapon.alignment
+	worksheet.column_dimensions[get_column_letter(col)].width = 5
+
+	col += 1
+	worksheet.column_dimensions[get_column_letter(col)].width = 3
+	
+	col += 1
+	c = worksheet.cell(row=row, column=col)
+	c.value = "RPM"
+	c.alignment = Weapon.alignment
+	worksheet.column_dimensions[get_column_letter(col)].width = 5
+
+	col += 1
+	c = worksheet.cell(row=row, column=col)
+	c.value = "Capacity"
+	c.alignment = Weapon.alignment
+	worksheet.column_dimensions[get_column_letter(col)].width = 8
+	
+	col += 1
+	c = worksheet.cell(row=row, column=col)
+	c.value = "Pellets"
+	c.alignment = Weapon.alignment
+	worksheet.column_dimensions[get_column_letter(col)].width = 6
+	
+	col += 1
+	worksheet.column_dimensions[get_column_letter(col)].width = 3
+	
+	col += 1
+	c = worksheet.cell(row=row, column=col)
+	c.value = "ADS time"
+	c.alignment = Weapon.alignment
+	worksheet.column_dimensions[get_column_letter(col)].width = 8
+
+	col += 1
+	worksheet.column_dimensions[get_column_letter(col)].width = 3
+
+	col += 1
+	worksheet.merge_cells(start_row=row-1, end_row=row-1, start_column=col, end_column=col + 1)
+	c = worksheet.cell(row=row-1, column=col)
+	c.value = "Reload times"
+	c.alignment = Weapon.alignment
+	
+	c = worksheet.cell(row=row, column=col)
+	c.value = "Tactical"
+	c.alignment = Weapon.alignment
+	worksheet.column_dimensions[get_column_letter(col)].width = 8
+	
+	col += 1
+	c = worksheet.cell(row=row, column=col)
+	c.value = "Full"
+	c.alignment = Weapon.alignment
+	worksheet.column_dimensions[get_column_letter(col)].width = 4
+		
+	worksheet.freeze_panes = worksheet.cell(row=row+1, column=1)
+
+	if type(descriptions) == type(stat_methods) == tuple:
+		if len(descriptions) == len(stat_methods):
+			for description, stat_method in zip(descriptions, stat_methods):
+				row = add_stat_to_worksheet(worksheet, weapons, stat_name, description, stat_method, row)
+				row += 1
+		else:
+			raise Exception(f"Parameters are tuples of different length.")
+		
+	elif type(descriptions) == str:
+		row = add_stat_to_worksheet(worksheet, weapons, stat_name, descriptions, stat_methods, row)
+		
+	else:
+		raise Exception(f"Parameters aren't values nor tuples of values.")
+	
 	return
 
 def safe_to_xlsx_file(weapons : list[Weapon]):
@@ -665,29 +719,52 @@ def safe_to_xlsx_file(weapons : list[Weapon]):
 
 	workbook.remove(workbook.active)
 
-	add_stat_worksheet(workbook, weapons, "DMG", "Damage per bullet", "damage-per-bullet",
+	add_stats_worksheet(workbook, weapons, "Damage per bullet", "Damage per bullet", "damage-per-bullet",
 		       "The colored areas represent steady damage, the colorless areas represent decreasing damage.", Weapon.getDamage)
 
-	add_stat_worksheet(workbook, weapons, "DmgPerShot", "Damage per shot", "damage-per-shot",
+	add_stats_worksheet(workbook, weapons, "Damage per shot", "Damage per shot", "damage-per-shot",
 		       "The color gradient illustrates the damage compared to the weapon's base damage.", Weapon.getDamagePerShot)
 
-	add_stat_worksheet(workbook, weapons, "DPS", "Damage per second", "damage-per-second---dps",
+	add_stats_worksheet(workbook, weapons, "Damage per second", "Damage per second", "damage-per-second---dps",
 		       "The color gradient illustrates the DPS compared to the highest DPS of the weapon's type (excluding extended barrel stats).", Weapon.getDPS)
+
+	healths = (100, 110, 125, 120, 130, 145)
+	descriptions = ("against 1 armor (100 hp)", "against 2 armor (110 hp)", "against 3 armor (125 hp)",
+	  "against 1 armor with Rook armor (120 hp)", "against 2 armor with Rook armor (130 hp)", "against 3 armor with Rook armor (145 hp)")
+	stdok_methods = tuple([lambda weapon, index, hp=health: Weapon.getSTDOK(weapon, index, hp) for health in healths])
+	ttdok_methods = tuple([lambda weapon, index, hp=health: Weapon.getTTDOK(weapon, index, hp) for health in healths])
+
+	add_stats_worksheet(workbook, weapons,
+		     "STDOK",
+		     "Shots to down or kill - STDOK",
+			 "shots-to-down-or-kill---stdok",
+			 descriptions,
+			 stdok_methods)
+
+	add_stats_worksheet(workbook, weapons,
+		     "TTDOK",
+		     "Time to down or kill - TTDOK",
+			 "time-to-down-or-kill---ttdok",
+			 descriptions,
+			 ttdok_methods)
 
 	# save to file
 	workbook.save(file_path)
 
+	#os.system(file_path)
+
 	# resize columns
-	import win32com.client
-	excel = win32com.client.Dispatch('Excel.Application')
-	wb = excel.Workbooks.Open(file_path)
-	for i in range(1, excel.Worksheets.Count + 1):
-		excel.Worksheets(i).Activate()
-		excel.ActiveSheet.Columns.AutoFit()
-	excel.Worksheets(1).Activate()
-	wb.Save()
-	wb.Close()
-	excel.Quit()
+	# import win32com.client
+	# excel = win32com.client.Dispatch('Excel.Application')
+	# wb = excel.Workbooks.Open(file_path)
+	# for i in range(1, excel.Worksheets.Count + 1):
+	# 	excel.Worksheets(i).Activate()
+	# 	excel.ActiveSheet.Columns[0].AutoFit()
+	# 	excel.ActiveSheet.Columns(40,50).AutoFit()
+	# excel.Worksheets(1).Activate()
+	# wb.Save()
+	# wb.Close()
+	# excel.Quit()
 
 	return
 
