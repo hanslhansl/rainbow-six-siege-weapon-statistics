@@ -32,6 +32,7 @@ background_colors = ("5083EA", "B6668E", "76A5AE", "8771BD", "7CB563", "FFD609",
 ###################################################
 
 # install exception catcher
+from re import S
 import sys, traceback
 
 def show_exception_and_exit(exc_type, exc_value, tb):
@@ -115,12 +116,6 @@ class Weapon:
 	stylesBF = (lambda t=types, b=borders, f=fills: [NamedStyle(name=t[i] + " BF", border=b[i], fill=f[i]) for i in range(len(t))])()
 	stylesAB = (lambda t=types, a=alignment, b=borders: [NamedStyle(name=t[i] + " AB", alignment=a, border=b[i]) for i in range(len(t))])()
 	stylesA = NamedStyle(name="A", alignment=alignment)
-	
-	lowest_damage : dict[int, int] = {}
-	highest_damage : dict[int, int] = {}
-
-	lowest_dps : dict[int, int] = {}
-	highest_dps : dict[int, int] = {}
 
 	default_rpm = 0
 	default_ads = 0.
@@ -131,6 +126,11 @@ class Weapon:
 
 	extended_barrel_weapon_name = "+ extended barrel"
 	extended_barrel_damage_multiplier = 1.1
+	
+	tdok_hps = (100, 110, 125, 120, 130, 145)
+
+	lowest_highest_dps : dict[int, tuple[int, int]] = {}
+	lowest_highest_ttdok : dict[int, dict[int, tuple[int, int]]] = {}
 
 	def __init__(self, name_ : str, json_content_):
 		self.name = name_
@@ -150,24 +150,21 @@ class Weapon:
 		if type(self.json_content) != dict:
 			raise Exception(f"Weapon '{self.name}' doesn't deserialize to a dict.")
 		
-		if self.type_index not in Weapon.lowest_damage:
-			Weapon.lowest_damage[self.type_index] = min(self.damages)
+		DPS = tuple([round(self.dps(i)) for i in range(len(Weapon.distances))])
+		if self.type_index not in Weapon.lowest_highest_dps:
+			Weapon.lowest_highest_dps[self.type_index] = min(DPS), max(DPS)
 		else:
-			Weapon.lowest_damage[self.type_index] = min(Weapon.lowest_damage[self.type_index], min(self.damages))
-		if self.type_index not in Weapon.highest_damage:
-			Weapon.highest_damage[self.type_index] = max(self.damages)
-		else:
-			Weapon.highest_damage[self.type_index] = max(Weapon.highest_damage[self.type_index], max(self.damages))
+			Weapon.lowest_highest_dps[self.type_index] = min(Weapon.lowest_highest_dps[self.type_index][0], min(DPS)), max(Weapon.lowest_highest_dps[self.type_index][1], max(DPS))
 
-		DPS = tuple([self.getDPS(i)[0] for i in range(len(Weapon.distances))])
-		if self.type_index not in Weapon.lowest_dps:
-			Weapon.lowest_dps[self.type_index] = min(DPS)
-		else:
-			Weapon.lowest_dps[self.type_index] = min(Weapon.lowest_dps[self.type_index], min(DPS))
-		if self.type_index not in Weapon.highest_dps:
-			Weapon.highest_dps[self.type_index] = max(DPS)
-		else:
-			Weapon.highest_dps[self.type_index] = max(Weapon.highest_dps[self.type_index], max(DPS))
+		for hp in self.tdok_hps:
+			if hp not in Weapon.lowest_highest_ttdok:
+				Weapon.lowest_highest_ttdok[hp] = {}
+				
+			TTDOK = tuple([round(self.ttdok(i, hp)) for i in range(len(Weapon.distances))])
+			if self.type_index not in Weapon.lowest_highest_ttdok[hp]:
+				Weapon.lowest_highest_ttdok[hp][self.type_index] = min(TTDOK), max(TTDOK)
+			else:
+				Weapon.lowest_highest_ttdok[hp][self.type_index] = min(Weapon.lowest_highest_ttdok[hp][self.type_index][0], min(TTDOK)), max(Weapon.lowest_highest_ttdok[hp][self.type_index][1], max(TTDOK))
 
 		return
 
@@ -385,9 +382,9 @@ class Weapon:
 	def getDPS(self, index : int):
 		return round(self.dps(index)), self.getStyleAB()
 	def getSTDOK(self, index : int, hp : int):
-		return self.stdok(index, hp), self.getTDOKStyle(index, hp)
+		return self.stdok(index, hp), self.getSTDOKStyle(index, hp)
 	def getTTDOK(self, index : int, hp : int):
-		return round(self.ttdok(index, hp)), self.getTDOKStyle(index, hp)
+		return round(self.ttdok(index, hp)), self.getStyleAB()
 	def getCapacity(self):
 		return str(self.capacity[0]) + "+" + str(self.capacity[1]), self.getStyleABF()
 	def getReloadTimes(self):
@@ -416,7 +413,7 @@ class Weapon:
 			return self.getStyleABF()
 		else:
 			return self.getStyleA()
-	def getTDOKStyle(self, index : int, hp : int):
+	def getSTDOKStyle(self, index : int, hp : int):
 		a, b = self.getTDOKBorders(hp)
 		if index <= a:
 			return self.getStyleABF()
@@ -433,15 +430,15 @@ class Weapon:
 	def getStyleA(self):
 		return self.stylesA
 	
+	# interval methods for excel conditional formatting
+	def getDPSInterval(self):
+		return self.lowest_highest_dps[self.type_index]
+	def getDmgPerShotInterval(self):
+		return min(self.damages) * self.pellets, max(self.damages) * self.pellets
+	def getTTDOKInterval(self, hp : int):
+		return self.lowest_highest_ttdok[hp][self.type_index]
+
 	# other methods
-	def getStartEndValue(self, statName : str):
-		if statName == "Damage per second":
-			return self.lowest_dps[self.type_index], self.highest_dps[self.type_index]
-		elif statName == "Damage per shot":
-			return min(self.damages) * self.pellets, max(self.damages) * self.pellets
-		else:
-			raise Exception(f"Invalid stat name '{statName}'.")
-		return
 	def getDamageDropoffBorders(self):
 		lastInitialDamageIndex = -1
 		firstEndDamageIndex = -1
@@ -557,7 +554,7 @@ def get_weapons_dict() -> list[Weapon]:
 	
 	return weapons
 
-def add_weapon_to_stat_worksheet(worksheet, weapon : Weapon, stat_name : str, stat_method : typing.Any, row : int):
+def add_weapon_to_stat_worksheet(worksheet, weapon : Weapon, sub_name : str, stat_method : typing.Any, interval_method : typing.Any, row : int):
 	c = worksheet.cell(row=row, column=1)
 	c.value, c.style = weapon.getName()
 		
@@ -565,10 +562,13 @@ def add_weapon_to_stat_worksheet(worksheet, weapon : Weapon, stat_name : str, st
 		c = worksheet.cell(row=row, column=col)
 		c.value, c.style = stat_method(weapon, col - 2)
 
-	if stat_name in ("Damage per second", "Damage per shot"):
+	if interval_method != None:
 		end_color = background_colors[weapon.type_index]
 		start_color = "FFFFFF"
-		start_value, end_value = weapon.getStartEndValue(stat_name)
+		if sub_name == "Time to down or kill":
+			end_color, start_color = start_color, end_color
+
+		start_value, end_value = interval_method(weapon)
 
 		color_rule = ColorScaleRule(start_type="num", start_value=start_value, start_color=start_color,
 									end_type="num", end_value=end_value, end_color=end_color)
@@ -603,7 +603,7 @@ def add_weapon_to_stat_worksheet(worksheet, weapon : Weapon, stat_name : str, st
 		# c2.style = c1.style
 	return
 
-def add_stat_to_worksheet(worksheet : typing.Any, weapons : list[Weapon], sub_name : str, description : str, stat_method : typing.Any, row : int):
+def add_stat_to_worksheet(worksheet : typing.Any, weapons : list[Weapon], sub_name : str, description : str, stat_method : typing.Any, interval_method : typing.Any, row : int):
 	if description != "":
 		row += 1
 		worksheet.merge_cells(start_row=row, end_row=row, start_column=1, end_column=1 + len(Weapon.distances))
@@ -613,16 +613,17 @@ def add_stat_to_worksheet(worksheet : typing.Any, weapons : list[Weapon], sub_na
 	
 	for weapon in weapons:
 		row += 1
-		add_weapon_to_stat_worksheet(worksheet, weapon, sub_name, stat_method, row)
+		add_weapon_to_stat_worksheet(worksheet, weapon, sub_name, stat_method, interval_method, row)
 		
 		if (weapon.extended_barrel):
 			row += 1
 			extended_barrel_weapon = weapon.getExtendedBarrelWeapon()
-			add_weapon_to_stat_worksheet(worksheet, extended_barrel_weapon, sub_name, stat_method, row)
+			add_weapon_to_stat_worksheet(worksheet, extended_barrel_weapon, sub_name, stat_method, interval_method, row)
 		
 	return row
 
-def add_stats_worksheet(workbook : typing.Any, weapons : list[Weapon], worksheet_name : str, stat_name : str, stat_link : str, description : str, sub_names : str | tuple[str,...], stat_methods : typing.Any | tuple[typing.Any]):
+def add_stats_worksheet(workbook : typing.Any, weapons : list[Weapon], worksheet_name : str, stat_name : str, stat_link : str,
+			description : str, sub_names : tuple[str,...], stat_methods : tuple[typing.Any], interval_methods : tuple[typing.Any]):
 	worksheet = workbook.create_sheet(worksheet_name)
 	
 	row = 1
@@ -724,19 +725,12 @@ def add_stats_worksheet(workbook : typing.Any, weapons : list[Weapon], worksheet
 		
 	worksheet.freeze_panes = worksheet.cell(row=row+1, column=1)
 
-	if type(sub_names) == type(stat_methods) == tuple:
-		if len(sub_names) == len(stat_methods):
-			for sub_name, stat_method in zip(sub_names, stat_methods):
-				row = add_stat_to_worksheet(worksheet, weapons, stat_name, sub_name, stat_method, row)
-				row += 1
-		else:
-			raise Exception(f"Parameters are tuples of different length.")
-		
-	elif type(sub_names) == str:
-		row = add_stat_to_worksheet(worksheet, weapons, stat_name, sub_names, stat_methods, row)
-		
+	if len(sub_names) == len(stat_methods) == len(interval_methods):
+		for sub_name, stat_method, interval_method in zip(sub_names, stat_methods, interval_methods):
+			row = add_stat_to_worksheet(worksheet, weapons, stat_name, sub_name, stat_method, interval_method, row)
+			row += 1
 	else:
-		raise Exception(f"Parameters aren't values nor tuples of values.")
+		raise Exception(f"Parameters are tuples of different length.")
 	
 	return
 
@@ -752,15 +746,14 @@ def safe_to_xlsx_file(weapons : list[Weapon]):
 	workbook.remove(workbook.active)
 
 	add_stats_worksheet(workbook, weapons, "Damage per bullet", "Damage per bullet", "damage-per-bullet",
-		       "The colored areas represent steady damage, the white areas represent decreasing damage.", "", Weapon.getDamage)
+		       "The colored areas represent steady damage, the white areas represent decreasing damage.", ("", ), (Weapon.getDamage, ), (None, ))
 
 	add_stats_worksheet(workbook, weapons, "Damage per shot", "Damage per shot", "damage-per-shot",
-		       "The color gradient illustrates the damage compared to the weapon's base damage.", "", Weapon.getDamagePerShot)
+		       "The color gradient illustrates the damage compared to the weapon's base damage.", ("", ), (Weapon.getDamagePerShot, ), (Weapon.getDmgPerShotInterval, ))
 
 	add_stats_worksheet(workbook, weapons, "Damage per second", "Damage per second", "damage-per-second---dps",
-		       "The color gradient illustrates the DPS compared to the highest DPS of the weapon's type (excluding extended barrel stats).", "", Weapon.getDPS)
+		       "The color gradient illustrates the DPS compared to the highest DPS of the weapon's type (excluding extended barrel stats).", ("", ), (Weapon.getDPS, ), (Weapon.getDPSInterval, ))
 
-	healths = (100, 110, 125, 120, 130, 145)
 	sub_names = ("against 1 armor (100 hp)", "against 2 armor (110 hp)", "against 3 armor (125 hp)",
 	  "against 1 armor with Rook armor (120 hp)", "against 2 armor with Rook armor (130 hp)", "against 3 armor with Rook armor (145 hp)")
 
@@ -769,16 +762,18 @@ def safe_to_xlsx_file(weapons : list[Weapon]):
 		     "Shots to down or kill",
 			 "shots-to-down-or-kill---stdok",
 			 "The colored areas represent steady STDOK, the white areas represent increasing STDOK.",
-			 sub_names,
-			 tuple([lambda weapon, index, hp=health: Weapon.getSTDOK(weapon, index, hp) for health in healths]))
+			 tuple(["STDOK " + sub for sub in sub_names]),
+			 tuple([lambda weapon, index, hp=health: Weapon.getSTDOK(weapon, index, hp) for health in Weapon.tdok_hps]),
+			 tuple([None for health in Weapon.tdok_hps]))
 
 	add_stats_worksheet(workbook, weapons,
 		     "TTDOK",
 		     "Time to down or kill",
 			 "time-to-down-or-kill---ttdok",
-			 "The colored areas represent steady TTDOK, the white areas represent increasing TTDOK.",
-			 sub_names,
-			 tuple([lambda weapon, index, hp=health: Weapon.getTTDOK(weapon, index, hp) for health in healths]))
+			 "The color gradient illustrates the TTDOK compared to the lowest TTDOK of the weapon's type (excluding extended barrel stats).",
+			 tuple(["TTDOK " + sub for sub in sub_names]),
+			 tuple([lambda weapon, index, hp=health: Weapon.getTTDOK(weapon, index, hp) for health in Weapon.tdok_hps]),
+			 tuple([lambda weapon, hp=health: Weapon.getTTDOKInterval(weapon, hp) for health in Weapon.tdok_hps]))
 
 	# save to file
 	workbook.save(file_path)
