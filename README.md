@@ -29,7 +29,7 @@ The damage per second calculates as $DPS = DmgPerShot * RPS = DmgPerShot * RPM /
 ## Shots to down or kill - STDOK
 For a target with $x$ hp the STDOK calculate as $\lceil {x \over Damage} \rceil$. No measuring necessary.
 ## Time to down or kill - TTDOK
-For a target with $x$ hp the TTDOK in milliseconds calculates as ${STDOK \over rpms}$. No measuring necessary.
+For a target with $x$ hp the TTDOK in milliseconds calculates as ${STDOK - 1 \over rpms}$. No measuring necessary.
 ## Magazine capacity
 Most weapons have, in addition to the bullets loaded in the magazine, one bullet loaded in the chamber. For those weapons this value is displayed as $Capacity+1$ (e.g. $30+1$, $20+1$, etc.). For all other weapons without a bullet loaded in the chamber this value is displayed as $Capacity+0$ (e.g. $100+0$, $80+0$).
 ## Aim down sight time - ADS time
