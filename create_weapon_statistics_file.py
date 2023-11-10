@@ -183,6 +183,9 @@ class Weapon:
 		
 		return self._type_index
 	@property
+	def type(self) -> str:
+		return self.types[self.type_index]
+	@property
 	def rpm(self) -> int:
 		if self._rpm == None:
 			# get weapon fire rate
@@ -562,11 +565,9 @@ def add_weapon_to_stat_worksheet(worksheet, weapon : Weapon, sub_name : str, sta
 		c = worksheet.cell(row=row, column=col)
 		c.value, c.style = stat_method(weapon, col - 2)
 
-	if interval_method != None:
+	if interval_method != None and sub_name == "Damage per shot":
 		end_color = background_colors[weapon.type_index]
 		start_color = "FFFFFF"
-		if sub_name == "Time to down or kill":
-			end_color, start_color = start_color, end_color
 
 		start_value, end_value = interval_method(weapon)
 
@@ -603,7 +604,8 @@ def add_weapon_to_stat_worksheet(worksheet, weapon : Weapon, sub_name : str, sta
 		# c2.style = c1.style
 	return
 
-def add_stat_to_worksheet(worksheet : typing.Any, weapons : list[Weapon], sub_name : str, description : str, stat_method : typing.Any, interval_method : typing.Any, row : int):
+def add_stat_to_worksheet(worksheet : typing.Any, weapons : list[Weapon], sub_name : str, description : str,
+			  stat_method : typing.Any, interval_method : typing.Any, row : int):
 	if description != "":
 		row += 1
 		worksheet.merge_cells(start_row=row, end_row=row, start_column=1, end_column=1 + len(Weapon.distances))
@@ -611,10 +613,36 @@ def add_stat_to_worksheet(worksheet : typing.Any, weapons : list[Weapon], sub_na
 		c.value = description
 		c.font = Font(bold=True)
 	
-	for weapon in weapons:
+	old_type_index = 0
+	start_row = 0
+	old_interval = None
+	apply_cond_format = interval_method != None and sub_name in ("Damage per second", "Time to down or kill")
+	
+	for i in range(len(weapons)):
+		weapon = weapons[i]
 		row += 1
-		add_weapon_to_stat_worksheet(worksheet, weapon, sub_name, stat_method, interval_method, row)
 		
+		if apply_cond_format and i == 0:
+			old_type_index = weapon.type_index
+			start_row = row
+			old_interval = interval_method(weapon)
+
+		elif apply_cond_format:
+			if weapon.type_index != old_type_index or i == len(weapons)-1:
+				end_color = background_colors[old_type_index]
+				start_color = "FFFFFF"
+				if sub_name == "Time to down or kill":
+					end_color, start_color = start_color, end_color
+					
+				start_value, end_value = old_interval
+				color_rule = ColorScaleRule(start_type="num", start_value=start_value, start_color=start_color, end_type="num", end_value=end_value, end_color=end_color)
+				worksheet.conditional_formatting.add(f"{get_column_letter(2)}{start_row}:{get_column_letter(len(Weapon.distances)+2)}{row-1+(i == len(weapons)-1)}", color_rule)
+				
+				old_type_index = weapon.type_index
+				start_row = row
+				old_interval = interval_method(weapon)
+			
+		add_weapon_to_stat_worksheet(worksheet, weapon, sub_name, stat_method, interval_method, row)
 		if (weapon.extended_barrel):
 			row += 1
 			extended_barrel_weapon = weapon.getExtendedBarrelWeapon()
@@ -736,49 +764,177 @@ def add_stats_worksheet(workbook : typing.Any, weapons : list[Weapon], worksheet
 
 def safe_to_xlsx_file(weapons : list[Weapon]):
 	""" https://openpyxl.readthedocs.io/en/stable/ """
-	file_path = os.path.join(os.path.dirname(os.path.realpath(__file__)), "Rainbow-Six-Siege-Weapon-Statistics.xlsx")
+	
+	stat_names = ("Damage per bullet", "Damage per shot", "Damage per second", "Shots to down or kill", "Time to down or kill")
+	sheet_names = ("Damage per bullet", "Damage per shot", "DPS", "STDOK", "TTDOK")
+	stat_links = ("damage-per-bullet", "damage-per-shot", "damage-per-second---dps", "shots-to-down-or-kill---stdok", "time-to-down-or-kill---ttdok")
+
+	excel_file_path = os.path.join(os.path.dirname(os.path.realpath(__file__)), "Rainbow-Six-Siege-Weapon-Statistics.xlsx")
+	html_file_path = os.path.join(os.path.dirname(os.path.realpath(__file__)), "Rainbow-Six-Siege-Weapon-Statistics.html")
 
 	weapons = sorted(weapons, key=lambda x: x.type_index, reverse=False)
 
-	# create the workbook
+	# html file
+	string = """<!DOCTYPE html><html lang="en"><body>"""
+	string += """<script> function toggledCheckbox(event)
+{
+	if (event.target.checked) {
+		document.getElementById("row_" + event.target.id).style.visibility = 'visible';
+	} else {
+		document.getElementById("row_" + event.target.id).style.visibility = 'collapse';
+	}
+}
+function changedStat(event) {
+	let values = document.getElementById('values');
+	let tbody = values.children[0];
+	let data = document.getElementById('data');
+	let data_tbody = data.children[0];
+	
+	if (event.target.id == 'Damage per bullet') {
+		for (let i = 1; i < tbody.childElementCount; i++) {
+			let row = tbody.children[i];
+			let data_row = data_tbody.children[i-1];
+			for (let j = 1; j < """ + f"{len(Weapon.distances) + 1}" + """; j++) {
+				row.children[j].textContent = data_row.children[j-1].textContent;
+			}
+		}
+	} else if (event.target.id == 'Damage per shot') {
+		for (let i = 1; i < tbody.childElementCount; i++) {
+			let row = tbody.children[i];
+			let pellets = parseInt(row.children[47].textContent);
+			let data_row = data_tbody.children[i-1];
+			for (let j = 1; j < """ + f"{len(Weapon.distances) + 1}" + """; j++) {
+				row.children[j].textContent = parseInt(data_row.children[j-1].textContent) * parseInt(pellets);
+			}
+		}
+	} else if (event.target.id == 'Damage per second') {
+		for (let i = 1; i < tbody.childElementCount; i++) {
+			let row = tbody.children[i];
+			let rpm = parseInt(row.children[45].textContent);
+			let data_row = data_tbody.children[i-1];
+			for (let j = 1; j < """ + f"{len(Weapon.distances) + 1}" + """; j++) {
+				row.children[j].textContent = Math.round(parseInt(data_row.children[j-1].textContent) * rpm / 60.);
+			}
+		}
+	} else if (event.target.id == 'Shots to down or kill') {
+		let hp = 100;
+		for (let i = 1; i < tbody.childElementCount; i++) {
+			let row = tbody.children[i];
+			let data_row = data_tbody.children[i-1];
+			for (let j = 1; j < """ + f"{len(Weapon.distances) + 1}" + """; j++) {
+				row.children[j].textContent = Math.ceil(hp / parseInt(data_row.children[j-1].textContent));
+			}
+		}
+	} else if (event.target.id == 'Time to down or kill') {
+		let hp = 100;
+		for (let i = 1; i < tbody.childElementCount; i++) {
+			let row = tbody.children[i];
+			let rpm = parseInt(row.children[45].textContent);
+			let data_row = data_tbody.children[i-1];
+			for (let j = 1; j < """ + f"{len(Weapon.distances) + 1}" + """; j++) {
+				row.children[j].textContent = Math.round((Math.ceil(hp / parseInt(data_row.children[j-1].textContent)) - 1) * 60000 / rpm);
+			}
+		}
+	}
+}
+</script>"""
+
+	# weapon filter
+	string += """<table><tr style="vertical-align:top">"""
+	current_type_index = 0
+	for weapon in weapons:
+		if current_type_index != weapon.type_index or weapon == weapons[0]:
+			if weapon != weapons[0]:
+				current_type_index = weapon.type_index
+				string += f"</fieldset></td>"
+			string += f"""<td><fieldset><legend>{weapon.types[weapon.type_index]}{"" if weapon.types[weapon.type_index] == "Else" else "s"}:</legend>"""
+			
+		weapon_name = weapon.name
+		string += f"""<input type="checkbox" id="{weapon_name}" value="{weapon_name}" onchange="toggledCheckbox(event)"><label for="{weapon_name}">{weapon_name}</label><br>"""
+
+		if weapon == weapons[-1]:
+			string += "</fieldset></td>"
+		pass
+	string += """</tr></table>"""
+	
+	# displayed stat
+	string += """<fieldset><legend>Stat:</legend><form><table id="displayed stat"><tr>"""
+	for stat in stat_names:
+		string += f"""<td><input type="radio" id="{stat}" name="stat" onchange="changedStat(event)" {"checked" if stat == stat_names[0] else ""}><label for="{stat}">{stat}</label></td>"""
+	string += """</tr></table></form></fieldset>"""
+
+	# values
+	string += """<table id="values">"""
+	string += "<tr>" + ("<td></td>" * 51) + """<th colspan="2">Reload time</th></tr>"""
+	string += "<tr><th>Distance</th>"
+	for distance in Weapon.distances:
+		string += f"""<th>{distance}</th>"""
+	string += """<th>&emsp;</th><th>Type</th><th>&emsp;</th><th>RPM</th><th>Capacity</th><th>Pellets</th><th>&emsp;</th><th>ADS time</th><th>&emsp;</th><td>Tactical</td><td>Full</td></tr>"""
+		
+	for weapon in weapons:
+		bg = f"background-color:#{background_colors[weapon.type_index]};"
+		string += f"""<tr id="row_{weapon.name}" style="visibility:collapse;"><td style="{bg}">{weapon.name}</td>"""
+		for i in range(len(Weapon.distances)):
+			string += f"""<td>{weapon.damages[i]}</td>"""
+		string += f"""<td></td><td style="{bg}">{weapon.type}</td><td></td><td style="{bg}">{weapon.rpm}</td><td style="{bg}">{weapon.capacity[0]}+{weapon.capacity[1]}</td>"""
+		string += f"""<td style="{bg}">{weapon.pellets}</td><td></td><td style="{bg}">{weapon.ads}</td><td></td><td>a</td><td>b</td></tr>"""
+		string += "</tr>"
+	string += "</table>"
+
+	string += """<table id="data">"""
+	for weapon in weapons:
+		string += f"""<tr style="display:none">"""
+		for i in range(len(Weapon.distances)):
+			string += f"""<td>{weapon.damages[i]}</td>"""
+		string += "</tr>"
+	string += "</table>"	
+
+
+	string += """</body></html>"""
+
+	with open(html_file_path, "w") as file:
+		file.write(string)
+		
+	os.system("start " + html_file_path)
+	#return
+
+	# excel file
 	workbook = Workbook()
 
 	workbook.remove(workbook.active)
 
-	add_stats_worksheet(workbook, weapons, "Damage per bullet", "Damage per bullet", "damage-per-bullet",
-		       "The colored areas represent steady damage, the white areas represent decreasing damage.", ("", ), (Weapon.getDamage, ), (None, ))
+	add_stats_worksheet(workbook, weapons, sheet_names[0], stat_names[0], stat_links[0],
+		"The colored areas represent steady damage, the white areas represent decreasing damage.", ("", ), (Weapon.getDamage, ), (None, ))
 
-	add_stats_worksheet(workbook, weapons, "Damage per shot", "Damage per shot", "damage-per-shot",
-		       "The color gradient illustrates the damage compared to the weapon's base damage.", ("", ), (Weapon.getDamagePerShot, ), (Weapon.getDmgPerShotInterval, ))
+	add_stats_worksheet(workbook, weapons, sheet_names[1], stat_names[1], stat_links[1],
+		"The color gradient illustrates the damage compared to the weapon's base damage.", ("", ), (Weapon.getDamagePerShot, ), (Weapon.getDmgPerShotInterval, ))
 
-	add_stats_worksheet(workbook, weapons, "Damage per second", "Damage per second", "damage-per-second---dps",
-		       "The color gradient illustrates the DPS compared to the highest DPS of the weapon's type (excluding extended barrel stats).", ("", ), (Weapon.getDPS, ), (Weapon.getDPSInterval, ))
+	add_stats_worksheet(workbook, weapons, sheet_names[2], stat_names[2], stat_links[2],
+		"The color gradient illustrates the DPS compared to the highest DPS of the weapon's type (excluding extended barrel stats).", ("", ), (Weapon.getDPS, ), (Weapon.getDPSInterval, ))
 
 	sub_names = ("against 1 armor (100 hp)", "against 2 armor (110 hp)", "against 3 armor (125 hp)",
 	  "against 1 armor with Rook armor (120 hp)", "against 2 armor with Rook armor (130 hp)", "against 3 armor with Rook armor (145 hp)")
 
 	add_stats_worksheet(workbook, weapons,
-		     "STDOK",
-		     "Shots to down or kill",
-			 "shots-to-down-or-kill---stdok",
-			 "The colored areas represent steady STDOK, the white areas represent increasing STDOK.",
-			 tuple(["STDOK " + sub for sub in sub_names]),
-			 tuple([lambda weapon, index, hp=health: Weapon.getSTDOK(weapon, index, hp) for health in Weapon.tdok_hps]),
-			 tuple([None for health in Weapon.tdok_hps]))
+		sheet_names[3],
+		stat_names[3],
+		stat_links[3],
+		"The colored areas represent steady STDOK, the white areas represent increasing STDOK.",
+		tuple(["STDOK " + sub for sub in sub_names]),
+		tuple([lambda weapon, index, hp=health: Weapon.getSTDOK(weapon, index, hp) for health in Weapon.tdok_hps]),
+		tuple([None for health in Weapon.tdok_hps]))
 
 	add_stats_worksheet(workbook, weapons,
-		     "TTDOK",
-		     "Time to down or kill",
-			 "time-to-down-or-kill---ttdok",
-			 "The color gradient illustrates the TTDOK compared to the lowest TTDOK of the weapon's type (excluding extended barrel stats).",
-			 tuple(["TTDOK " + sub for sub in sub_names]),
-			 tuple([lambda weapon, index, hp=health: Weapon.getTTDOK(weapon, index, hp) for health in Weapon.tdok_hps]),
-			 tuple([lambda weapon, hp=health: Weapon.getTTDOKInterval(weapon, hp) for health in Weapon.tdok_hps]))
+		sheet_names[4],
+		stat_names[4],
+		stat_links[4],
+		"The color gradient illustrates the TTDOK compared to the lowest TTDOK of the weapon's type (excluding extended barrel stats).",
+		tuple(["TTDOK " + sub for sub in sub_names]),
+		tuple([lambda weapon, index, hp=health: Weapon.getTTDOK(weapon, index, hp) for health in Weapon.tdok_hps]),
+		tuple([lambda weapon, hp=health: Weapon.getTTDOKInterval(weapon, hp) for health in Weapon.tdok_hps]))
 
 	# save to file
-	workbook.save(file_path)
-
-	#os.system(file_path)
+	workbook.save(excel_file_path)
 
 	# resize columns
 	# import win32com.client
@@ -792,7 +948,8 @@ def safe_to_xlsx_file(weapons : list[Weapon]):
 	# wb.Save()
 	# wb.Close()
 	# excel.Quit()
-
+	
+	os.system("start " + excel_file_path)
 	return
 
 
