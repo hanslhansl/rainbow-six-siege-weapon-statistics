@@ -778,21 +778,29 @@ def safe_to_xlsx_file(weapons : list[Weapon]):
 	string = """<!DOCTYPE html><html lang="en"><body>"""
 	string += """<script> function toggledCheckbox(event)
 {
-	if (event.target.checked) {
+	if (event.target.checked)
 		document.getElementById("row_" + event.target.id).style.visibility = 'visible';
-		//document.getElementById("row_" + event.target.id).style.display = 'block';
-	} else {
+	else
 		document.getElementById("row_" + event.target.id).style.visibility = 'collapse';
-		//document.getElementById("row_" + event.target.id).style.display = 'none';
-	}
 }
-function changedStat(event) {
+function changedStat() {
 	let values = document.getElementById('values');
 	let tbody = values.children[0];
 	let data = document.getElementById('data');
 	let data_tbody = data.children[0];
 	
-	let hp = 100;
+	let displayed_stats_tbody = document.getElementById('displayed stat').children[0];
+	
+	let row0 = displayed_stats_tbody.children[0];
+	let dmgPerBullet = row0.children[0].children[0];
+	let dmgPerShot = row0.children[1].children[0];
+	let dmgPerSecond = row0.children[2].children[0];
+	let STDOK = row0.children[3].children[0];
+	let TTDOK = row0.children[4].children[0];
+	
+	let row1 = displayed_stats_tbody.children[1];
+	let hp = row1.children[3].children[0].valueAsNumber;
+	//let hp = 100;
 	
 	for (let i = 0; i < tbody.childElementCount; i++)
 	{
@@ -805,9 +813,19 @@ function changedStat(event) {
 			let cell = row.children[j];
 			let data_cell = data_row.children[j-1];
 		
-			//cell.textContent = i + ":" + j + ":" + data_cell.textContent;
 			
-			if (event.target.id == 'Damage per bullet')
+			if (dmgPerBullet.checked == true)
+				cell.textContent = data_cell.textContent;
+			else if (dmgPerShot.checked == true)
+				cell.textContent = parseInt(data_cell.textContent) * parseInt(pellets);
+			else if (dmgPerSecond.checked == true)
+				cell.textContent = Math.round(parseFloat(data_cell.textContent) * pellets * rpm / 60.);
+			else if (STDOK.checked == true)
+				cell.textContent = Math.ceil(hp / parseInt(data_cell.textContent));
+			else if (TTDOK.checked == true)
+				cell.textContent = Math.round((Math.ceil(hp / parseInt(data_cell.textContent)) - 1) * 60000 / rpm);
+			
+			/*if (event.target.id == 'Damage per bullet')
 				cell.textContent = data_cell.textContent;
 			else if (event.target.id == 'Damage per shot')
 				cell.textContent = parseInt(data_cell.textContent) * parseInt(pellets);
@@ -816,7 +834,7 @@ function changedStat(event) {
 			else if (event.target.id == 'Shots to down or kill')
 				cell.textContent = Math.ceil(hp / parseInt(data_cell.textContent));
 			else if (event.target.id == 'Time to down or kill')
-				cell.textContent = Math.round((Math.ceil(hp / parseInt(data_cell.textContent)) - 1) * 60000 / rpm);
+				cell.textContent = Math.round((Math.ceil(hp / parseInt(data_cell.textContent)) - 1) * 60000 / rpm);*/
 		}
 	}
 }
@@ -843,7 +861,8 @@ function changedStat(event) {
 	# displayed stat
 	string += """<fieldset><legend>Stat:</legend><form><table id="displayed stat"><tr>"""
 	for stat in stat_names:
-		string += f"""<td><input type="radio" id="{stat}" name="stat" onchange="changedStat(event)" {"checked" if stat == stat_names[0] else ""}><label for="{stat}">{stat}</label></td>"""
+		string += f"""<td><input type="radio" id="{stat}" name="stat" onchange="changedStat()" {"checked" if stat == stat_names[0] else ""}><label for="{stat}">{stat}</label></td>"""
+	string += f"""<tr><td></td><td></td><td></td><td colspan="2" align="center"><input type="number" id="hp" value="100" onchange="changedStat()"><label for="hp"> hp</label></td></tr>"""
 	string += """</tr></table></form></fieldset>"""
 
 	# values
@@ -857,7 +876,6 @@ function changedStat(event) {
 	for weapon in weapons:
 		bg = f"background-color:#{background_colors[weapon.type_index]};"
 		string += f"""<tr id="row_{weapon.name}" style="visibility:collapse;"><td style="{bg}">{weapon.name}</td>"""
-		#string += f"""<tr id="row_{weapon.name}" style="display:none;"><td style="{bg}">{weapon.name}</td>"""
 		for i in range(len(Weapon.distances)):
 			string += f"""<td>{weapon.damages[i]}</td>"""
 		string += f"""<td></td><td style="{bg}">{weapon.type}</td><td></td><td style="{bg}">{weapon.rpm}</td><td style="{bg}">{weapon.capacity[0]}+{weapon.capacity[1]}</td>"""
