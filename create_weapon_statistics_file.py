@@ -150,7 +150,7 @@ class Weapon:
 		if type(self.json_content) != dict:
 			raise Exception(f"Weapon '{self.name}' doesn't deserialize to a dict.")
 		
-		DPS = tuple([round(self.dps(i)) for i in range(len(Weapon.distances))])
+		DPS = tuple([int(self.dps(i) + 0.5) for i in range(len(Weapon.distances))])
 		if self.type_index not in Weapon.lowest_highest_dps:
 			Weapon.lowest_highest_dps[self.type_index] = min(DPS), max(DPS)
 		else:
@@ -160,7 +160,7 @@ class Weapon:
 			if hp not in Weapon.lowest_highest_ttdok:
 				Weapon.lowest_highest_ttdok[hp] = {}
 				
-			TTDOK = tuple([round(self.ttdok(i, hp)) for i in range(len(Weapon.distances))])
+			TTDOK = tuple([int(self.ttdok(i, hp) + 0.5) for i in range(len(Weapon.distances))])
 			if self.type_index not in Weapon.lowest_highest_ttdok[hp]:
 				Weapon.lowest_highest_ttdok[hp][self.type_index] = min(TTDOK), max(TTDOK)
 			else:
@@ -358,7 +358,7 @@ class Weapon:
 	def damage_per_shot(self, index : int):
 		return self.damages[index] * self.pellets
 	def dps(self, index : int):
-		return self.damages[index] * self.pellets * self.rps
+		return self.damages[index] * self.pellets * self.rpm / 60.
 	def stdok(self, index : int, hp : int):
 		return math.ceil(hp / self.damages[index] / self.pellets)
 	def ttdok(self, index : int, hp : int):
@@ -383,11 +383,11 @@ class Weapon:
 	def getDamagePerShot(self, index : int):
 		return self.damage_per_shot(index), self.getStyleAB()
 	def getDPS(self, index : int):
-		return round(self.dps(index)), self.getStyleAB()
+		return int(self.dps(index) + 0.5), self.getStyleAB()
 	def getSTDOK(self, index : int, hp : int):
 		return self.stdok(index, hp), self.getSTDOKStyle(index, hp)
 	def getTTDOK(self, index : int, hp : int):
-		return round(self.ttdok(index, hp)), self.getStyleAB()
+		return int(self.ttdok(index, hp) + 0.5), self.getStyleAB()
 	def getCapacity(self):
 		return str(self.capacity[0]) + "+" + str(self.capacity[1]), self.getStyleABF()
 	def getReloadTimes(self):
@@ -780,8 +780,10 @@ def safe_to_xlsx_file(weapons : list[Weapon]):
 {
 	if (event.target.checked) {
 		document.getElementById("row_" + event.target.id).style.visibility = 'visible';
+		//document.getElementById("row_" + event.target.id).style.display = 'block';
 	} else {
 		document.getElementById("row_" + event.target.id).style.visibility = 'collapse';
+		//document.getElementById("row_" + event.target.id).style.display = 'none';
 	}
 }
 function changedStat(event) {
@@ -790,50 +792,31 @@ function changedStat(event) {
 	let data = document.getElementById('data');
 	let data_tbody = data.children[0];
 	
-	if (event.target.id == 'Damage per bullet') {
-		for (let i = 1; i < tbody.childElementCount; i++) {
-			let row = tbody.children[i];
-			let data_row = data_tbody.children[i-1];
-			for (let j = 1; j < """ + f"{len(Weapon.distances) + 1}" + """; j++) {
-				row.children[j].textContent = data_row.children[j-1].textContent;
-			}
-		}
-	} else if (event.target.id == 'Damage per shot') {
-		for (let i = 1; i < tbody.childElementCount; i++) {
-			let row = tbody.children[i];
-			let pellets = parseInt(row.children[47].textContent);
-			let data_row = data_tbody.children[i-1];
-			for (let j = 1; j < """ + f"{len(Weapon.distances) + 1}" + """; j++) {
-				row.children[j].textContent = parseInt(data_row.children[j-1].textContent) * parseInt(pellets);
-			}
-		}
-	} else if (event.target.id == 'Damage per second') {
-		for (let i = 1; i < tbody.childElementCount; i++) {
-			let row = tbody.children[i];
-			let rpm = parseInt(row.children[45].textContent);
-			let data_row = data_tbody.children[i-1];
-			for (let j = 1; j < """ + f"{len(Weapon.distances) + 1}" + """; j++) {
-				row.children[j].textContent = Math.round(parseInt(data_row.children[j-1].textContent) * rpm / 60.);
-			}
-		}
-	} else if (event.target.id == 'Shots to down or kill') {
-		let hp = 100;
-		for (let i = 1; i < tbody.childElementCount; i++) {
-			let row = tbody.children[i];
-			let data_row = data_tbody.children[i-1];
-			for (let j = 1; j < """ + f"{len(Weapon.distances) + 1}" + """; j++) {
-				row.children[j].textContent = Math.ceil(hp / parseInt(data_row.children[j-1].textContent));
-			}
-		}
-	} else if (event.target.id == 'Time to down or kill') {
-		let hp = 100;
-		for (let i = 1; i < tbody.childElementCount; i++) {
-			let row = tbody.children[i];
-			let rpm = parseInt(row.children[45].textContent);
-			let data_row = data_tbody.children[i-1];
-			for (let j = 1; j < """ + f"{len(Weapon.distances) + 1}" + """; j++) {
-				row.children[j].textContent = Math.round((Math.ceil(hp / parseInt(data_row.children[j-1].textContent)) - 1) * 60000 / rpm);
-			}
+	let hp = 100;
+	
+	for (let i = 0; i < tbody.childElementCount; i++)
+	{
+		let row = tbody.children[i+2];
+		let data_row = data_tbody.children[i];
+		let pellets = parseInt(row.children[47].textContent);
+		let rpm = parseInt(row.children[45].textContent);
+		for (let j = 1; j < """ + f"{len(Weapon.distances) + 1}" + """; j++)
+		{
+			let cell = row.children[j];
+			let data_cell = data_row.children[j-1];
+		
+			//cell.textContent = i + ":" + j + ":" + data_cell.textContent;
+			
+			if (event.target.id == 'Damage per bullet')
+				cell.textContent = data_cell.textContent;
+			else if (event.target.id == 'Damage per shot')
+				cell.textContent = parseInt(data_cell.textContent) * parseInt(pellets);
+			else if (event.target.id == 'Damage per second')
+				cell.textContent = Math.round(parseFloat(data_cell.textContent) * pellets * rpm / 60.);
+			else if (event.target.id == 'Shots to down or kill')
+				cell.textContent = Math.ceil(hp / parseInt(data_cell.textContent));
+			else if (event.target.id == 'Time to down or kill')
+				cell.textContent = Math.round((Math.ceil(hp / parseInt(data_cell.textContent)) - 1) * 60000 / rpm);
 		}
 	}
 }
@@ -874,6 +857,7 @@ function changedStat(event) {
 	for weapon in weapons:
 		bg = f"background-color:#{background_colors[weapon.type_index]};"
 		string += f"""<tr id="row_{weapon.name}" style="visibility:collapse;"><td style="{bg}">{weapon.name}</td>"""
+		#string += f"""<tr id="row_{weapon.name}" style="display:none;"><td style="{bg}">{weapon.name}</td>"""
 		for i in range(len(Weapon.distances)):
 			string += f"""<td>{weapon.damages[i]}</td>"""
 		string += f"""<td></td><td style="{bg}">{weapon.type}</td><td></td><td style="{bg}">{weapon.rpm}</td><td style="{bg}">{weapon.capacity[0]}+{weapon.capacity[1]}</td>"""

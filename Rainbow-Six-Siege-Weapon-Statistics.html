@@ -2,8 +2,10 @@
 {
 	if (event.target.checked) {
 		document.getElementById("row_" + event.target.id).style.visibility = 'visible';
+		//document.getElementById("row_" + event.target.id).style.display = 'block';
 	} else {
 		document.getElementById("row_" + event.target.id).style.visibility = 'collapse';
+		//document.getElementById("row_" + event.target.id).style.display = 'none';
 	}
 }
 function changedStat(event) {
@@ -12,50 +14,31 @@ function changedStat(event) {
 	let data = document.getElementById('data');
 	let data_tbody = data.children[0];
 	
-	if (event.target.id == 'Damage per bullet') {
-		for (let i = 1; i < tbody.childElementCount; i++) {
-			let row = tbody.children[i];
-			let data_row = data_tbody.children[i-1];
-			for (let j = 1; j < 42; j++) {
-				row.children[j].textContent = data_row.children[j-1].textContent;
-			}
-		}
-	} else if (event.target.id == 'Damage per shot') {
-		for (let i = 1; i < tbody.childElementCount; i++) {
-			let row = tbody.children[i];
-			let pellets = parseInt(row.children[47].textContent);
-			let data_row = data_tbody.children[i-1];
-			for (let j = 1; j < 42; j++) {
-				row.children[j].textContent = parseInt(data_row.children[j-1].textContent) * parseInt(pellets);
-			}
-		}
-	} else if (event.target.id == 'Damage per second') {
-		for (let i = 1; i < tbody.childElementCount; i++) {
-			let row = tbody.children[i];
-			let rpm = parseInt(row.children[45].textContent);
-			let data_row = data_tbody.children[i-1];
-			for (let j = 1; j < 42; j++) {
-				row.children[j].textContent = Math.round(parseInt(data_row.children[j-1].textContent) * rpm / 60.);
-			}
-		}
-	} else if (event.target.id == 'Shots to down or kill') {
-		let hp = 100;
-		for (let i = 1; i < tbody.childElementCount; i++) {
-			let row = tbody.children[i];
-			let data_row = data_tbody.children[i-1];
-			for (let j = 1; j < 42; j++) {
-				row.children[j].textContent = Math.ceil(hp / parseInt(data_row.children[j-1].textContent));
-			}
-		}
-	} else if (event.target.id == 'Time to down or kill') {
-		let hp = 100;
-		for (let i = 1; i < tbody.childElementCount; i++) {
-			let row = tbody.children[i];
-			let rpm = parseInt(row.children[45].textContent);
-			let data_row = data_tbody.children[i-1];
-			for (let j = 1; j < 42; j++) {
-				row.children[j].textContent = Math.round((Math.ceil(hp / parseInt(data_row.children[j-1].textContent)) - 1) * 60000 / rpm);
-			}
+	let hp = 100;
+	
+	for (let i = 0; i < tbody.childElementCount; i++)
+	{
+		let row = tbody.children[i+2];
+		let data_row = data_tbody.children[i];
+		let pellets = parseInt(row.children[47].textContent);
+		let rpm = parseInt(row.children[45].textContent);
+		for (let j = 1; j < 42; j++)
+		{
+			let cell = row.children[j];
+			let data_cell = data_row.children[j-1];
+		
+			//cell.textContent = i + ":" + j + ":" + data_cell.textContent;
+			
+			if (event.target.id == 'Damage per bullet')
+				cell.textContent = data_cell.textContent;
+			else if (event.target.id == 'Damage per shot')
+				cell.textContent = parseInt(data_cell.textContent) * parseInt(pellets);
+			else if (event.target.id == 'Damage per second')
+				cell.textContent = Math.round(parseFloat(data_cell.textContent) * pellets * rpm / 60.);
+			else if (event.target.id == 'Shots to down or kill')
+				cell.textContent = Math.ceil(hp / parseInt(data_cell.textContent));
+			else if (event.target.id == 'Time to down or kill')
+				cell.textContent = Math.round((Math.ceil(hp / parseInt(data_cell.textContent)) - 1) * 60000 / rpm);
 		}
 	}
 }
