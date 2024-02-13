@@ -3,7 +3,7 @@
   "rpm": 1080,
   "pellets": 1,
   "ads": 0.3,
-  "extended_barrel":false,
+  "extended_barrel": false,
   "capacity": [
     40,
     1
@@ -50,5 +50,6 @@
     "38": 0,
     "39": 0,
     "40": 13
-  }
+  },
+  "name": "SCORPION EVO 3 A1"
 }

@@ -132,12 +132,12 @@ class Weapon:
 	lowest_highest_dps : dict[int, tuple[int, int]] = {}
 	lowest_highest_ttdok : dict[int, dict[int, tuple[int, int]]] = {}
 
-	def __init__(self, name_ : str, json_content_):
-		self.name = name_
+	def __init__(self, json_content_):
 		self.json_content =  json_content_
 
 		self.operator_indices : tuple[int,...]
 		
+		self._name = None
 		self._damages = None
 		self._type_index = None
 		self._rpm = None	# rounds per minute
@@ -166,9 +166,22 @@ class Weapon:
 			else:
 				Weapon.lowest_highest_ttdok[hp][self.type_index] = min(Weapon.lowest_highest_ttdok[hp][self.type_index][0], min(TTDOK)), max(Weapon.lowest_highest_ttdok[hp][self.type_index][1], max(TTDOK))
 
+		print(self.name)
+
 		return
 
 	# primary properties
+	@property
+	def name(self) -> str:
+		if self._name == None:
+			# get weapon name
+			if "name" not in self.json_content:
+				raise Exception(f"Weapon is missing its name.")
+			if type(self.json_content["name"]) != str:
+				raise Exception(f"Weapon has a name that doesn't deserialize to a string.")
+			self._name = self.json_content["name"]
+		
+		return self._name
 	@property
 	def type_index(self) -> int:
 		if self._type_index == None:
@@ -475,7 +488,7 @@ class Weapon:
 	def getExtendedBarrelWeapon(self):
 		retVar = copy.deepcopy(self)
 		
-		retVar.name = self.extended_barrel_weapon_name
+		retVar._name = self.extended_barrel_weapon_name
 		retVar.json_content = None
 
 		retVar._damages = tuple(math.ceil(dmg * self.extended_barrel_damage_multiplier) for dmg in self.damages)
@@ -550,7 +563,7 @@ def get_weapons_dict() -> list[Weapon]:
 			print(f"{message('Message: Excluding')} weapon '{message(name)}' because of _.")
 			continue
 		
-		weapons.append(Weapon(name, deserialize_json(file_path)))
+		weapons.append(Weapon(deserialize_json(file_path)))
 		
 	# get all operator weapons
 	get_operator_weapons(weapons, operator_weapons_file_name)
