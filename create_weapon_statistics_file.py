@@ -147,6 +147,8 @@ class Weapon:
 		self._capacity = None	# (magazine, chamber)
 		self._extended_barrel = None # whether the weapon has an extended barrel attachment
 
+		self._extended_barrel_parent = None	# the base weapon object if this is an extended barrel version
+
 		if type(self.json_content) != dict:
 			raise Exception(f"Weapon '{self.name}' doesn't deserialize to a dict.")
 		
@@ -399,6 +401,8 @@ class Weapon:
 		return int(self.dps(index) + 0.5), self.getStyleAB()
 	def getSTDOK(self, index : int, hp : int):
 		return self.stdok(index, hp), self.getSTDOKStyle(index, hp)
+	def getNewSTDOK(self, index : int, hp : int):
+		return self.stdok(index, hp), self.getNewSTDOKStyle(index, hp)
 	def getTTDOK(self, index : int, hp : int):
 		return int(self.ttdok(index, hp) + 0.5), self.getStyleAB()
 	def getCapacity(self):
@@ -437,6 +441,15 @@ class Weapon:
 			return self.getStyleABF()
 		else:
 			return self.getStyleA()
+	def getNewSTDOKStyle(self, index : int, hp : int):
+		# if this is the extended barrel version of a weapon
+		if self._extended_barrel_parent != None:
+			# if the stdok of the extended barrel version is different from the stdok of the normal version
+			if self.stdok(index, hp) != self._extended_barrel_parent.stdok(index, hp):
+				return self.getStyleABF()
+			
+		return self.getStyleA()
+		
 	def getStyleABF(self):
 		return self.stylesABF[self.type_index]
 	def getStyleAB(self):
@@ -498,6 +511,8 @@ class Weapon:
 		retVar._ads = None
 		retVar._capacity = None
 		retVar._extended_barrel = False
+
+		retVar._extended_barrel_parent = self
 
 		return retVar
 
@@ -617,8 +632,7 @@ def add_weapon_to_stat_worksheet(worksheet, weapon : Weapon, sub_name : str, sta
 		# c2.style = c1.style
 	return
 
-def add_stat_to_worksheet(worksheet : typing.Any, weapons : list[Weapon], sub_name : str, description : str,
-			  stat_method : typing.Any, interval_method : typing.Any, row : int):
+def add_stat_to_worksheet(worksheet : typing.Any, weapons : list[Weapon], sub_name : str, description : str, stat_method : typing.Any, interval_method : typing.Any, row : int):
 	if description != "":
 		row += 1
 		worksheet.merge_cells(start_row=row, end_row=row, start_column=1, end_column=1 + len(Weapon.distances))
@@ -778,9 +792,9 @@ def add_stats_worksheet(workbook : typing.Any, weapons : list[Weapon], worksheet
 def safe_to_xlsx_file(weapons : list[Weapon]):
 	""" https://openpyxl.readthedocs.io/en/stable/ """
 	
-	stat_names = ("Damage per bullet", "Damage per shot", "Damage per second", "Shots to down or kill", "Time to down or kill")
-	sheet_names = ("Damage per bullet", "Damage per shot", "DPS", "STDOK", "TTDOK")
-	stat_links = ("damage-per-bullet", "damage-per-shot", "damage-per-second---dps", "shots-to-down-or-kill---stdok", "time-to-down-or-kill---ttdok")
+	stat_names = ("Damage per bullet", "Damage per shot", "Damage per second", "Shots to down or kill", "Shots to down or kill - new", "Time to down or kill")
+	sheet_names = ("Damage per bullet", "Damage per shot", "DPS", "STDOK", "STDOK - new", "TTDOK")
+	stat_links = ("damage-per-bullet", "damage-per-shot", "damage-per-second---dps", "shots-to-down-or-kill---stdok", "shots-to-down-or-kill---stdok", "time-to-down-or-kill---ttdok")
 
 	excel_file_path = os.path.join(os.path.dirname(os.path.realpath(__file__)), "Rainbow-Six-Siege-Weapon-Statistics.xlsx")
 	html_file_path = os.path.join(os.path.dirname(os.path.realpath(__file__)), "Rainbow-Six-Siege-Weapon-Statistics.html")
@@ -943,6 +957,15 @@ function changedStat() {
 		sheet_names[4],
 		stat_names[4],
 		stat_links[4],
+		"The colored areas show where the extended barrel attachment actually affects the STDOK.",
+		tuple(["STDOK " + sub for sub in sub_names]),
+		tuple([lambda weapon, index, hp=health: Weapon.getNewSTDOK(weapon, index, hp) for health in Weapon.tdok_hps]),
+		tuple([None for health in Weapon.tdok_hps]))
+
+	add_stats_worksheet(workbook, weapons,
+		sheet_names[-1],
+		stat_names[-1],
+		stat_links[-1],
 		"The color gradient illustrates the TTDOK compared to the lowest TTDOK of the weapon's type (excluding extended barrel stats).",
 		tuple(["TTDOK " + sub for sub in sub_names]),
 		tuple([lambda weapon, index, hp=health: Weapon.getTTDOK(weapon, index, hp) for health in Weapon.tdok_hps]),
