@@ -385,7 +385,7 @@ class Weapon:
 	def ttdok(self, index : int, hp : int):
 		return (self.stdok(index, hp) - 1) / self.rpms
 	def how_useful_is_extended_barrel(self, hp : int):
-		return self.extended_barrel_parent.stdok(0, hp) - self.stdok(0, hp)
+		return self.extended_barrel_parent.stdok(0, hp) - self.stdok(0, hp), self.extended_barrel_parent.ttdok(0, hp) - self.ttdok(0, hp)
 
 	# properties with excel styles
 	def getName(self):
@@ -433,10 +433,10 @@ class Weapon:
 			return str(val)[1:], self.getStyleAB()
 	def getHowUsefulIsExtendedBarrel(self, hp : int):
 		usefulness = self.how_useful_is_extended_barrel(hp)
-		if usefulness == 0:
-			return str(), self.getStyleA()
+		if usefulness[0] == 0:
+			return 0, 0, self.getStyleA()
 		else:
-			return usefulness, self.getStyleABF()
+			return usefulness[0], int(usefulness[1] + 0.5), self.getStyleABF()
 
 	# excel styles
 	def getDamageStyle(self, index : int):
@@ -657,7 +657,7 @@ def add_weapon_to_worksheet(worksheet : typing.Any, weapon : Weapon, sub_name : 
 		
 	return
 
-def add_stats_worksheet_header(workbook : typing.Any, worksheet_name : str, stat_name : str, stat_link : str, description : str, cols_inbetween : int):
+def add_stats_worksheet_header(workbook : typing.Any, worksheet_name : str, stat_name : str, stat_link : str, description : str | tuple[str,...], cols_inbetween : int):
 	worksheet = workbook.create_sheet(worksheet_name)
 	
 	row = 1
@@ -679,10 +679,13 @@ def add_stats_worksheet_header(workbook : typing.Any, worksheet_name : str, stat
 	c.font = Font(color = "FF0000FF")
 	c.font = Font(bold=True)
 	
-	row += 1
-	worksheet.merge_cells(start_row=row, end_row=row, start_column=2, end_column=1 + cols_inbetween)
-	c = worksheet.cell(row=row, column=2)
-	c.value = description
+	if type(description) == str:
+		description = (description, )
+	for desc in description:
+		row += 1
+		worksheet.merge_cells(start_row=row, end_row=row, start_column=2, end_column=1 + cols_inbetween)
+		c = worksheet.cell(row=row, column=2)
+		c.value = desc
 	
 	row += 1
 	col = cols_inbetween + 2
@@ -838,10 +841,25 @@ def add_stats_worksheet(workbook : typing.Any, weapons : list[Weapon], worksheet
 	return
 
 def add_extended_barrel_overview(workbook : typing.Any, weapons : list[Weapon]):
-	worksheet, row = add_stats_worksheet_header(workbook, "Extended barrel", "Extended barrel overview", "the-extended-barrel", "foo", 6)
-	
 	col_names = ("1 (100)", "2 (110)", "3 (125)", "1R (120)", "2R (130)", "3R (145)")
-
+	
+	worksheet, row = add_stats_worksheet_header(workbook, "Extended barrel", "Extended barrel overview", "the-extended-barrel",
+											 ("Shows how much the extended barrel affects STDOK and TTDOK up until the damage drop-off starts.", ""), 13)
+	
+	row -= 1
+	worksheet.unmerge_cells(start_row=row, end_row=row, start_column=2, end_column=14)
+	
+	worksheet.merge_cells(start_row=row, end_row=row, start_column=2, end_column=7)
+	c = worksheet.cell(row=row, column=2)
+	c.value = "STDOK"
+	c.alignment = Weapon.alignment
+	
+	worksheet.merge_cells(start_row=row, end_row=row, start_column=9, end_column=14)
+	c = worksheet.cell(row=row, column=9)
+	c.value = "TTDOK"
+	c.alignment = Weapon.alignment
+	
+	row += 1
 	col = 1
 	c = worksheet.cell(row=row, column=col)
 	c.value = "Health rating"
@@ -853,6 +871,11 @@ def add_extended_barrel_overview(workbook : typing.Any, weapons : list[Weapon]):
 		c.value = col_name
 		c.alignment = Weapon.alignment
 		worksheet.column_dimensions[get_column_letter(col)].width = 8
+		
+		c = worksheet.cell(row=row, column=col + len(col_names) + 1)
+		c.value = col_name
+		c.alignment = Weapon.alignment
+		worksheet.column_dimensions[get_column_letter(col)].width = 8
 
 	for weapon in weapons:
 		if weapon.extended_barrel == False:
@@ -860,13 +883,15 @@ def add_extended_barrel_overview(workbook : typing.Any, weapons : list[Weapon]):
 		extended_weapon = weapon.getExtendedBarrelWeapon()
 		
 		row += 1
-		add_secondary_weapon_stats(worksheet, weapon, row, 9)
+		add_secondary_weapon_stats(worksheet, weapon, row, 16)
 
 		col = 1
 		for hp in Weapon.tdok_hps:
 			col += 1
-			c = worksheet.cell(row=row, column=col)
-			c.value, c.style = extended_weapon.getHowUsefulIsExtendedBarrel(hp)
+			c1 = worksheet.cell(row=row, column=col)
+			c2 = worksheet.cell(row=row, column=col + len(col_names) + 1)
+			c1.value, c2.value, c1.style = extended_weapon.getHowUsefulIsExtendedBarrel(hp)
+			c2.style = c1.style
 
 	return
 
