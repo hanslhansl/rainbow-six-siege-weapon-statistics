@@ -112,9 +112,9 @@ class Weapon:
 				) for i in range(len(types))]
 	fills = [PatternFill(fgColor=background_colors[i], fill_type = "solid") for i in range(len(types))]
 	
-	stylesABF = (lambda t=types, a=alignment, b=borders, f=fills: [NamedStyle(name=t[i] + " ABF", alignment=a, border=b[i], fill=f[i]) for i in range(len(t))])()
-	stylesBF = (lambda t=types, b=borders, f=fills: [NamedStyle(name=t[i] + " BF", border=b[i], fill=f[i]) for i in range(len(t))])()
-	stylesAB = (lambda t=types, a=alignment, b=borders: [NamedStyle(name=t[i] + " AB", alignment=a, border=b[i]) for i in range(len(t))])()
+	stylesABF : list[NamedStyle] = (lambda t=types, a=alignment, b=borders, f=fills: [NamedStyle(name=t[i] + " ABF", alignment=a, border=b[i], fill=f[i]) for i in range(len(t))])()
+	stylesBF : list[NamedStyle] = (lambda t=types, b=borders, f=fills: [NamedStyle(name=t[i] + " BF", border=b[i], fill=f[i]) for i in range(len(t))])()
+	stylesAB : list[NamedStyle] = (lambda t=types, a=alignment, b=borders: [NamedStyle(name=t[i] + " AB", alignment=a, border=b[i]) for i in range(len(t))])()
 	stylesA = NamedStyle(name="A", alignment=alignment)
 
 	default_rpm = 0
@@ -131,6 +131,9 @@ class Weapon:
 
 	lowest_highest_dps : dict[int, tuple[int, int]] = {}
 	lowest_highest_ttdok : dict[int, dict[int, tuple[int, int]]] = {}
+	
+	DPSColorScaleRule : dict[int, typing.Any] = {}	# type_index : ColorScaleRule
+	TTDOKColorScaleRules : dict[int, dict[int, typing.Any]] = {}	# hp : {type_index : ColorScaleRule}
 
 	def __init__(self, json_content_):
 		self.json_content =  json_content_
@@ -147,7 +150,10 @@ class Weapon:
 		self._capacity = None	# (magazine, chamber)
 		self._extended_barrel = None # whether the weapon has an extended barrel attachment
 
-		self._extended_barrel_parent = None	# the base weapon object if this is an extended barrel version
+		self.is_extended_barrel = False	# whether this is an extended barrel version
+		self.extended_barrel_parent : Weapon = None	# the base weapon object if this is an extended barrel version
+		
+		self.DmgPerShotColorScaleRule = None
 
 		if type(self.json_content) != dict:
 			raise Exception(f"Weapon '{self.name}' doesn't deserialize to a dict.")
@@ -378,6 +384,8 @@ class Weapon:
 		return math.ceil(hp / self.damages[index] / self.pellets)
 	def ttdok(self, index : int, hp : int):
 		return (self.stdok(index, hp) - 1) / self.rpms
+	def how_useful_is_extended_barrel(self, hp : int):
+		return self.extended_barrel_parent.stdok(0, hp) - self.stdok(0, hp)
 
 	# properties with excel styles
 	def getName(self):
@@ -399,10 +407,10 @@ class Weapon:
 		return self.damage_per_shot(index), self.getStyleAB()
 	def getDPS(self, index : int):
 		return int(self.dps(index) + 0.5), self.getStyleAB()
+	def getOldSTDOK(self, index : int, hp : int):
+		return self.stdok(index, hp), self.getOldSTDOKStyle(index, hp)
 	def getSTDOK(self, index : int, hp : int):
 		return self.stdok(index, hp), self.getSTDOKStyle(index, hp)
-	def getNewSTDOK(self, index : int, hp : int):
-		return self.stdok(index, hp), self.getNewSTDOKStyle(index, hp)
 	def getTTDOK(self, index : int, hp : int):
 		return int(self.ttdok(index, hp) + 0.5), self.getStyleAB()
 	def getCapacity(self):
@@ -423,6 +431,12 @@ class Weapon:
 		else:
 			return val, self.getStyleAB()
 			return str(val)[1:], self.getStyleAB()
+	def getHowUsefulIsExtendedBarrel(self, hp : int):
+		usefulness = self.how_useful_is_extended_barrel(hp)
+		if usefulness == 0:
+			return str(), self.getStyleA()
+		else:
+			return usefulness, self.getStyleABF()
 
 	# excel styles
 	def getDamageStyle(self, index : int):
@@ -433,7 +447,7 @@ class Weapon:
 			return self.getStyleABF()
 		else:
 			return self.getStyleA()
-	def getSTDOKStyle(self, index : int, hp : int):
+	def getOldSTDOKStyle(self, index : int, hp : int):
 		a, b = self.getTDOKBorders(hp)
 		if index <= a:
 			return self.getStyleABF()
@@ -441,11 +455,11 @@ class Weapon:
 			return self.getStyleABF()
 		else:
 			return self.getStyleA()
-	def getNewSTDOKStyle(self, index : int, hp : int):
+	def getSTDOKStyle(self, index : int, hp : int):
 		# if this is the extended barrel version of a weapon
-		if self._extended_barrel_parent != None:
+		if self.extended_barrel_parent != None:
 			# if the stdok of the extended barrel version is different from the stdok of the normal version
-			if self.stdok(index, hp) != self._extended_barrel_parent.stdok(index, hp):
+			if self.stdok(index, hp) != self.extended_barrel_parent.stdok(index, hp):
 				return self.getStyleABF()
 			
 		return self.getStyleA()
@@ -459,13 +473,38 @@ class Weapon:
 	def getStyleA(self):
 		return self.stylesA
 	
+	def getDmgPerShotColorScaleRule(self):
+		if self.DmgPerShotColorScaleRule == None:
+			start_val, end_val = self.getDmgPerShotInterval()
+			end_col = background_colors[self.type_index]
+			self.DmgPerShotColorScaleRule = ColorScaleRule(start_type="num", start_value=start_val, start_color="FFFFFF", end_type="num", end_value=end_val, end_color=end_col)
+
+		return self.DmgPerShotColorScaleRule
+	def getDPSColorScaleRule(self):
+		if self.type_index not in Weapon.DPSColorScaleRule:
+			start_val, end_val = self.getDPSInterval()
+			end_col = background_colors[self.type_index]
+			Weapon.DPSColorScaleRule[self.type_index] = ColorScaleRule(start_type="num", start_value=start_val, start_color="FFFFFF", end_type="num", end_value=end_val, end_color=end_col)
+
+		return Weapon.DPSColorScaleRule[self.type_index]
+	def getTTDOKColorScaleRule(self, hp : int):
+		if hp not in Weapon.TTDOKColorScaleRules:
+			Weapon.TTDOKColorScaleRules[hp] = {}
+			
+		if self.type_index not in Weapon.TTDOKColorScaleRules[hp]:
+			start_val, end_val = self.getTTDOKInterval(hp)
+			start_col = background_colors[self.type_index]
+			Weapon.TTDOKColorScaleRules[hp][self.type_index] = ColorScaleRule(start_type="num", start_value=start_val, start_color=start_col, end_type="num", end_value=end_val, end_color="FFFFFF")
+
+		return Weapon.TTDOKColorScaleRules[hp][self.type_index]
+	
 	# interval methods for excel conditional formatting
-	def getDPSInterval(self):
-		return self.lowest_highest_dps[self.type_index]
 	def getDmgPerShotInterval(self):
 		return min(self.damages) * self.pellets, max(self.damages) * self.pellets
+	def getDPSInterval(self):
+		return Weapon.lowest_highest_dps[self.type_index]
 	def getTTDOKInterval(self, hp : int):
-		return self.lowest_highest_ttdok[hp][self.type_index]
+		return Weapon.lowest_highest_ttdok[hp][self.type_index]
 
 	# other methods
 	def getDamageDropoffBorders(self):
@@ -512,7 +551,10 @@ class Weapon:
 		retVar._capacity = None
 		retVar._extended_barrel = False
 
-		retVar._extended_barrel_parent = self
+		retVar.is_extended_barrel = True
+		retVar.extended_barrel_parent = self
+		
+		retVar.DmgPerShotColorScaleRule = None
 
 		return retVar
 
@@ -585,141 +627,65 @@ def get_weapons_dict() -> list[Weapon]:
 	
 	return weapons
 
-def add_weapon_to_stat_worksheet(worksheet, weapon : Weapon, sub_name : str, stat_method : typing.Any, interval_method : typing.Any, row : int):
-	c = worksheet.cell(row=row, column=1)
-	c.value, c.style = weapon.getName()
+def add_weapon_to_worksheet(worksheet : typing.Any, weapon : Weapon, sub_name : None | str, stat_method : typing.Any, format_method : typing.Any,
+							additional_param : None | typing.Any, row : int, cond_formats : dict[typing.Any, str]):
+	if sub_name != None:
+		c = worksheet.cell(row=row, column=1)
+		c.value = sub_name
+	
+	if additional_param == None:
+		for col in range(2, len(Weapon.distances) + 2):
+			c = worksheet.cell(row=row, column=col)
+			c.value, c.style = stat_method(weapon, col - 2)
+		if format_method != None:
+			cond_format = format_method(weapon)
+			if cond_format in cond_formats:
+				cond_formats[cond_format] += f" {get_column_letter(2)}{row}:{get_column_letter(len(Weapon.distances)+2)}{row}"
+			else:
+				cond_formats[cond_format] = f"{get_column_letter(2)}{row}:{get_column_letter(len(Weapon.distances)+2)}{row}"
 		
-	for col in range(2, len(Weapon.distances) + 2):
-		c = worksheet.cell(row=row, column=col)
-		c.value, c.style = stat_method(weapon, col - 2)
-
-	if interval_method != None and sub_name == "Damage per shot":
-		end_color = background_colors[weapon.type_index]
-		start_color = "FFFFFF"
-
-		start_value, end_value = interval_method(weapon)
-
-		color_rule = ColorScaleRule(start_type="num", start_value=start_value, start_color=start_color,
-									end_type="num", end_value=end_value, end_color=end_color)
-		worksheet.conditional_formatting.add(f"{get_column_letter(2)}{row}:{get_column_letter(len(Weapon.distances)+2)}{row}", color_rule)
-
-	if weapon.getName()[0] != weapon.extended_barrel_weapon_name:
-		col += 2
-		c = worksheet.cell(row=row, column=col)
-		c.value, c.style = weapon.getType()
+	else:
+		for col in range(2, len(Weapon.distances) + 2):
+			c = worksheet.cell(row=row, column=col)
+			c.value, c.style = stat_method(weapon, col - 2, additional_param)
+		if format_method != None:
+			cond_format = format_method(weapon, additional_param)
+			if cond_format in cond_formats:
+				cond_formats[cond_format] += f" {get_column_letter(2)}{row}:{get_column_letter(len(Weapon.distances)+2)}{row}"
+			else:
+				cond_formats[cond_format] = f"{get_column_letter(2)}{row}:{get_column_letter(len(Weapon.distances)+2)}{row}"
 		
-		col += 2
-		c = worksheet.cell(row=row, column=col)
-		c.value, c.style = weapon.getRPM()
-		
-		col += 1
-		c = worksheet.cell(row=row, column=col)
-		c.value, c.style = weapon.getCapacity()
-
-		col += 1
-		c = worksheet.cell(row=row, column=col)
-		c.value, c.style = weapon.getPellets()
-		
-		col += 2
-		c = worksheet.cell(row=row, column=col)
-		c.value, c.style = weapon.getADSTime()
-
-		# col += 1
-		# c1 = worksheet.cell(row=row, column=col)
-		# col += 1
-		# c2 = worksheet.cell(row=row, column=col)
-		# c1.value, c2.value, c1.style = weapon.getReloadTimes()
-		# c2.style = c1.style
 	return
 
-def add_stat_to_worksheet(worksheet : typing.Any, weapons : list[Weapon], sub_name : str, description : str, stat_method : typing.Any, interval_method : typing.Any, row : int):
-	if description != "":
-		row += 1
-		worksheet.merge_cells(start_row=row, end_row=row, start_column=1, end_column=1 + len(Weapon.distances))
-		c = worksheet.cell(row=row, column=1)
-		c.value = description
-		c.font = Font(bold=True)
-	
-	old_type_index = 0
-	start_row = 0
-	old_interval = None
-	apply_cond_format = interval_method != None and sub_name in ("Damage per second", "Time to down or kill")
-	
-	for i in range(len(weapons)):
-		weapon = weapons[i]
-		row += 1
-		
-		if apply_cond_format and i == 0:
-			old_type_index = weapon.type_index
-			start_row = row
-			old_interval = interval_method(weapon)
-
-		elif apply_cond_format:
-			if weapon.type_index != old_type_index or i == len(weapons)-1:
-				end_color = background_colors[old_type_index]
-				start_color = "FFFFFF"
-				if sub_name == "Time to down or kill":
-					end_color, start_color = start_color, end_color
-					
-				start_value, end_value = old_interval
-				color_rule = ColorScaleRule(start_type="num", start_value=start_value, start_color=start_color, end_type="num", end_value=end_value, end_color=end_color)
-				worksheet.conditional_formatting.add(f"{get_column_letter(2)}{start_row}:{get_column_letter(len(Weapon.distances)+2)}{row-1+(i == len(weapons)-1)}", color_rule)
-				
-				old_type_index = weapon.type_index
-				start_row = row
-				old_interval = interval_method(weapon)
-			
-		add_weapon_to_stat_worksheet(worksheet, weapon, sub_name, stat_method, interval_method, row)
-		if (weapon.extended_barrel):
-			row += 1
-			extended_barrel_weapon = weapon.getExtendedBarrelWeapon()
-			add_weapon_to_stat_worksheet(worksheet, extended_barrel_weapon, sub_name, stat_method, interval_method, row)
-		
-	return row
-
-def add_stats_worksheet(workbook : typing.Any, weapons : list[Weapon], worksheet_name : str, stat_name : str, stat_link : str,
-			description : str, sub_names : tuple[str,...], stat_methods : tuple[typing.Any], interval_methods : tuple[typing.Any]):
+def add_stats_worksheet_header(workbook : typing.Any, worksheet_name : str, stat_name : str, stat_link : str, description : str, cols_inbetween : int):
 	worksheet = workbook.create_sheet(worksheet_name)
 	
 	row = 1
-	worksheet.merge_cells(start_row=row, end_row=row, start_column=1, end_column=1 + len(Weapon.distances))
-	c = worksheet.cell(row=row, column=1)
+	worksheet.merge_cells(start_row=row, end_row=row, start_column=2, end_column=1 + cols_inbetween)
+	c = worksheet.cell(row=row, column=2)
 	c.value = "created by hanslhansl"
 	c.font = Font(bold=True)
 
 	row += 1
-	worksheet.merge_cells(start_row=row, end_row=row, start_column=1, end_column=1 + len(Weapon.distances))
-	c = worksheet.cell(row=row, column=1)
+	worksheet.merge_cells(start_row=row, end_row=row, start_column=2, end_column=1 + cols_inbetween)
+	c = worksheet.cell(row=row, column=2)
 	c.value = '=HYPERLINK("https://github.com/hanslhansl/R6S-Weapon-Statistics/", "A detailed explanation can be found here")'
 	c.font = Font(color = "FF0000FF")
 	
 	row += 2
-	worksheet.merge_cells(start_row=row, end_row=row, start_column=1, end_column=1 + len(Weapon.distances))
-	c = worksheet.cell(row=row, column=1)
+	worksheet.merge_cells(start_row=row, end_row=row, start_column=2, end_column=1 + cols_inbetween)
+	c = worksheet.cell(row=row, column=2)
 	c.value = f'=HYPERLINK("https://github.com/hanslhansl/R6S-Weapon-Statistics/#{stat_link}", "{stat_name}")'
 	c.font = Font(color = "FF0000FF")
 	c.font = Font(bold=True)
 	
 	row += 1
-	worksheet.merge_cells(start_row=row, end_row=row, start_column=1, end_column=1 + len(Weapon.distances))
-	c = worksheet.cell(row=row, column=1)
+	worksheet.merge_cells(start_row=row, end_row=row, start_column=2, end_column=1 + cols_inbetween)
+	c = worksheet.cell(row=row, column=2)
 	c.value = description
-
-	col = 1
-	row += 1
-	c = worksheet.cell(row=row, column=col)
-	c.value = "Distance"
-	worksheet.column_dimensions[get_column_letter(col)].width = 18
 	
-	for col in range(2, len(Weapon.distances) + 2):
-		c = worksheet.cell(row=row, column=col)
-		c.value = Weapon.distances[col - 2]
-		c.alignment = Weapon.alignment
-		worksheet.column_dimensions[get_column_letter(col)].width = 4.8
-
-	space_mult = 6
-
-	col += 1
+	row += 1
+	col = cols_inbetween + 2
 	worksheet.column_dimensions[get_column_letter(col)].width = 3
 
 	col += 1
@@ -778,23 +744,148 @@ def add_stats_worksheet(workbook : typing.Any, weapons : list[Weapon], worksheet
 	c.alignment = Weapon.alignment
 	worksheet.column_dimensions[get_column_letter(col)].width = 4
 		
-	worksheet.freeze_panes = worksheet.cell(row=row+1, column=1)
+	worksheet.freeze_panes = worksheet.cell(row=row+1, column=2)
 
-	if len(sub_names) == len(stat_methods) == len(interval_methods):
-		for sub_name, stat_method, interval_method in zip(sub_names, stat_methods, interval_methods):
-			row = add_stat_to_worksheet(worksheet, weapons, stat_name, sub_name, stat_method, interval_method, row)
-			row += 1
-	else:
-		raise Exception(f"Parameters are tuples of different length.")
+	return worksheet, row
+
+def add_secondary_weapon_stats(worksheet : typing.Any, weapon : Weapon, row : int, col : int):
+	c = worksheet.cell(row=row, column=1)
+	c.value, c.style = weapon.getName()
+
+	c = worksheet.cell(row=row, column=col)
+	c.value, c.style = weapon.getType()
+		
+	col += 2
+	c = worksheet.cell(row=row, column=col)
+	c.value, c.style = weapon.getRPM()
+		
+	col += 1
+	c = worksheet.cell(row=row, column=col)
+	c.value, c.style = weapon.getCapacity()
+
+	col += 1
+	c = worksheet.cell(row=row, column=col)
+	c.value, c.style = weapon.getPellets()
+		
+	col += 2
+	c = worksheet.cell(row=row, column=col)
+	c.value, c.style = weapon.getADSTime()
+
+	# col += 1
+	# c1 = worksheet.cell(row=row, column=col)
+	# col += 1
+	# c2 = worksheet.cell(row=row, column=col)
+	# c1.value, c2.value, c1.style = weapon.getReloadTimes()
+	# c2.style = c1.style
+
+	return
+
+def add_stats_worksheet(workbook : typing.Any, weapons : list[Weapon], worksheet_name : str, stat_name : str, stat_link : str, description : str,
+						sub_names : None | tuple[str,...], stat_method : typing.Any, format_method : typing.Any, additional_params : None | tuple[typing.Any]):
 	
+	worksheet, row = add_stats_worksheet_header(workbook, worksheet_name, stat_name, stat_link, description, len(Weapon.distances))
+
+	col = 1
+	c = worksheet.cell(row=row, column=col)
+	c.value = "Distance"
+	worksheet.column_dimensions[get_column_letter(col)].width = 20.5
+	
+	for col in range(2, len(Weapon.distances) + 2):
+		c = worksheet.cell(row=row, column=col)
+		c.value = Weapon.distances[col - 2]
+		c.alignment = Weapon.alignment
+		worksheet.column_dimensions[get_column_letter(col)].width = 4.8
+
+	cond_formats : dict[typing.Any, str] = {}
+
+	row += 1
+	for i in range(len(weapons)):
+		weapon = weapons[i]
+
+		add_secondary_weapon_stats(worksheet, weapon, row, len(Weapon.distances) + 3)
+
+		if sub_names == None and additional_params == None:
+			add_weapon_to_worksheet(worksheet, weapon, None, stat_method, format_method, None, row, cond_formats)
+			row += 1
+			
+			if (weapon.extended_barrel):
+				extended_barrel_weapon = weapon.getExtendedBarrelWeapon()
+				add_weapon_to_worksheet(worksheet, extended_barrel_weapon, Weapon.extended_barrel_weapon_name, stat_method, format_method, None, row, cond_formats)
+				row += 1
+				
+		elif type(sub_names) == tuple and type(additional_params) == tuple: 
+			if len(sub_names) != len(additional_params):
+				raise Exception(f"Parameters are tuples of different length.")
+
+			worksheet.merge_cells(start_row=row, end_row=row, start_column=2, end_column=1 + len(Weapon.distances))
+			row += 1
+
+			if (weapon.extended_barrel):
+				extended_barrel_weapon = weapon.getExtendedBarrelWeapon()
+			for sub_name, additional_param in zip(sub_names, additional_params):
+				add_weapon_to_worksheet(worksheet, weapon, sub_name, stat_method, format_method, additional_param, row, cond_formats)
+				row += 1
+				if (weapon.extended_barrel):
+					add_weapon_to_worksheet(worksheet, extended_barrel_weapon, Weapon.extended_barrel_weapon_name, stat_method, format_method, additional_param, row, cond_formats)
+					row += 1
+					
+		else:
+			raise Exception(f"Parameters aren't both None or tuples.")
+		
+	for cond_format, rng in cond_formats.items():
+		worksheet.conditional_formatting.add(rng, cond_format)
+	
+	return
+
+def add_extended_barrel_overview(workbook : typing.Any, weapons : list[Weapon]):
+	worksheet, row = add_stats_worksheet_header(workbook, "Extended barrel", "Extended barrel overview", "the-extended-barrel", "foo", 6)
+	
+	col_names = ("1 (100)", "2 (110)", "3 (125)", "1R (120)", "2R (130)", "3R (145)")
+
+	col = 1
+	c = worksheet.cell(row=row, column=col)
+	c.value = "Health rating"
+	worksheet.column_dimensions[get_column_letter(col)].width = 20.5
+
+	for col_name in col_names:
+		col += 1
+		c = worksheet.cell(row=row, column=col)
+		c.value = col_name
+		c.alignment = Weapon.alignment
+		worksheet.column_dimensions[get_column_letter(col)].width = 8
+
+	for weapon in weapons:
+		if weapon.extended_barrel == False:
+			continue
+		extended_weapon = weapon.getExtendedBarrelWeapon()
+		
+		row += 1
+		add_secondary_weapon_stats(worksheet, weapon, row, 9)
+
+		col = 1
+		for hp in Weapon.tdok_hps:
+			col += 1
+			c = worksheet.cell(row=row, column=col)
+			c.value, c.style = extended_weapon.getHowUsefulIsExtendedBarrel(hp)
+
 	return
 
 def safe_to_xlsx_file(weapons : list[Weapon]):
 	""" https://openpyxl.readthedocs.io/en/stable/ """
 	
-	stat_names = ("Damage per bullet", "Damage per shot", "Damage per second", "Shots to down or kill", "Shots to down or kill - new", "Time to down or kill")
-	sheet_names = ("Damage per bullet", "Damage per shot", "DPS", "STDOK", "STDOK - new", "TTDOK")
+	stat_names = ("Damage per bullet", "Damage per shot", "Damage per second", "Shots to down or kill - old", "Shots to down or kill", "Time to down or kill")
+	sheet_names = ("Damage per bullet", "Damage per shot", "DPS", "STDOK - old", "STDOK", "TTDOK")
 	stat_links = ("damage-per-bullet", "damage-per-shot", "damage-per-second---dps", "shots-to-down-or-kill---stdok", "shots-to-down-or-kill---stdok", "time-to-down-or-kill---ttdok")
+	explanations = (
+		"The colored areas represent steady damage, the white areas represent decreasing damage.",
+		"The color gradient illustrates the damage compared to the weapon's base damage.",
+		"The color gradient illustrates the DPS compared to the highest DPS of the weapon's type (excluding extended barrel stats).",
+		"The colored areas represent steady STDOK, the white areas represent increasing STDOK.",
+		"The colored areas show where the extended barrel attachment actually affects the STDOK.",
+		"The color gradient illustrates the TTDOK compared to the lowest TTDOK of the weapon's type (excluding extended barrel stats).")
+
+	sub_names = ("1 armor (100 hp)", "2 armor (110 hp)", "3 armor (125 hp)",
+	  "1 armor + Rook (120 hp)", "2 armor + Rook (130 hp)", "3 armor + Rook (145 hp)")
 
 	excel_file_path = os.path.join(os.path.dirname(os.path.realpath(__file__)), "Rainbow-Six-Siege-Weapon-Statistics.xlsx")
 	html_file_path = os.path.join(os.path.dirname(os.path.realpath(__file__)), "Rainbow-Six-Siege-Weapon-Statistics.html")
@@ -931,45 +1022,26 @@ function changedStat() {
 	workbook = Workbook()
 
 	workbook.remove(workbook.active)
-
+		
 	add_stats_worksheet(workbook, weapons, sheet_names[0], stat_names[0], stat_links[0],
-		"The colored areas represent steady damage, the white areas represent decreasing damage.", ("", ), (Weapon.getDamage, ), (None, ))
+		explanations[0], None, Weapon.getDamage, None, None)
 
 	add_stats_worksheet(workbook, weapons, sheet_names[1], stat_names[1], stat_links[1],
-		"The color gradient illustrates the damage compared to the weapon's base damage.", ("", ), (Weapon.getDamagePerShot, ), (Weapon.getDmgPerShotInterval, ))
+		explanations[1], None, Weapon.getDamagePerShot, Weapon.getDmgPerShotColorScaleRule, None)
 
 	add_stats_worksheet(workbook, weapons, sheet_names[2], stat_names[2], stat_links[2],
-		"The color gradient illustrates the DPS compared to the highest DPS of the weapon's type (excluding extended barrel stats).", ("", ), (Weapon.getDPS, ), (Weapon.getDPSInterval, ))
+		explanations[2], None, Weapon.getDPS, Weapon.getDPSColorScaleRule, None)
 
-	sub_names = ("against 1 armor (100 hp)", "against 2 armor (110 hp)", "against 3 armor (125 hp)",
-	  "against 1 armor with Rook armor (120 hp)", "against 2 armor with Rook armor (130 hp)", "against 3 armor with Rook armor (145 hp)")
+	#add_stats_worksheet(workbook, weapons, sheet_names[3], stat_names[3], stat_links[3],
+	#	explanations[3], sub_names, Weapon.getOldSTDOK, None, Weapon.tdok_hps)
 
-	add_stats_worksheet(workbook, weapons,
-		sheet_names[3],
-		stat_names[3],
-		stat_links[3],
-		"The colored areas represent steady STDOK, the white areas represent increasing STDOK.",
-		tuple(["STDOK " + sub for sub in sub_names]),
-		tuple([lambda weapon, index, hp=health: Weapon.getSTDOK(weapon, index, hp) for health in Weapon.tdok_hps]),
-		tuple([None for health in Weapon.tdok_hps]))
+	add_stats_worksheet(workbook, weapons, sheet_names[4], stat_names[4], stat_links[4],
+		explanations[4], sub_names, Weapon.getSTDOK, None, Weapon.tdok_hps)
 
-	add_stats_worksheet(workbook, weapons,
-		sheet_names[4],
-		stat_names[4],
-		stat_links[4],
-		"The colored areas show where the extended barrel attachment actually affects the STDOK.",
-		tuple(["STDOK " + sub for sub in sub_names]),
-		tuple([lambda weapon, index, hp=health: Weapon.getNewSTDOK(weapon, index, hp) for health in Weapon.tdok_hps]),
-		tuple([None for health in Weapon.tdok_hps]))
-
-	add_stats_worksheet(workbook, weapons,
-		sheet_names[-1],
-		stat_names[-1],
-		stat_links[-1],
-		"The color gradient illustrates the TTDOK compared to the lowest TTDOK of the weapon's type (excluding extended barrel stats).",
-		tuple(["TTDOK " + sub for sub in sub_names]),
-		tuple([lambda weapon, index, hp=health: Weapon.getTTDOK(weapon, index, hp) for health in Weapon.tdok_hps]),
-		tuple([lambda weapon, hp=health: Weapon.getTTDOKInterval(weapon, hp) for health in Weapon.tdok_hps]))
+	add_stats_worksheet(workbook, weapons, sheet_names[5], stat_names[5], stat_links[5],
+		explanations[5], sub_names, Weapon.getTTDOK, Weapon.getTTDOKColorScaleRule, Weapon.tdok_hps)
+	
+	add_extended_barrel_overview(workbook, weapons)
 
 	# save to file
 	workbook.save(excel_file_path)
