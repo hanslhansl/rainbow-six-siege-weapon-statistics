@@ -34,6 +34,8 @@
   "Grim": [ "552 COMMANDO", "SG-CQB", "P229", "Bailiff 410" ],
   "Brava": [ "PARA-308", "CAMRS", "SUPER SHORTY", "USP40" ],
   "Ram": [ "R4-C", "LMG-E", "MK1 9mm", "ITA12S" ],
+  "Deimos": [ "AK-74M", "M590A1", ".44 Vendetta" ],
+
   "Smoke": [ "FMG-9", "M590A1", "P226 MK 25", "SMG-11" ],
   "Mute": [ "MP5K", "M590A1", "P226 MK 25", "SMG-11" ],
   "Castle": [ "UMP45", "M1014", "5.7 USG", "SUPER SHORTY", "M45 MEUSOC" ],
@@ -67,5 +69,6 @@
   "Thorn": [ "UZK50GI", "M870", "1911 TACOPS", "C75 Auto" ],
   "Azami": [ "9x19VSN", "ACS12", "D-50" ],
   "Solis": [ "P90", "ITA12L", "SMG-11" ],
-  "Fenrir": [ "MP7", "SASG-12", "Bailiff 410", "5.7 USG" ]
+  "Fenrir": [ "MP7", "SASG-12", "Bailiff 410", "5.7 USG" ],
+  "Tuberao": [ "MPX", "AR-15.50", "P226 MK 25" ]
 }

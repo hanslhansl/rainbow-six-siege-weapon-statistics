@@ -22,8 +22,7 @@ last_distance = 40
 weapon_types = ("AR", "SMG", "MP", "LMG", "DMR", "SG", "Pistol", "Else")
 
 # weapon type background colors
-background_colors = ("5083EA", "B6668E", "76A5AE", "8771BD", "7CB563", "FFBC01", "A3A3A3", "F48020")
-background_colors = ("5083EA", "B6668E", "76A5AE", "8771BD", "7CB563", "FFD609", "A3A3A3", "F47220")
+background_colors = {"AR":"5083EA", "SMG":"B6668E", "MP":"76A5AE", "LMG":"8771BD", "DMR":"7CB563", "SG":"FFBC01", "Pistol":"A3A3A3", "Else":"F48020"}
 
 
 ###################################################
@@ -36,9 +35,9 @@ from re import S
 import sys, traceback
 
 def show_exception_and_exit(exc_type, exc_value, tb):
-    traceback.print_exception(exc_type, exc_value, tb)
-    input("\nAbort")
-    sys.exit(-1)
+	traceback.print_exception(exc_type, exc_value, tb)
+	input("\nAbort")
+	sys.exit(-1)
 sys.excepthook = show_exception_and_exit
 
 #imports
@@ -72,7 +71,7 @@ exception = "\x1b[38;2;255;0;0mException:\033[0m"
 
 def color_to_border_color(s : str):
 	r, g, b = int(s[0:2], 16) / 0xFF, int(s[2:4], 16) / 0xFF, int(s[4:6], 16) / 0xFF
-    
+	
 	r = pow(r, 2.2)
 	g = pow(g, 2.2)
 	b = pow(b, 2.2)
@@ -104,17 +103,18 @@ class Weapon:
 	alignment = Alignment("center", "center")
 	border_color = "FF8CA5D0"
 
-	borders = [Border(
-				left = Side(border_style=border_style, color=color_to_border_color(background_colors[i])),
-                right=Side(border_style=border_style, color=color_to_border_color(background_colors[i])),
-                top=Side(border_style=border_style, color=color_to_border_color(background_colors[i])),
-                bottom=Side(border_style=border_style, color=color_to_border_color(background_colors[i]))
-				) for i in range(len(types))]
-	fills = [PatternFill(fgColor=background_colors[i], fill_type = "solid") for i in range(len(types))]
+	borders = {type_ : Border(
+				left = Side(border_style=border_style, color=color_to_border_color(background_colors[type_])),
+				right=Side(border_style=border_style, color=color_to_border_color(background_colors[type_])),
+				top=Side(border_style=border_style, color=color_to_border_color(background_colors[type_])),
+				bottom=Side(border_style=border_style, color=color_to_border_color(background_colors[type_]))
+				) for type_ in types}
 	
-	stylesABF : list[NamedStyle] = (lambda t=types, a=alignment, b=borders, f=fills: [NamedStyle(name=t[i] + " ABF", alignment=a, border=b[i], fill=f[i]) for i in range(len(t))])()
-	stylesBF : list[NamedStyle] = (lambda t=types, b=borders, f=fills: [NamedStyle(name=t[i] + " BF", border=b[i], fill=f[i]) for i in range(len(t))])()
-	stylesAB : list[NamedStyle] = (lambda t=types, a=alignment, b=borders: [NamedStyle(name=t[i] + " AB", alignment=a, border=b[i]) for i in range(len(t))])()
+	fills = {type_ : PatternFill(fgColor=background_colors[type_], fill_type = "solid") for type_ in types}
+	
+	stylesABF = (lambda t=types, a=alignment, b=borders, f=fills: {type_ : NamedStyle(name=type_ + " ABF", alignment=a, border=b[type_], fill=f[type_]) for type_ in t})()
+	stylesBF = (lambda t=types, b=borders, f=fills: {type_ : NamedStyle(name=type_ + " BF", border=b[type_], fill=f[type_]) for type_ in t})()
+	stylesAB = (lambda t=types, a=alignment, b=borders: {type_ : NamedStyle(name=type_ + " AB", alignment=a, border=b[type_]) for type_ in t})()
 	stylesA = NamedStyle(name="A", alignment=alignment)
 
 	default_rpm = 0
@@ -123,17 +123,18 @@ class Weapon:
 	default_reload_times = (0., 0.)
 	default_capacity = (0, 0)
 	default_extended_barrel = False
+	default_grip = False
 
 	extended_barrel_weapon_name = "+ extended barrel"
 	extended_barrel_damage_multiplier = 1.1
 	
 	tdok_hps = (100, 110, 125, 120, 130, 145)
 
-	lowest_highest_dps : dict[int, tuple[int, int]] = {}
-	lowest_highest_ttdok : dict[int, dict[int, tuple[int, int]]] = {}
+	lowest_highest_dps : dict[str, tuple[int, int]] = {}	# type : (lowest dps, highest dps)
+	lowest_highest_ttdok : dict[int, dict[str, tuple[int, int]]] = {}	# hp : {type : (lowest ttdok, highest ttdok)}
 	
-	DPSColorScaleRule : dict[int, typing.Any] = {}	# type_index : ColorScaleRule
-	TTDOKColorScaleRules : dict[int, dict[int, typing.Any]] = {}	# hp : {type_index : ColorScaleRule}
+	DPSColorScaleRule : dict[str, typing.Any] = {}	# type : ColorScaleRule
+	TTDOKColorScaleRules : dict[int, dict[str, typing.Any]] = {}	# hp : {type : ColorScaleRule}
 
 	def __init__(self, json_content_):
 		self.json_content =  json_content_
@@ -142,13 +143,14 @@ class Weapon:
 		
 		self._name = None
 		self._damages = None
-		self._type_index = None
+		self._type = None	# type string
 		self._rpm = None	# rounds per minute
 		self._reload_times = None	# time in seconds
 		self._ads = None	# time in seconds
 		self._pellets = None	# number of pellets
 		self._capacity = None	# (magazine, chamber)
 		self._extended_barrel = None # whether the weapon has an extended barrel attachment
+		self._grip = None	# whether the weapon has access to a grip attachment
 
 		self.is_extended_barrel = False	# whether this is an extended barrel version
 		self.extended_barrel_parent : Weapon = None	# the base weapon object if this is an extended barrel version
@@ -159,20 +161,20 @@ class Weapon:
 			raise Exception(f"Weapon '{self.name}' doesn't deserialize to a dict.")
 		
 		DPS = tuple([int(self.dps(i) + 0.5) for i in range(len(Weapon.distances))])
-		if self.type_index not in Weapon.lowest_highest_dps:
-			Weapon.lowest_highest_dps[self.type_index] = min(DPS), max(DPS)
+		if self.type not in Weapon.lowest_highest_dps:
+			Weapon.lowest_highest_dps[self.type] = min(DPS), max(DPS)
 		else:
-			Weapon.lowest_highest_dps[self.type_index] = min(Weapon.lowest_highest_dps[self.type_index][0], min(DPS)), max(Weapon.lowest_highest_dps[self.type_index][1], max(DPS))
+			Weapon.lowest_highest_dps[self.type] = min(Weapon.lowest_highest_dps[self.type][0], min(DPS)), max(Weapon.lowest_highest_dps[self.type][1], max(DPS))
 
 		for hp in self.tdok_hps:
 			if hp not in Weapon.lowest_highest_ttdok:
 				Weapon.lowest_highest_ttdok[hp] = {}
 				
 			TTDOK = tuple([int(self.ttdok(i, hp) + 0.5) for i in range(len(Weapon.distances))])
-			if self.type_index not in Weapon.lowest_highest_ttdok[hp]:
-				Weapon.lowest_highest_ttdok[hp][self.type_index] = min(TTDOK), max(TTDOK)
+			if self.type not in Weapon.lowest_highest_ttdok[hp]:
+				Weapon.lowest_highest_ttdok[hp][self.type] = min(TTDOK), max(TTDOK)
 			else:
-				Weapon.lowest_highest_ttdok[hp][self.type_index] = min(Weapon.lowest_highest_ttdok[hp][self.type_index][0], min(TTDOK)), max(Weapon.lowest_highest_ttdok[hp][self.type_index][1], max(TTDOK))
+				Weapon.lowest_highest_ttdok[hp][self.type] = min(Weapon.lowest_highest_ttdok[hp][self.type][0], min(TTDOK)), max(Weapon.lowest_highest_ttdok[hp][self.type][1], max(TTDOK))
 
 		print(self.name)
 
@@ -191,8 +193,8 @@ class Weapon:
 		
 		return self._name
 	@property
-	def type_index(self) -> int:
-		if self._type_index == None:
+	def type(self) -> str:
+		if self._type == None:
 			# get weapon type
 			if "type" not in self.json_content:
 				raise Exception(f"Weapon '{self.name}' is missing a type.")
@@ -200,12 +202,8 @@ class Weapon:
 				raise Exception(f"Weapon '{self.name}' has a type that doesn't deserialize to a string.")
 			if self.json_content["type"] not in self.types:
 				raise Exception(f"Weapon '{self.name}' has an invalid type.")
-			self._type_index = self.types.index(self.json_content["type"])
-		
-		return self._type_index
-	@property
-	def type(self) -> str:
-		return self.types[self.type_index]
+			self._type = self.json_content["type"]
+		return self._type
 	@property
 	def rpm(self) -> int:
 		if self._rpm == None:
@@ -308,7 +306,11 @@ class Weapon:
 			if not numpy.array_equal(Weapon.distances, distances):
 				raise Exception(f"Weapon '{self.name}' has incorrect distance values.")
 
-			# make sure damages only stagnates or decreases and zeros are surrounded by equal non-zero damages
+			# make sure the last damage value is given. otherwise the extrapolation will be wrong
+			if damages[-1] == 0:
+				raise Exception(f"Weapon '{self.name}' is missing a damage value at {distances[-1]}m.")
+
+			# make sure damages only stagnate or decrease and zeros are surrounded by identical non-zero damages
 			# interpolate gaps. damages will be continuous in [5;40]
 			previous_real_damage = 0
 			previous_was_interpolated = False
@@ -335,7 +337,7 @@ class Weapon:
 			elif first_nonzero_index == -1:
 				raise Exception(f"Weapon '{self.name}' has no damage values at all.")
 			else:
-				if self.types[self.type_index] == "SG":	# special treatment for shotguns
+				if self.type == "SG":	# special treatment for shotguns
 					if first_nonzero_index <= 5:
 						for i in range(first_nonzero_index):
 							damages[i] = damages[first_nonzero_index]
@@ -366,6 +368,19 @@ class Weapon:
 				
 		return self._extended_barrel
 	@property
+	def grip(self) -> bool:
+		if self._grip == None:
+			# get weapon grip
+			if "grip" in self.json_content:
+				if type(self.json_content["grip"]) != bool:
+					raise Exception(f"Weapon '{self.name}' has a grip value that doesn't deserialize to a bool.")
+				self._grip = self.json_content["grip"]
+			else:
+				print(f"{warning('Warning:')} Weapon '{warning(self.name)}' is missing a {warning('grip')} value. Using default value ({self.default_grip}) instead.")
+				self._grip = self.default_grip
+			pass
+		return self._grip
+	@property
 	def operators(self):
 		return tuple([self.operators[opIndex] for opIndex in self.operator_indices])
 
@@ -394,7 +409,7 @@ class Weapon:
 		else:
 			return self.name, self.getStyleBF()
 	def getType(self):
-		return self.types[self.type_index], self.getStyleABF()
+		return self.type, self.getStyleABF()
 	def getRPM(self):
 		return self.rpm, self.getStyleABF()
 	def getRPS(self):
@@ -465,46 +480,46 @@ class Weapon:
 		return self.getStyleA()
 		
 	def getStyleABF(self):
-		return self.stylesABF[self.type_index]
+		return self.stylesABF[self.type]
 	def getStyleAB(self):
-		return self.stylesAB[self.type_index]
+		return self.stylesAB[self.type]
 	def getStyleBF(self):
-		return self.stylesBF[self.type_index]
+		return self.stylesBF[self.type]
 	def getStyleA(self):
 		return self.stylesA
 	
 	def getDmgPerShotColorScaleRule(self):
 		if self.DmgPerShotColorScaleRule == None:
 			start_val, end_val = self.getDmgPerShotInterval()
-			end_col = background_colors[self.type_index]
+			end_col = background_colors[self.type]
 			self.DmgPerShotColorScaleRule = ColorScaleRule(start_type="num", start_value=start_val, start_color="FFFFFF", end_type="num", end_value=end_val, end_color=end_col)
 
 		return self.DmgPerShotColorScaleRule
 	def getDPSColorScaleRule(self):
-		if self.type_index not in Weapon.DPSColorScaleRule:
+		if self.type not in Weapon.DPSColorScaleRule:
 			start_val, end_val = self.getDPSInterval()
-			end_col = background_colors[self.type_index]
-			Weapon.DPSColorScaleRule[self.type_index] = ColorScaleRule(start_type="num", start_value=start_val, start_color="FFFFFF", end_type="num", end_value=end_val, end_color=end_col)
+			end_col = background_colors[self.type]
+			Weapon.DPSColorScaleRule[self.type] = ColorScaleRule(start_type="num", start_value=start_val, start_color="FFFFFF", end_type="num", end_value=end_val, end_color=end_col)
 
-		return Weapon.DPSColorScaleRule[self.type_index]
+		return Weapon.DPSColorScaleRule[self.type]
 	def getTTDOKColorScaleRule(self, hp : int):
 		if hp not in Weapon.TTDOKColorScaleRules:
 			Weapon.TTDOKColorScaleRules[hp] = {}
 			
-		if self.type_index not in Weapon.TTDOKColorScaleRules[hp]:
+		if self.type not in Weapon.TTDOKColorScaleRules[hp]:
 			start_val, end_val = self.getTTDOKInterval(hp)
-			start_col = background_colors[self.type_index]
-			Weapon.TTDOKColorScaleRules[hp][self.type_index] = ColorScaleRule(start_type="num", start_value=start_val, start_color=start_col, end_type="num", end_value=end_val, end_color="FFFFFF")
+			start_col = background_colors[self.type]
+			Weapon.TTDOKColorScaleRules[hp][self.type] = ColorScaleRule(start_type="num", start_value=start_val, start_color=start_col, end_type="num", end_value=end_val, end_color="FFFFFF")
 
-		return Weapon.TTDOKColorScaleRules[hp][self.type_index]
+		return Weapon.TTDOKColorScaleRules[hp][self.type]
 	
 	# interval methods for excel conditional formatting
 	def getDmgPerShotInterval(self):
 		return min(self.damages) * self.pellets, max(self.damages) * self.pellets
 	def getDPSInterval(self):
-		return Weapon.lowest_highest_dps[self.type_index]
+		return Weapon.lowest_highest_dps[self.type]
 	def getTTDOKInterval(self, hp : int):
-		return Weapon.lowest_highest_ttdok[hp][self.type_index]
+		return Weapon.lowest_highest_ttdok[hp][self.type]
 
 	# other methods
 	def getDamageDropoffBorders(self):
@@ -907,7 +922,7 @@ def safe_to_xlsx_file(weapons : list[Weapon]):
 		"The color gradient illustrates the DPS compared to the highest DPS of the weapon's type (excluding extended barrel stats).",
 		"The colored areas represent steady STDOK, the white areas represent increasing STDOK.",
 		"The colored areas show where the extended barrel attachment actually affects the STDOK.",
-		"The color gradient illustrates the TTDOK compared to the lowest TTDOK of the weapon's type (excluding extended barrel stats).")
+		"The color gradient illustrates the TTDOK compared to the lowest TTDOK of the weapon's type against the same armor rating (excluding extended barrel stats).")
 
 	sub_names = ("1 armor (100 hp)", "2 armor (110 hp)", "3 armor (125 hp)",
 	  "1 armor + Rook (120 hp)", "2 armor + Rook (130 hp)", "3 armor + Rook (145 hp)")
@@ -915,7 +930,7 @@ def safe_to_xlsx_file(weapons : list[Weapon]):
 	excel_file_path = os.path.join(os.path.dirname(os.path.realpath(__file__)), "Rainbow-Six-Siege-Weapon-Statistics.xlsx")
 	html_file_path = os.path.join(os.path.dirname(os.path.realpath(__file__)), "Rainbow-Six-Siege-Weapon-Statistics.html")
 
-	weapons = sorted(weapons, key=lambda x: x.type_index, reverse=False)
+	weapons = sorted(weapons, key=lambda x: x.type, reverse=False)
 
 	# html file
 	string = """<!DOCTYPE html><html lang="en"><body>"""
@@ -985,13 +1000,13 @@ function changedStat() {
 
 	# weapon filter
 	string += """<table><tr style="vertical-align:top">"""
-	current_type_index = 0
+	current_type = ""
 	for weapon in weapons:
-		if current_type_index != weapon.type_index or weapon == weapons[0]:
+		if current_type != weapon.type or weapon == weapons[0]:
 			if weapon != weapons[0]:
-				current_type_index = weapon.type_index
+				current_type = weapon.type
 				string += f"</fieldset></td>"
-			string += f"""<td><fieldset><legend>{weapon.types[weapon.type_index]}{"" if weapon.types[weapon.type_index] == "Else" else "s"}:</legend>"""
+			string += f"""<td><fieldset><legend>{weapon.type}{"" if weapon.type == "Else" else "s"}:</legend>"""
 			
 		weapon_name = weapon.name
 		string += f"""<input type="checkbox" id="{weapon_name}" value="{weapon_name}" onchange="toggledCheckbox(event)"><label for="{weapon_name}">{weapon_name}</label><br>"""
@@ -1017,7 +1032,7 @@ function changedStat() {
 	string += """<th>&emsp;</th><th>Type</th><th>&emsp;</th><th>RPM</th><th>Capacity</th><th>Pellets</th><th>&emsp;</th><th>ADS time</th><th>&emsp;</th><td>Tactical</td><td>Full</td></tr>"""
 		
 	for weapon in weapons:
-		bg = f"background-color:#{background_colors[weapon.type_index]};"
+		bg = f"background-color:#{background_colors[weapon.type]};"
 		string += f"""<tr id="row_{weapon.name}" style="visibility:collapse;"><td style="{bg}">{weapon.name}</td>"""
 		for i in range(len(Weapon.distances)):
 			string += f"""<td>{weapon.damages[i]}</td>"""

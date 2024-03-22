@@ -45,11 +45,12 @@
     "37": 0,
     "38": 0,
     "39": 0,
-    "40": 0
+    "40": 32
   },
   "extended_barrel": false,
   "name": ".44 Mag Semi-Auto",
   "pellets": 1,
   "rpm": 480,
-  "type": "Pistol"
+  "type": "Pistol",
+  "grip": false
 }
