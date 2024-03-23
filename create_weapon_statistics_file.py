@@ -149,11 +149,12 @@ class Weapon:
 		self._ads = None	# time in seconds
 		self._pellets = None	# number of pellets
 		self._capacity = None	# (magazine, chamber)
-		self._extended_barrel = None # whether the weapon has an extended barrel attachment
 		self._grip = None	# whether the weapon has access to a grip attachment
-
+		
+		self._has_extended_barrel = None # whether the weapon has an extended barrel attachment
+		self.extended_barrel_weapon : Weapon = None	# the extended barrel version of this weapon
 		self.is_extended_barrel = False	# whether this is an extended barrel version
-		self.extended_barrel_parent : Weapon = None	# the base weapon object if this is an extended barrel version
+		self.extended_barrel_parent : None | Weapon = None	# the base weapon object if this is an extended barrel version
 		
 		self.DmgPerShotColorScaleRule = None
 
@@ -179,6 +180,69 @@ class Weapon:
 		print(self.name)
 
 		return
+
+	def validate_damages(self, distance_damage_dict : dict[int, int]):
+		# insert missing distances with damage = 0
+		for distance in Weapon.distances:
+			if distance not in distance_damage_dict:
+				distance_damage_dict[distance] = 0
+				
+		# sort distance_damage_dict in ascending order by distance
+		distance_damage_dict = dict(sorted(distance_damage_dict.items()))
+
+		distances = list(distance_damage_dict.keys())
+		damages = list(distance_damage_dict.values())
+		
+		#if Weapon.distances != distances:
+		if not numpy.array_equal(Weapon.distances, distances):
+			raise Exception(f"Weapon '{self.name}' has incorrect distance values.")
+
+		# make sure the last damage value is given. otherwise the extrapolation will be wrong
+		if damages[-1] == 0:
+			raise Exception(f"Weapon '{self.name}' is missing a damage value at {distances[-1]}m.")
+
+		# make sure damages only stagnate or decrease and zeros are surrounded by identical non-zero damages
+		# interpolate gaps. damages will be continuous in [5;40]
+		previous_real_damage = 0
+		previous_was_interpolated = False
+		for i in range(len(Weapon.distances)):
+			if damages[i] == 0:	# this damage value needs to be interpolated
+				damages[i] = previous_real_damage
+				previous_was_interpolated = True
+				
+			else:	# this damage value is given
+				if damages[i] > previous_real_damage and previous_real_damage != 0:
+					raise Exception(f"Weapon '{self.name}' has a damage increase from '{previous_real_damage}' to '{damages[i]}' at {Weapon.distances[i]}m.")
+				if previous_real_damage != 0 and previous_was_interpolated == True and damages[i] != previous_real_damage:
+					raise Exception(f"Tried to interpolate between two unequal damage values '{previous_real_damage}' and '{damages[i]}' at {Weapon.distances[i]}m for weapon '{self.name}'.")
+				
+				previous_real_damage = damages[i]
+				previous_was_interpolated = False
+
+		# get index to first non-zero damage
+		first_nonzero_index = next((i for i, damage in enumerate(damages) if damage != 0), -1)
+
+		# extrapolate first 5 meters. damages will be continuous in [0;4]
+		if first_nonzero_index == 0:
+			pass	# no extrapolation needed
+		elif first_nonzero_index == -1:
+			raise Exception(f"Weapon '{self.name}' has no damage values at all.")
+		else:
+			if self.type == "SG":	# special treatment for shotguns
+				if first_nonzero_index <= 5:
+					for i in range(first_nonzero_index):
+						damages[i] = damages[first_nonzero_index]
+				else:
+					raise Exception(f"Can't extrapolate first {first_nonzero_index} meters for shotgun '{self.name}'.")
+			else:
+				if damages[first_nonzero_index] == damages[first_nonzero_index+1] == damages[first_nonzero_index+2]:
+					for i in range(first_nonzero_index):
+						damages[i] = damages[first_nonzero_index]
+				else:
+					raise Exception(f"Can't extrapolate first {first_nonzero_index} meters for weapon '{self.name}'.")
+
+		# return the damage stats
+		return tuple(damages)
 
 	# primary properties
 	@property
@@ -285,88 +349,53 @@ class Weapon:
 				raise Exception(f"Weapon '{self.name}' is missing damage values.")
 			if type(self.json_content["damages"]) != dict:
 				raise Exception(f"Weapon '{self.name}' has damage values that don't deserialize to a dict.")
-			if not all(isinstance(distance, str) for distance in self.json_content["damages"]):
-				raise Exception(f"Weapon '{self.name}' has distance values that don't deserialize to strings.")
 			if not all(isinstance(damage, int) for damage in self.json_content["damages"].values()):
 				raise Exception(f"Weapon '{self.name}' has damage values that don't deserialize to integers.")
 			distance_damage_dict = {int(distance) : int(damage) for distance, damage in self.json_content["damages"].items()}
-
-			# insert missing distances with damage = 0
-			for distance in Weapon.distances:
-				if distance not in distance_damage_dict:
-					distance_damage_dict[distance] = 0
-				
-			# sort distance_damage_dict in ascending order by distance
-			distance_damage_dict = dict(sorted(distance_damage_dict.items()))
-
-			distances = list(distance_damage_dict.keys())
-			damages = list(distance_damage_dict.values())
-		
-			#if Weapon.distances != distances:
-			if not numpy.array_equal(Weapon.distances, distances):
-				raise Exception(f"Weapon '{self.name}' has incorrect distance values.")
-
-			# make sure the last damage value is given. otherwise the extrapolation will be wrong
-			if damages[-1] == 0:
-				raise Exception(f"Weapon '{self.name}' is missing a damage value at {distances[-1]}m.")
-
-			# make sure damages only stagnate or decrease and zeros are surrounded by identical non-zero damages
-			# interpolate gaps. damages will be continuous in [5;40]
-			previous_real_damage = 0
-			previous_was_interpolated = False
-			for i in range(len(Weapon.distances)):
-				if damages[i] == 0:	# this damage value needs to be interpolated
-					damages[i] = previous_real_damage
-					previous_was_interpolated = True
-				
-				else:	# this damage value is given
-					if damages[i] > previous_real_damage and previous_real_damage != 0:
-						raise Exception(f"Weapon '{self.name}' has a damage increase from '{previous_real_damage}' to '{damages[i]}' at {Weapon.distances[i]}m.")
-					if previous_real_damage != 0 and previous_was_interpolated == True and damages[i] != previous_real_damage:
-						raise Exception(f"Tried to interpolate between two unequal damage values '{previous_real_damage}' and '{damages[i]}' at {Weapon.distances[i]}m for weapon '{self.name}'.")
-				
-					previous_real_damage = damages[i]
-					previous_was_interpolated = False
-
-			# get index to first non-zero damage
-			first_nonzero_index = next((i for i, damage in enumerate(damages) if damage != 0), -1)
-
-			# extrapolate first 5 meters. damages will be continuous in [0;4]
-			if first_nonzero_index == 0:
-				pass	# no extrapolation needed
-			elif first_nonzero_index == -1:
-				raise Exception(f"Weapon '{self.name}' has no damage values at all.")
-			else:
-				if self.type == "SG":	# special treatment for shotguns
-					if first_nonzero_index <= 5:
-						for i in range(first_nonzero_index):
-							damages[i] = damages[first_nonzero_index]
-					else:
-						raise Exception(f"Can't extrapolate first {first_nonzero_index} meters for shotgun '{self.name}'.")
-				else:
-					if damages[first_nonzero_index] == damages[first_nonzero_index+1] == damages[first_nonzero_index+2]:
-						for i in range(first_nonzero_index):
-							damages[i] = damages[first_nonzero_index]
-					else:
-						raise Exception(f"Can't extrapolate first {first_nonzero_index} meters for weapon '{self.name}'.")
-
-			# save the damage stats
-			self._damages = tuple(damages)
+			
+			self._damages = self.validate_damages(distance_damage_dict)
 
 		return self._damages
 	@property
-	def extended_barrel(self) -> bool:
-		if self._extended_barrel == None:
+	def has_extended_barrel(self) -> bool:
+		if self._has_extended_barrel == None:
+			potential_eb = copy.deepcopy(self)
+		
 			# get weapon extended barrel
 			if "extended_barrel" in self.json_content:
-				if type(self.json_content["extended_barrel"]) != bool:
-					raise Exception(f"Weapon '{self.name}' has an extended barrel value that doesn't deserialize to a bool.")
-				self._extended_barrel = self.json_content["extended_barrel"]
+				if type(self.json_content["extended_barrel"]) == bool:	# use default damage multiplier for extended barrel
+					self._has_extended_barrel = self.json_content["extended_barrel"]
+					if self._has_extended_barrel == True:
+						potential_eb._damages = tuple(math.ceil(dmg * self.extended_barrel_damage_multiplier) for dmg in self.damages)
+					
+				elif type(self.json_content["extended_barrel"]) == dict:	# use custom damages for extended barrel
+					if not all(isinstance(damage, int) for damage in self.json_content["extended_barrel"].values()):
+						raise Exception(f"Weapon '{self.name}' has damage values that don't deserialize to integers.")
+					distance_damage_dict = {int(distance) : int(damage) for distance, damage in self.json_content["extended_barrel"].items()}
+					potential_eb._damages = self.validate_damages(distance_damage_dict)
+					self._has_extended_barrel = True
+				else:
+					raise Exception(f"Weapon '{self.name}' has an extended barrel value that doesn't deserialize to a bool or a dict.")
+
 			else:
-				print(f"{warning('Warning:')} Weapon '{warning(self.name)}' is missing an {warning('extended barrel')} value. Using default value ({self.default_extended_barrel}) instead.")
-				self._extended_barrel = self.default_extended_barrel
+				print(f"{warning('Warning:')} Weapon '{warning(self.name)}' is missing an {warning('extended barrel')} value. Using default value ({self.default_has_extended_barrel}) instead.")
+				self._has_extended_barrel = self.default_has_extended_barrel
 				
-		return self._extended_barrel
+			if self._has_extended_barrel == True:
+				potential_eb.json_content = None
+				
+				potential_eb._name = self.extended_barrel_weapon_name
+
+				potential_eb._has_extended_barrel = False
+				potential_eb.extended_barrel_weapon = None
+				potential_eb.is_extended_barrel = True
+				potential_eb.extended_barrel_parent = self
+		
+				potential_eb.DmgPerShotColorScaleRule = None
+				
+				self.extended_barrel_weapon = potential_eb
+
+		return self._has_extended_barrel
 	@property
 	def grip(self) -> bool:
 		if self._grip == None:
@@ -553,25 +582,7 @@ class Weapon:
 
 		return lastInitialSTDOKIndex, firstEndSTDOKIndex
 	def getExtendedBarrelWeapon(self):
-		retVar = copy.deepcopy(self)
-		
-		retVar._name = self.extended_barrel_weapon_name
-		retVar.json_content = None
-
-		retVar._damages = tuple(math.ceil(dmg * self.extended_barrel_damage_multiplier) for dmg in self.damages)
-		retVar._rpm = self.rpm
-		retVar._pellets = self.pellets
-		retVar._reload_times = None
-		retVar._ads = None
-		retVar._capacity = None
-		retVar._extended_barrel = False
-
-		retVar.is_extended_barrel = True
-		retVar.extended_barrel_parent = self
-		
-		retVar.DmgPerShotColorScaleRule = None
-
-		return retVar
+		return self.extended_barrel_weapon
 
 
 def deserialize_json(file_name : str):
@@ -826,7 +837,7 @@ def add_stats_worksheet(workbook : typing.Any, weapons : list[Weapon], worksheet
 			add_weapon_to_worksheet(worksheet, weapon, None, stat_method, format_method, None, row, cond_formats)
 			row += 1
 			
-			if (weapon.extended_barrel):
+			if (weapon.has_extended_barrel):
 				extended_barrel_weapon = weapon.getExtendedBarrelWeapon()
 				add_weapon_to_worksheet(worksheet, extended_barrel_weapon, Weapon.extended_barrel_weapon_name, stat_method, format_method, None, row, cond_formats)
 				row += 1
@@ -838,12 +849,12 @@ def add_stats_worksheet(workbook : typing.Any, weapons : list[Weapon], worksheet
 			worksheet.merge_cells(start_row=row, end_row=row, start_column=2, end_column=1 + len(Weapon.distances))
 			row += 1
 
-			if (weapon.extended_barrel):
+			if (weapon.has_extended_barrel):
 				extended_barrel_weapon = weapon.getExtendedBarrelWeapon()
 			for sub_name, additional_param in zip(sub_names, additional_params):
 				add_weapon_to_worksheet(worksheet, weapon, sub_name, stat_method, format_method, additional_param, row, cond_formats)
 				row += 1
-				if (weapon.extended_barrel):
+				if (weapon.has_extended_barrel):
 					add_weapon_to_worksheet(worksheet, extended_barrel_weapon, Weapon.extended_barrel_weapon_name, stat_method, format_method, additional_param, row, cond_formats)
 					row += 1
 					
@@ -893,7 +904,7 @@ def add_extended_barrel_overview(workbook : typing.Any, weapons : list[Weapon]):
 		worksheet.column_dimensions[get_column_letter(col)].width = 8
 
 	for weapon in weapons:
-		if weapon.extended_barrel == False:
+		if weapon.has_extended_barrel == False:
 			continue
 		extended_weapon = weapon.getExtendedBarrelWeapon()
 		
