@@ -938,7 +938,6 @@ def add_attachment_overview(workbook : typing.Any, weapons : list[Weapon]):
 
 	worksheet, row = add_worksheet_header(workbook, "Attachments", "Attachment overview", None, "A short overview over all available attachments.", 19)
 	worksheet.freeze_panes = worksheet.cell(row=row, column=2)
-	row += 1
 
 	for attachment_category, attachment_dict in attachment_categories.items():
 		if not isinstance(attachment_dict, dict):
@@ -1149,6 +1148,7 @@ def save_to_output_files(weapons : list[Weapon]):
 	#save_to_html_file(weapons, stat_names)
 	save_to_xlsx_file(weapons, stat_names, stat_links)
 	return
+
 
 weapons = get_weapons_dict()
 save_to_output_files(weapons)
