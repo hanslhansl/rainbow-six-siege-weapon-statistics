@@ -938,8 +938,8 @@ def safe_to_xlsx_file(weapons : list[Weapon]):
 	sub_names = ("1 armor (100 hp)", "2 armor (110 hp)", "3 armor (125 hp)",
 	  "1 armor + Rook (120 hp)", "2 armor + Rook (130 hp)", "3 armor + Rook (145 hp)")
 
-	excel_file_path = os.path.join(os.path.dirname(os.path.realpath(__file__)), "Rainbow-Six-Siege-Weapon-Statistics.xlsx")
-	html_file_path = os.path.join(os.path.dirname(os.path.realpath(__file__)), "Rainbow-Six-Siege-Weapon-Statistics.html")
+	excel_file_path = os.path.join(os.path.dirname(os.path.realpath(__file__)), "rainbow-six-siege-weapon-statistics.xlsx")
+	html_file_path = os.path.join(os.path.dirname(os.path.realpath(__file__)), "rainbow-six-siege-weapon-statistics.html")
 
 	weapons = sorted(weapons, key=lambda x: x.type, reverse=False)
 
