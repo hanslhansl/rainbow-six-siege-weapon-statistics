@@ -4,11 +4,17 @@
 # settings
 ###################################################
 
-# the delimiter used in csv files
-csv_delimiter = ";"
-
 # the file containing the weapons each operator has access to
 operator_weapons_file_name = "operator_weapons.json"
+
+# the file containing the attachment overview
+attachment_overview_file_name = "attachment_overview.json"
+
+# the file name of the html output file
+html_output_file_name = "rainbow-six-siege-weapon-statistics.html"
+
+# the file name of the xlsx output file
+xlsx_output_file_name = "rainbow-six-siege-weapon-statistics.xlsx"
 
 # the directory containing the weapon damage files
 weapon_data_dir = "weapons"
@@ -126,7 +132,7 @@ class Weapon:
 	default_grip = False
 
 	extended_barrel_weapon_name = "+ extended barrel"
-	extended_barrel_damage_multiplier = 1.1
+	extended_barrel_damage_multiplier = 0.0
 	
 	tdok_hps = (100, 110, 125, 120, 130, 145)
 
@@ -451,8 +457,6 @@ class Weapon:
 		return self.damage_per_shot(index), self.getStyleAB()
 	def getDPS(self, index : int):
 		return int(self.dps(index) + 0.5), self.getStyleAB()
-	def getOldSTDOK(self, index : int, hp : int):
-		return self.stdok(index, hp), self.getOldSTDOKStyle(index, hp)
 	def getSTDOK(self, index : int, hp : int):
 		return self.stdok(index, hp), self.getSTDOKStyle(index, hp)
 	def getTTDOK(self, index : int, hp : int):
@@ -485,14 +489,6 @@ class Weapon:
 	# excel styles
 	def getDamageStyle(self, index : int):
 		a, b = self.getDamageDropoffBorders()
-		if index <= a:
-			return self.getStyleABF()
-		elif index >= b:
-			return self.getStyleABF()
-		else:
-			return self.getStyleA()
-	def getOldSTDOKStyle(self, index : int, hp : int):
-		a, b = self.getTDOKBorders(hp)
 		if index <= a:
 			return self.getStyleABF()
 		elif index >= b:
@@ -634,8 +630,10 @@ def get_operator_weapons(weapons : list[Weapon], file_name : str) -> None:
 	return
 
 def get_weapons_dict() -> list[Weapon]:
-	weapons : list[Weapon] = []
+	attachment_categories = deserialize_json(attachment_overview_file_name)
+	Weapon.extended_barrel_damage_multiplier = 1.0 + attachment_categories["Barrels"]["Extended barrel"]["damage increase"]
 
+	weapons : list[Weapon] = []
 	for file_name in os.listdir(weapon_data_dir):
 		file_path = os.path.join(weapon_data_dir, file_name)		
 
@@ -651,6 +649,8 @@ def get_weapons_dict() -> list[Weapon]:
 	# get all operator weapons
 	get_operator_weapons(weapons, operator_weapons_file_name)
 	
+	weapons = sorted(weapons, key=lambda weapon: weapon_types.index(weapon.type), reverse=False)
+
 	return weapons
 
 def add_weapon_to_worksheet(worksheet : typing.Any, weapon : Weapon, sub_name : None | str, stat_method : typing.Any, format_method : typing.Any,
@@ -683,8 +683,10 @@ def add_weapon_to_worksheet(worksheet : typing.Any, weapon : Weapon, sub_name : 
 		
 	return
 
-def add_stats_worksheet_header(workbook : typing.Any, worksheet_name : str, stat_name : str, stat_link : str, description : str | tuple[str,...], cols_inbetween : int):
+def add_worksheet_header(workbook : typing.Any, worksheet_name : str, stat_name : str, stat_link : str | None, description : str | tuple[str,...], cols_inbetween : int):
 	worksheet = workbook.create_sheet(worksheet_name)
+	
+	worksheet.column_dimensions[get_column_letter(1)].width = 20.5
 	
 	row = 1
 	worksheet.merge_cells(start_row=row, end_row=row, start_column=2, end_column=1 + cols_inbetween)
@@ -701,8 +703,11 @@ def add_stats_worksheet_header(workbook : typing.Any, worksheet_name : str, stat
 	row += 2
 	worksheet.merge_cells(start_row=row, end_row=row, start_column=2, end_column=1 + cols_inbetween)
 	c = worksheet.cell(row=row, column=2)
-	c.value = f'=HYPERLINK("https://github.com/hanslhansl/R6S-Weapon-Statistics/#{stat_link}", "{stat_name}")'
-	c.font = Font(color = "FF0000FF")
+	if type(stat_link) == str:
+		c.value = f'=HYPERLINK("https://github.com/hanslhansl/R6S-Weapon-Statistics/#{stat_link}", "{stat_name}")'
+		c.font = Font(color = "FF0000FF")
+	else:
+		c.value = stat_name
 	c.font = Font(bold=True)
 	
 	if type(description) == str:
@@ -714,7 +719,10 @@ def add_stats_worksheet_header(workbook : typing.Any, worksheet_name : str, stat
 		c.value = desc
 	
 	row += 1
-	col = cols_inbetween + 2
+
+	return worksheet, row
+
+def add_stats_header(worksheet : typing.Any, row : int, col : int):
 	worksheet.column_dimensions[get_column_letter(col)].width = 3
 
 	col += 1
@@ -772,15 +780,8 @@ def add_stats_worksheet_header(workbook : typing.Any, worksheet_name : str, stat
 	c.value = "Full"
 	c.alignment = Weapon.alignment
 	worksheet.column_dimensions[get_column_letter(col)].width = 4
-		
-	worksheet.freeze_panes = worksheet.cell(row=row+1, column=2)
-
-	return worksheet, row
 
 def add_secondary_weapon_stats(worksheet : typing.Any, weapon : Weapon, row : int, col : int):
-	c = worksheet.cell(row=row, column=1)
-	c.value, c.style = weapon.getName()
-
 	c = worksheet.cell(row=row, column=col)
 	c.value, c.style = weapon.getType()
 		
@@ -812,13 +813,14 @@ def add_secondary_weapon_stats(worksheet : typing.Any, weapon : Weapon, row : in
 def add_stats_worksheet(workbook : typing.Any, weapons : list[Weapon], worksheet_name : str, stat_name : str, stat_link : str, description : str,
 						sub_names : None | tuple[str,...], stat_method : typing.Any, format_method : typing.Any, additional_params : None | tuple[typing.Any]):
 	
-	worksheet, row = add_stats_worksheet_header(workbook, worksheet_name, stat_name, stat_link, description, len(Weapon.distances))
+	worksheet, row = add_worksheet_header(workbook, worksheet_name, stat_name, stat_link, description, len(Weapon.distances))
+	add_stats_header(worksheet, row, len(Weapon.distances) + 2)
+	worksheet.freeze_panes = worksheet.cell(row=row+1, column=2)
 
 	col = 1
 	c = worksheet.cell(row=row, column=col)
 	c.value = "Distance"
-	worksheet.column_dimensions[get_column_letter(col)].width = 20.5
-	
+
 	for col in range(2, len(Weapon.distances) + 2):
 		c = worksheet.cell(row=row, column=col)
 		c.value = Weapon.distances[col - 2]
@@ -830,6 +832,9 @@ def add_stats_worksheet(workbook : typing.Any, weapons : list[Weapon], worksheet
 	row += 1
 	for i in range(len(weapons)):
 		weapon = weapons[i]
+
+		c = worksheet.cell(row=row, column=1)
+		c.value, c.style = weapon.getName()
 
 		add_secondary_weapon_stats(worksheet, weapon, row, len(Weapon.distances) + 3)
 
@@ -866,27 +871,22 @@ def add_stats_worksheet(workbook : typing.Any, weapons : list[Weapon], worksheet
 	
 	return
 
-def add_extended_barrel_overview(workbook : typing.Any, weapons : list[Weapon]):
+def add_extended_barrel_overview(worksheet : typing.Any, weapons : list[Weapon], row : int, col : int, with_secondary_weapon_stats : bool):
 	col_names = ("1 (100)", "2 (110)", "3 (125)", "1R (120)", "2R (130)", "3R (145)")
-	
-	worksheet, row = add_stats_worksheet_header(workbook, "Extended barrel", "Extended barrel overview", "the-extended-barrel",
-											 ("Shows how much the extended barrel affects STDOK and TTDOK up until the damage drop-off starts.", ""), 13)
-	
-	row -= 1
-	worksheet.unmerge_cells(start_row=row, end_row=row, start_column=2, end_column=14)
-	
-	worksheet.merge_cells(start_row=row, end_row=row, start_column=2, end_column=7)
-	c = worksheet.cell(row=row, column=2)
+	original_col = col
+
+	worksheet.merge_cells(start_row=row, end_row=row, start_column=col+1, end_column=col+6)
+	c = worksheet.cell(row=row, column=col+1)
 	c.value = "STDOK"
 	c.alignment = Weapon.alignment
 	
-	worksheet.merge_cells(start_row=row, end_row=row, start_column=9, end_column=14)
-	c = worksheet.cell(row=row, column=9)
+	worksheet.merge_cells(start_row=row, end_row=row, start_column=col+8, end_column=col+13)
+	c = worksheet.cell(row=row, column=col+8)
 	c.value = "TTDOK"
 	c.alignment = Weapon.alignment
 	
 	row += 1
-	col = 1
+	
 	c = worksheet.cell(row=row, column=col)
 	c.value = "Health rating"
 	worksheet.column_dimensions[get_column_letter(col)].width = 20.5
@@ -902,31 +902,82 @@ def add_extended_barrel_overview(workbook : typing.Any, weapons : list[Weapon]):
 		c.value = col_name
 		c.alignment = Weapon.alignment
 		worksheet.column_dimensions[get_column_letter(col)].width = 8
+		
+	row += 1
 
 	for weapon in weapons:
 		if weapon.has_extended_barrel == False:
 			continue
 		extended_weapon = weapon.getExtendedBarrelWeapon()
 		
-		row += 1
-		add_secondary_weapon_stats(worksheet, weapon, row, 16)
+		col = original_col
+		
+		c = worksheet.cell(row=row, column=col)
+		c.value, c.style = weapon.getName()
 
-		col = 1
+		if with_secondary_weapon_stats:
+			add_secondary_weapon_stats(worksheet, weapon, row, col+15)
+
 		for hp in Weapon.tdok_hps:
 			col += 1
 			c1 = worksheet.cell(row=row, column=col)
 			c2 = worksheet.cell(row=row, column=col + len(col_names) + 1)
 			c1.value, c2.value, c1.style = extended_weapon.getHowUsefulIsExtendedBarrel(hp)
 			c2.style = c1.style
+			
+		row += 1
 
-	return
+	return row
 
-def safe_to_xlsx_file(weapons : list[Weapon]):
-	""" https://openpyxl.readthedocs.io/en/stable/ """
+def add_attachment_overview(workbook : typing.Any, weapons : list[Weapon]):
+	json_content = deserialize_json(attachment_overview_file_name)
 	
-	stat_names = ("Damage per bullet", "Damage per shot", "Damage per second", "Shots to down or kill - old", "Shots to down or kill", "Time to down or kill")
+	if not isinstance(json_content, dict):
+		raise Exception(f"File '{attachment_overview_file_name}' doesn't deserialize to a dictionary.")
+	attachment_categories : dict[str, typing.Any] = json_content
+
+	worksheet, row = add_worksheet_header(workbook, "Attachments", "Attachment overview", None, "A short overview over all available attachments.", 19)
+	worksheet.freeze_panes = worksheet.cell(row=row, column=2)
+	row += 1
+
+	for attachment_category, attachment_dict in attachment_categories.items():
+		if not isinstance(attachment_dict, dict):
+			raise Exception(f"An attachment category in file '{attachment_overview_file_name}' doesn't deserialize to a dictionary but to '{type(attachment_dict)}'.")
+		attachment_dict : dict[str, typing.Any]
+
+		c = worksheet.cell(row=row, column=1)
+		c.value = attachment_category
+		c.font = Font(bold=True)
+		
+		for attachment_name, attachment in attachment_dict.items():
+			if not isinstance(attachment, dict):
+				raise Exception(f"An attachment in file '{attachment_overview_file_name}' doesn't deserialize to a dictionary but to '{type(attachment)}'.")
+
+			worksheet.merge_cells(start_row=row, end_row=row, start_column=2, end_column=1 + 19)
+			c = worksheet.cell(row=row, column=2)
+			c.value = attachment_name
+			c.font = Font(bold=True)
+			row += 1
+			
+			if "description" in attachment:
+				description = attachment.pop("description").format(*attachment.values())
+				worksheet.merge_cells(start_row=row, end_row=row, start_column=2, end_column=1 + 19)
+				c = worksheet.cell(row=row, column=2)
+				c.value = description
+				row += 1
+				
+			if "damage increase" in attachment:
+				row += 1
+				row = add_extended_barrel_overview(worksheet, weapons, row, 2, False)
+				
+			row += 1
+			
+		row += 1
+
+def save_to_xlsx_file(weapons : list[Weapon], stat_names : tuple[str,...], stat_links : tuple[str,...]):
+	""" https://openpyxl.readthedocs.io/en/stable/ """
+
 	sheet_names = ("Damage per bullet", "Damage per shot", "DPS", "STDOK - old", "STDOK", "TTDOK")
-	stat_links = ("damage-per-bullet", "damage-per-shot", "damage-per-second---dps", "shots-to-down-or-kill---stdok", "shots-to-down-or-kill---stdok", "time-to-down-or-kill---ttdok")
 	explanations = (
 		"The colored areas represent steady damage, the white areas represent decreasing damage.",
 		"The color gradient illustrates the damage compared to the weapon's base damage.",
@@ -937,12 +988,36 @@ def safe_to_xlsx_file(weapons : list[Weapon]):
 
 	sub_names = ("1 armor (100 hp)", "2 armor (110 hp)", "3 armor (125 hp)",
 	  "1 armor + Rook (120 hp)", "2 armor + Rook (130 hp)", "3 armor + Rook (145 hp)")
+	
+	# excel file
+	workbook = Workbook()
 
-	excel_file_path = os.path.join(os.path.dirname(os.path.realpath(__file__)), "rainbow-six-siege-weapon-statistics.xlsx")
-	html_file_path = os.path.join(os.path.dirname(os.path.realpath(__file__)), "rainbow-six-siege-weapon-statistics.html")
+	workbook.remove(workbook.active)
+		
+	add_stats_worksheet(workbook, weapons, sheet_names[0], stat_names[0], stat_links[0],
+		explanations[0], None, Weapon.getDamage, None, None)
 
-	weapons = sorted(weapons, key=lambda x: x.type, reverse=False)
+	add_stats_worksheet(workbook, weapons, sheet_names[1], stat_names[1], stat_links[1],
+		explanations[1], None, Weapon.getDamagePerShot, Weapon.getDmgPerShotColorScaleRule, None)
 
+	add_stats_worksheet(workbook, weapons, sheet_names[2], stat_names[2], stat_links[2],
+		explanations[2], None, Weapon.getDPS, Weapon.getDPSColorScaleRule, None)
+
+	add_stats_worksheet(workbook, weapons, sheet_names[4], stat_names[4], stat_links[4],
+		explanations[4], sub_names, Weapon.getSTDOK, None, Weapon.tdok_hps)
+
+	add_stats_worksheet(workbook, weapons, sheet_names[5], stat_names[5], stat_links[5],
+		explanations[5], sub_names, Weapon.getTTDOK, Weapon.getTTDOKColorScaleRule, Weapon.tdok_hps)
+	
+	add_attachment_overview(workbook, weapons)
+
+	# save to file
+	workbook.save(xlsx_output_file_name)
+	
+	os.system("start " + xlsx_output_file_name)
+	return
+
+def save_to_html_file(weapons : list[Weapon], stat_names : tuple[str,...]):
 	# html file
 	string = """<!DOCTYPE html><html lang="en"><body>"""
 	string += """<script> function toggledCheckbox(event)
@@ -1063,58 +1138,19 @@ function changedStat() {
 
 	string += """</body></html>"""
 
-	with open(html_file_path, "w") as file:
+	with open(html_output_file_name, "w") as file:
 		file.write(string)
-		
-	os.system("start " + html_file_path)
-	#return
+	os.system("start " + html_output_file_name)
 
-	# excel file
-	workbook = Workbook()
-
-	workbook.remove(workbook.active)
-		
-	add_stats_worksheet(workbook, weapons, sheet_names[0], stat_names[0], stat_links[0],
-		explanations[0], None, Weapon.getDamage, None, None)
-
-	add_stats_worksheet(workbook, weapons, sheet_names[1], stat_names[1], stat_links[1],
-		explanations[1], None, Weapon.getDamagePerShot, Weapon.getDmgPerShotColorScaleRule, None)
-
-	add_stats_worksheet(workbook, weapons, sheet_names[2], stat_names[2], stat_links[2],
-		explanations[2], None, Weapon.getDPS, Weapon.getDPSColorScaleRule, None)
-
-	#add_stats_worksheet(workbook, weapons, sheet_names[3], stat_names[3], stat_links[3],
-	#	explanations[3], sub_names, Weapon.getOldSTDOK, None, Weapon.tdok_hps)
-
-	add_stats_worksheet(workbook, weapons, sheet_names[4], stat_names[4], stat_links[4],
-		explanations[4], sub_names, Weapon.getSTDOK, None, Weapon.tdok_hps)
-
-	add_stats_worksheet(workbook, weapons, sheet_names[5], stat_names[5], stat_links[5],
-		explanations[5], sub_names, Weapon.getTTDOK, Weapon.getTTDOKColorScaleRule, Weapon.tdok_hps)
+def save_to_output_files(weapons : list[Weapon]):
+	stat_names = ("Damage per bullet", "Damage per shot", "Damage per second", "Shots to down or kill - old", "Shots to down or kill", "Time to down or kill")
+	stat_links = ("damage-per-bullet", "damage-per-shot", "damage-per-second---dps", "shots-to-down-or-kill---stdok", "shots-to-down-or-kill---stdok", "time-to-down-or-kill---ttdok")
 	
-	add_extended_barrel_overview(workbook, weapons)
-
-	# save to file
-	workbook.save(excel_file_path)
-
-	# resize columns
-	# import win32com.client
-	# excel = win32com.client.Dispatch('Excel.Application')
-	# wb = excel.Workbooks.Open(file_path)
-	# for i in range(1, excel.Worksheets.Count + 1):
-	# 	excel.Worksheets(i).Activate()
-	# 	excel.ActiveSheet.Columns[0].AutoFit()
-	# 	excel.ActiveSheet.Columns(40,50).AutoFit()
-	# excel.Worksheets(1).Activate()
-	# wb.Save()
-	# wb.Close()
-	# excel.Quit()
-	
-	os.system("start " + excel_file_path)
+	#save_to_html_file(weapons, stat_names)
+	save_to_xlsx_file(weapons, stat_names, stat_links)
 	return
 
-
 weapons = get_weapons_dict()
-safe_to_xlsx_file(weapons)
+save_to_output_files(weapons)
 
 input("\nCompleted!")
