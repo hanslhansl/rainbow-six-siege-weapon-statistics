@@ -17,15 +17,15 @@
   "Barrels": {
     "Flash hider": {
       "vertical recoil reduction": 0.2,
-      "description": "Reduces the vertical recoil by {0:%}. The go-to attachment for most fully automatic weapons."
+      "description": "Reduces the vertical recoil by {0:%}. The go-to muzzle attachment for most fully automatic weapons."
     },
     "Compensator": {
       "horizontal recoil reduction": 0.0,
-      "description": "Reduces the horizontal recoil by {0:%}. Strong on fully automatic weapons with more horizotnal than vertical recoil."
+      "description": "Reduces the horizontal recoil by {0:%}. Strong on fully automatic weapons with more horizontal than vertical recoil."
     },
     "Muzzle break": {
       "first shot recoil reduction": 0.0,
-      "description": "Reduces the first shot recoil by {0:%}. The go-to attachment for all semi-automatic weapons."
+      "description": "Reduces the first shot recoil by {0:%}. The go-to muzzle attachment for all semi-automatic weapons."
     },
     "Suppressor": {
       "description": "Reduces the sound emitted from a weapon and removes bulled trails."
@@ -38,19 +38,23 @@
 
   "Grips": {
     "Vertical grip": {
-      "vertical recoil reduction": 0.2
+      "vertical recoil reduction": 0.2,
+      "description": "Reduces the vertical recoil by {0:%}. The go-to grip attachment for most weapons."
     },
     "Angled grip": {
-      "weapon reload speed bonus": 0.2
+      "weapon reload speed bonus": 0.2,
+      "description": "Reduces weapon reload time by {0:%}."
     },
     "Horizontal grip": {
-      "movement speed bonus":  0.05
+      "movement speed bonus": 0.05,
+      "description": "Increases movement speed by {0:%}."
     }
   },
 
   "Under Barrel": {
     "Laser": {
-      "ads speed bonus": 0.1
+      "ads speed bonus": 0.1,
+      "description": "Increases movement speed by {0:%}."
     }
   }
 }
