@@ -16,19 +16,23 @@
 
   "Barrels": {
     "Flash hider": {
-      "vertical recoil reduction": 0.0
+      "vertical recoil reduction": 0.2,
+      "description": "Reduces the vertical recoil by {0:%}. The go-to attachment for most fully automatic weapons."
     },
     "Compensator": {
-      "horizontal recoil reduction": 0.0
+      "horizontal recoil reduction": 0.0,
+      "description": "Reduces the horizontal recoil by {0:%}. Strong on fully automatic weapons with more horizotnal than vertical recoil."
     },
     "Muzzle break": {
-      "first shot recoil reduction": 0.0
+      "first shot recoil reduction": 0.0,
+      "description": "Reduces the first shot recoil by {0:%}. The go-to attachment for all semi-automatic weapons."
     },
     "Suppressor": {
-
+      "description": "Reduces the sound emitted from a weapon and removes bulled trails."
     },
     "Extended barrel": {
-      "damage increase": 0.1
+      "damage increase": 0.1,
+      "description": "Increases weapon base damage and reduces damage drop-off."
     }
   },
 
