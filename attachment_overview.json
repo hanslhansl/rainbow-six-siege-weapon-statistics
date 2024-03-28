@@ -1,10 +1,12 @@
 {
   "Sights": {
     "Telescopic": {
-
+      "magnification": 3.5,
+      "description": "x{0:.1f} magnification"
     },
     "Magnified": {
-
+      "magnification": 2.5,
+      "description": "x{0:.1f} magnification"
     },
     "Non-magnifying": {
       "ads speed bonus": 0.05,
