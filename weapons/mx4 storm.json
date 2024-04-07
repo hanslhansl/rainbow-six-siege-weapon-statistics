@@ -1,8 +1,8 @@
 {
-  "type": "SMG",
   "rpm": 950,
   "pellets": 1,
   "laser": true,
+  "grip": true,
   "ads": 0.3,
   "extended_barrel": true,
   "capacity": [
@@ -52,5 +52,6 @@
     "39": 0,
     "40": 15
   },
-  "name": "Mx4 Storm"
+  "name": "Mx4 Storm",
+  "class": "SMG"
 }

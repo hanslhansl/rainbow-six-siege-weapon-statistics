@@ -1,9 +1,9 @@
 {
-  "type": "SG",
   "rpm": 220,
   "laser": true,
   "pellets": 8,
   "ads": 0.25,
+  "grip": false,
   "extended_barrel": false,
   "capacity": [
     8,
@@ -52,5 +52,6 @@
     "39": 0,
     "40": 12
   },
-  "name": "SUPER 90"
+  "name": "SUPER 90",
+  "class": "SG"
 }

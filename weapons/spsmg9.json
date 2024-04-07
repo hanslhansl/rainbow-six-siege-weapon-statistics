@@ -1,9 +1,9 @@
 {
-  "type": "MP",
   "rpm": 980,
   "pellets": 1,
   "laser": true,
   "ads": 0.275,
+  "grip": false,
   "extended_barrel": true,
   "capacity": [
     20,
@@ -52,5 +52,6 @@
     "39": 0,
     "40": 19
   },
-  "name": "SPSMG9"
+  "name": "SPSMG9",
+  "class": "MP"
 }

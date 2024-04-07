@@ -1,7 +1,7 @@
 {
-  "type": "SMG",
   "rpm": 575,
   "laser": true,
+  "grip": true,
   "pellets": 1,
   "ads": 0.3,
   "extended_barrel": true,
@@ -52,5 +52,6 @@
     "39": 0,
     "40": 21
   },
-  "name": "9mm C1"
+  "name": "9mm C1",
+  "class": "SMG"
 }

@@ -1,7 +1,7 @@
 {
-  "type": "SG",
   "rpm": 500,
   "laser": true,
+  "grip": false,
   "pellets": 4,
   "ads": 0.25,
   "extended_barrel": false,
@@ -52,5 +52,6 @@
     "39": 0,
     "40": 13
   },
-  "name": "Bailiff 410"
+  "name": "Bailiff 410",
+  "class": "Handgun"
 }

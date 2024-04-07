@@ -1,10 +1,10 @@
 {
-  "type": "SG",
   "rpm": 85,
   "pellets": 8,
   "laser": true,
   "ads": 0.25,
   "extended_barrel": false,
+  "grip": true,
   "capacity": [
     7,
     0
@@ -52,5 +52,6 @@
     "39": 0,
     "40": 19
   },
-  "name": "SG-CQB"
+  "name": "SG-CQB",
+  "class": "SG"
 }

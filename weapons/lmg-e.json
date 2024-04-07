@@ -1,7 +1,7 @@
 {
-  "type": "LMG",
   "rpm": 720,
   "pellets": 1,
+  "grip": true,
   "laser": true,
   "ads": 0.45,
   "extended_barrel": false,
@@ -52,5 +52,6 @@
     "39": 27,
     "40": 27
   },
-  "name": "LMG-E"
+  "name": "LMG-E",
+  "class": "LMG"
 }

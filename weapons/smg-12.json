@@ -1,10 +1,10 @@
 {
-  "type": "MP",
   "rpm": 1270,
   "pellets": 1,
   "laser": true,
   "ads": 0.275,
   "extended_barrel": false,
+  "grip": true,
   "capacity": [
     32,
     1
@@ -52,5 +52,6 @@
     "39": 0,
     "40": 16
   },
-  "name": "SMG-12"
+  "name": "SMG-12",
+  "class": "MP"
 }

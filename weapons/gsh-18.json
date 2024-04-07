@@ -1,5 +1,4 @@
 {
-  "type": "Pistol",
   "rpm": 480,
   "laser": true,
   "pellets": 1,
@@ -52,5 +51,7 @@
     "39": 0,
     "40": 26
   },
-  "name": "GSH-18"
+  "name": "GSH-18",
+  "class": "Handgun",
+  "grip": false
 }

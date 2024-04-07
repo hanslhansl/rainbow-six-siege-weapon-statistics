@@ -1,8 +1,8 @@
 {
-  "type": "SMG",
   "rpm": 970,
   "pellets": 1,
   "laser": true,
+  "grip": false,
   "ads": 0.3,
   "extended_barrel": true,
   "capacity": [
@@ -52,5 +52,6 @@
     "39": 0,
     "40": 13
   },
-  "name": "P90"
+  "name": "P90",
+  "class": "SMG"
 }

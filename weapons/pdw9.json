@@ -1,7 +1,7 @@
 {
-  "type": "SMG",
   "rpm": 800,
   "pellets": 1,
+  "grip": true,
   "laser": true,
   "ads": 0.3,
   "extended_barrel": true,
@@ -52,5 +52,6 @@
     "39": 0,
     "40": 20
   },
-  "name": "PDW9"
+  "name": "PDW9",
+  "class": "SMG"
 }

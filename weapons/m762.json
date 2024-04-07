@@ -1,6 +1,6 @@
 {
-  "type": "AR",
   "rpm": 730,
+  "grip": true,
   "pellets": 1,
   "laser": true,
   "ads": 0.4,
@@ -52,5 +52,6 @@
     "39": 0,
     "40": 27
   },
-  "name": "M762"
+  "name": "M762",
+  "class": "AR"
 }

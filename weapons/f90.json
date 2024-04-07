@@ -1,7 +1,7 @@
 {
-  "type": "AR",
   "rpm": 780,
   "laser": true,
+  "grip": true,
   "pellets": 1,
   "ads": 0.4,
   "extended_barrel": true,
@@ -52,5 +52,6 @@
     "39": 0,
     "40": 22
   },
-  "name": "F90"
+  "name": "F90",
+  "class": "AR"
 }

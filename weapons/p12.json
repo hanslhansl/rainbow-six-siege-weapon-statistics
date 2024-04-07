@@ -1,8 +1,8 @@
 {
-  "type": "Pistol",
   "rpm": 480,
   "pellets": 1,
   "laser": true,
+  "extra_ammo": 90,
   "ads": 0.2,
   "extended_barrel": false,
   "capacity": [
@@ -52,5 +52,7 @@
     "39": 0,
     "40": 26
   },
-  "name": "P12"
+  "name": "P12",
+  "class": "Handgun",
+  "grip": false
 }

@@ -1,10 +1,10 @@
 {
-  "type": "DMR",
   "rpm": 440,
   "laser": true,
   "pellets": 1,
   "ads": 0.4,
   "extended_barrel": false,
+  "grip": true,
   "capacity": [
     20,
     1
@@ -52,5 +52,6 @@
     "39": 43,
     "40": 43
   },
-  "name": "SR-25"
+  "name": "SR-25",
+  "class": "DMR"
 }

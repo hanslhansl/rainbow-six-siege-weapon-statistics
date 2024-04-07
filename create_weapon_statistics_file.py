@@ -25,10 +25,10 @@ first_distance = 0
 last_distance = 40 
 
 # weapon types
-weapon_classes = ("AR", "SMG", "MP", "LMG", "DMR", "SG", "Pistol", "Else")
+weapon_classes = ("AR", "SMG", "MP", "LMG", "DMR", "SR", "SG", "Slug SG", "Handgun", "Revolver", "Hand Canon")
 
 # weapon type background colors
-background_colors = {"AR":"5083EA", "SMG":"B6668E", "MP":"76A5AE", "LMG":"8771BD", "DMR":"7CB563", "SG":"FFBC01", "Pistol":"A3A3A3", "Else":"F48020"}
+background_colors = {"AR":"5083EA", "SMG":"B6668E", "MP":"76A5AE", "LMG":"8771BD", "DMR":"7CB563", "SR":"", "SG":"FFBC01", "Slug SG":"", "Handgun":"A3A3A3", "Revolver":"", "Else":"F48020"}
 
 
 ###################################################
@@ -795,7 +795,7 @@ def add_secondary_weapon_stats_header(worksheet : typing.Any, row : int, col : i
 	c = worksheet.cell(row=row, column=col)
 	c.value = "Class"
 	c.alignment = Weapon.alignment
-	worksheet.column_dimensions[get_column_letter(col)].width = 6
+	worksheet.column_dimensions[get_column_letter(col)].width = 9
 
 	col += 1
 	worksheet.column_dimensions[get_column_letter(col)].width = 3
@@ -899,19 +899,21 @@ def add_secondary_weapon_stats(worksheet : typing.Any, weapon : Weapon, row : in
 	c = worksheet.cell(row=row, column=col)
 	c.value, c.style = weapon.getADSTimeWithLaser()
 
+	weapon.has_grip
+
 	col += 2
-	c1 = worksheet.cell(row=row, column=col)
+	# c1 = worksheet.cell(row=row, column=col)
 	col += 1
-	c2 = worksheet.cell(row=row, column=col)
-	c1.value, c2.value, c1.style = weapon.getReloadTimes()
-	c2.style = c1.style
+	# c2 = worksheet.cell(row=row, column=col)
+	# c1.value, c2.value, c1.style = weapon.getReloadTimes()
+	# c2.style = c1.style
 	
 	col += 1
-	c1 = worksheet.cell(row=row, column=col)
+	# c1 = worksheet.cell(row=row, column=col)
 	col += 1
-	c2 = worksheet.cell(row=row, column=col)
-	c1.value, c2.value, c1.style = weapon.getReloadTimesWithAngledGrip()
-	c2.style = c1.style
+	# c2 = worksheet.cell(row=row, column=col)
+	# c1.value, c2.value, c1.style = weapon.getReloadTimesWithAngledGrip()
+	# c2.style = c1.style
 
 	return
 

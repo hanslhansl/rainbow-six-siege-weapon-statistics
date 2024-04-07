@@ -1,8 +1,9 @@
 {
-  "type": "SG",
   "rpm": 220,
   "pellets": 8,
-  "ads": 0.25,
+  "ads": 0.34,
+  "laser": true,
+  "grip":  false,
   "extended_barrel": false,
   "capacity": [
     5,
@@ -51,5 +52,6 @@
     "39": 0,
     "40": 13
   },
-  "name": "SKELETON KEY"
+  "name": "SKELETON KEY",
+  "class": "SG"
 }

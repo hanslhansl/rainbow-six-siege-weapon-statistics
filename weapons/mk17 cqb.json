@@ -1,9 +1,9 @@
 {
-  "type": "AR",
   "rpm": 585,
   "pellets": 1,
   "laser": true,
   "ads": 0.4,
+  "grip": true,
   "extended_barrel": true,
   "capacity": [
     20,
@@ -52,5 +52,6 @@
     "39": 0,
     "40": 24
   },
-  "name": "MK17 CQB"
+  "name": "MK17 CQB",
+  "class": "AR"
 }

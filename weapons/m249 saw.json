@@ -1,7 +1,7 @@
 {
-  "type": "LMG",
   "rpm": 650,
   "pellets": 1,
+  "grip": true,
   "laser": true,
   "ads": 0.45,
   "extended_barrel": false,
@@ -52,5 +52,6 @@
     "39": 32,
     "40": 32
   },
-  "name": "M249 SAW"
+  "name": "M249 SAW",
+  "class": "LMG"
 }

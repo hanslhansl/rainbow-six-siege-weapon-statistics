@@ -1,5 +1,4 @@
 {
-  "type": "Pistol",
   "rpm": 480,
   "laser": true,
   "pellets": 1,
@@ -52,5 +51,7 @@
     "39": 0,
     "40": 42
   },
-  "name": "D-50"
+  "name": "D-50",
+  "class": "Handgun",
+  "grip": false
 }

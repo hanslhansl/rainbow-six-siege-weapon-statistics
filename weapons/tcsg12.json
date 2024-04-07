@@ -1,10 +1,10 @@
 {
-  "type": "Else",
   "rpm": 490,
   "pellets": 1,
   "laser": true,
   "ads": 0.4,
   "extended_barrel": false,
+  "grip": true,
   "capacity": [
     10,
     1
@@ -52,5 +52,6 @@
     "39": 0,
     "40": 44
   },
-  "name": "TCSG12"
+  "name": "TCSG12",
+  "class": "Slug SG"
 }

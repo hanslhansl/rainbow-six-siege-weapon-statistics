@@ -1,9 +1,9 @@
 {
-  "type": "MP",
   "rpm": 1100,
   "laser": true,
   "pellets": 1,
   "ads": 0.275,
+  "grip": false,
   "extended_barrel": true,
   "capacity": [
     25,
@@ -52,5 +52,6 @@
     "39": 0,
     "40": 19
   },
-  "name": "BEARING 9"
+  "name": "BEARING 9",
+  "class": "MP"
 }

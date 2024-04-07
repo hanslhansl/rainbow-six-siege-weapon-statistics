@@ -1,7 +1,7 @@
 {
-  "type": "AR",
   "rpm": 750,
   "pellets": 1,
+  "grip": true,
   "laser": true,
   "ads": 0.4,
   "extended_barrel": true,
@@ -52,5 +52,6 @@
     "39": 0,
     "40": 26
   },
-  "name": "M4"
+  "name": "M4",
+  "class": "AR"
 }

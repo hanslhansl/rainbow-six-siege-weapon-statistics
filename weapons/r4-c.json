@@ -1,9 +1,10 @@
 {
-  "type": "AR",
   "rpm": 860,
   "pellets": 1,
   "laser": true,
+  "grip": true,
   "ads": 0.4,
+  "extra_ammo": 150,
   "extended_barrel": true,
   "capacity": [
     30,
@@ -52,5 +53,6 @@
     "39": 0,
     "40": 23
   },
-  "name": "R4-C"
+  "name": "R4-C",
+  "class": "AR"
 }

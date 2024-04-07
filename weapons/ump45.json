@@ -1,10 +1,11 @@
 {
-  "type": "SMG",
   "rpm": 600,
   "pellets": 1,
   "laser": true,
   "ads": 0.3,
   "extended_barrel": true,
+  "grip": true,
+  "extra_ammo": 150,
   "capacity": [
     25,
     1
@@ -52,5 +53,6 @@
     "39": 0,
     "40": 22
   },
-  "name": "UMP45"
+  "name": "UMP45",
+  "class": "SMG"
 }

@@ -1,8 +1,8 @@
 {
-  "type": "SMG",
   "rpm": 800,
   "pellets": 1,
   "laser": true,
+  "grip": true,
   "ads": 0.3,
   "extended_barrel": false,
   "capacity": [
@@ -52,5 +52,6 @@
     "39": 0,
     "40": 18
   },
-  "name": "MP5SD"
+  "name": "MP5SD",
+  "class": "SMG"
 }

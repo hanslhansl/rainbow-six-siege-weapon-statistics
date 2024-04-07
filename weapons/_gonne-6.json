@@ -1,5 +1,4 @@
 {
-  "type": "Else",
   "rpm": 0,
   "pellets": 1,
   "ads": 1000000000000.0,
@@ -52,5 +51,8 @@
     "40": -1
   },
   "name": "_GONNE-6",
-  "laser": false
+  "laser": false,
+  "class": "Hand Canon",
+  "grip": false,
+  "extra_ammo": 0
 }

@@ -1,8 +1,8 @@
 {
-  "type": "AR",
   "rpm": 720,
   "laser": true,
   "pellets": 1,
+  "grip": false,
   "ads": 0.4,
   "extended_barrel": false,
   "capacity": [
@@ -52,5 +52,6 @@
     "39": 0,
     "40": 25
   },
-  "name": "AUG A2"
+  "name": "AUG A2",
+  "class": "AR"
 }

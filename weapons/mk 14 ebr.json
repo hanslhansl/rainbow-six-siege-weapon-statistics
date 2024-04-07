@@ -1,8 +1,8 @@
 {
-  "type": "DMR",
   "rpm": 440,
   "pellets": 1,
   "laser": true,
+  "grip": true,
   "ads": 0.4,
   "extended_barrel": false,
   "capacity": [
@@ -52,5 +52,6 @@
     "39": 43,
     "40": 43
   },
-  "name": "Mk 14 EBR"
+  "name": "Mk 14 EBR",
+  "class": "DMR"
 }

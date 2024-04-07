@@ -1,10 +1,10 @@
 {
-  "type": "LMG",
   "rpm": 650,
   "pellets": 1,
   "laser": true,
   "ads": 0.45,
   "extended_barrel": false,
+  "grip": true,
   "capacity": [
     80,
     1
@@ -52,5 +52,6 @@
     "39": 30,
     "40": 30
   },
-  "name": "T-95 LSW"
+  "name": "T-95 LSW",
+  "class": "LMG"
 }

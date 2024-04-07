@@ -1,6 +1,6 @@
 {
-  "type": "SG",
   "rpm": 400,
+  "grip": true,
   "laser": true,
   "pellets": 8,
   "ads": 0.25,
@@ -52,5 +52,6 @@
     "39": 0,
     "40": 10
   },
-  "name": "FO-12"
+  "name": "FO-12",
+  "class": "SG"
 }

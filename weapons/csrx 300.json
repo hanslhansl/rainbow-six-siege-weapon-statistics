@@ -1,8 +1,8 @@
 {
-  "type": "Else",
   "rpm": 50,
   "pellets": 1,
   "ads": 0.5,
+  "grip": false,
   "laser": false,
   "extended_barrel": false,
   "capacity": [
@@ -52,5 +52,6 @@
     "39": 109,
     "40": 109
   },
-  "name": "CSRX 300"
+  "name": "CSRX 300",
+  "class": ""
 }

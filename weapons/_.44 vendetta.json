@@ -53,5 +53,5 @@
   "name": ".44 Vendetta",
   "pellets": 1,
   "rpm": 0,
-  "type": "Pistol"
+  "class": "Handgun"
 }

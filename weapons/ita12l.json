@@ -1,7 +1,7 @@
 {
-  "type": "SG",
   "rpm": 80,
   "laser": true,
+  "grip": false,
   "pellets": 8,
   "ads": 0.25,
   "extended_barrel": false,
@@ -52,5 +52,6 @@
     "39": 0,
     "40": 18
   },
-  "name": "ITA12L"
+  "name": "ITA12L",
+  "class": "SG"
 }

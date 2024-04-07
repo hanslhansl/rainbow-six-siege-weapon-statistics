@@ -1,8 +1,8 @@
 {
-  "type": "AR",
   "rpm": 837,
   "laser": true,
   "pellets": 1,
+  "grip": false,
   "ads": 0.4,
   "extended_barrel": true,
   "capacity": [
@@ -52,5 +52,6 @@
     "39": 0,
     "40": 24
   },
-  "name": "C8-SFW"
+  "name": "C8-SFW",
+  "class": "AR"
 }

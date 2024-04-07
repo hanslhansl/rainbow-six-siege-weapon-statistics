@@ -1,10 +1,10 @@
 {
-  "type": "AR",
   "rpm": 850,
   "pellets": 1,
   "laser": true,
   "ads": 0.4,
   "extended_barrel": false,
+  "grip": true,
   "capacity": [
     20,
     1
@@ -52,5 +52,6 @@
     "39": 0,
     "40": 24
   },
-  "name": "TYPE-89"
+  "name": "TYPE-89",
+  "class": "AR"
 }

@@ -1,9 +1,9 @@
 {
-  "type": "MP",
   "rpm": 1000,
   "laser": true,
   "pellets": 1,
   "ads": 0.275,
+  "grip": false,
   "extended_barrel": false,
   "capacity": [
     26,
@@ -52,5 +52,6 @@
     "39": 0,
     "40": 21
   },
-  "name": "C75 Auto"
+  "name": "C75 Auto",
+  "class": "MP"
 }

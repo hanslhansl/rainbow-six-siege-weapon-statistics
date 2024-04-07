@@ -1,8 +1,8 @@
 {
-  "type": "SMG",
   "rpm": 800,
   "laser": true,
   "pellets": 1,
+  "grip": false,
   "ads": 0.3,
   "extended_barrel": true,
   "capacity": [
@@ -52,5 +52,6 @@
     "39": 0,
     "40": 20
   },
-  "name": "FMG-9"
+  "name": "FMG-9",
+  "class": "SMG"
 }

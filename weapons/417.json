@@ -1,5 +1,4 @@
 {
-  "type": "DMR",
   "rpm": 430,
   "laser": true,
   "pellets": 1,
@@ -52,5 +51,7 @@
     "39": 49,
     "40": 49
   },
-  "name": "417"
+  "name": "417",
+  "class": "DMR",
+  "grip": true
 }

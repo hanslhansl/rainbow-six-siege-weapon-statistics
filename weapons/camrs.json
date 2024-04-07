@@ -1,8 +1,8 @@
 {
-  "type": "DMR",
   "rpm": 420,
   "laser": true,
   "pellets": 1,
+  "grip": true,
   "ads": 0.4,
   "extended_barrel": false,
   "capacity": [
@@ -52,5 +52,6 @@
     "39": 49,
     "40": 49
   },
-  "name": "CAMRS"
+  "name": "CAMRS",
+  "class": "DMR"
 }

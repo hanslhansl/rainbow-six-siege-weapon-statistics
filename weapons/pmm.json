@@ -1,5 +1,4 @@
 {
-  "type": "Pistol",
   "rpm": 480,
   "pellets": 1,
   "laser": true,
@@ -52,5 +51,7 @@
     "39": 0,
     "40": 36
   },
-  "name": "PMM"
+  "name": "PMM",
+  "class": "Handgun",
+  "grip": false
 }

@@ -1,10 +1,10 @@
 {
-  "type": "SMG",
   "rpm": 900,
   "pellets": 1,
   "ads": 0.3,
   "laser": true,
   "extended_barrel": true,
+  "grip": true,
   "capacity": [
     30,
     1
@@ -52,5 +52,6 @@
     "39": 0,
     "40": 16
   },
-  "name": "T-5 SMG"
+  "name": "T-5 SMG",
+  "class": "SMG"
 }

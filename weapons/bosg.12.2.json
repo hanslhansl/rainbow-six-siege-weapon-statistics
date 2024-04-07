@@ -1,7 +1,7 @@
 {
-  "type": "Else",
   "rpm": 600,
   "pellets": 1,
+  "grip": true,
   "laser": true,
   "ads": 0.4,
   "extended_barrel": false,
@@ -52,5 +52,6 @@
     "39": 0,
     "40": 87
   },
-  "name": "BOSG.12.2"
+  "name": "BOSG.12.2",
+  "class": "Slug SG"
 }

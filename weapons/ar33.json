@@ -1,7 +1,7 @@
 {
-  "type": "AR",
   "rpm": 749,
   "laser": true,
+  "grip": true,
   "pellets": 1,
   "ads": 0.4,
   "extended_barrel": false,
@@ -52,5 +52,6 @@
     "39": 0,
     "40": 24
   },
-  "name": "AR33"
+  "name": "AR33",
+  "class": "AR"
 }

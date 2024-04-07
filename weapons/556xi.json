@@ -1,7 +1,7 @@
 {
-  "type": "AR",
   "rpm": 690,
   "laser": true,
+  "grip": true,
   "pellets": 1,
   "ads": 0.4,
   "extended_barrel": false,
@@ -52,5 +52,6 @@
     "39": 0,
     "40": 28
   },
-  "name": "556XI"
+  "name": "556XI",
+  "class": "AR"
 }

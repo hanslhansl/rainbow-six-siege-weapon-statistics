@@ -1,8 +1,8 @@
 {
-  "type": "AR",
   "rpm": 850,
   "laser": true,
   "pellets": 1,
+  "grip": true,
   "ads": 0.4,
   "extended_barrel": false,
   "capacity": [
@@ -52,5 +52,6 @@
     "39": 0,
     "40": 24
   },
-  "name": "AK-12"
+  "name": "AK-12",
+  "class": "AR"
 }

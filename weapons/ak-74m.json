@@ -1,9 +1,9 @@
 {
-  "type": "AR",
   "rpm": 650,
   "laser": true,
   "pellets": 1,
   "ads": 0.4,
+  "grip": false,
   "extended_barrel": false,
   "capacity": [
     40,
@@ -52,5 +52,6 @@
     "39": 0,
     "40": 26
   },
-  "name": "AK-74M"
+  "name": "AK-74M",
+  "class": "AR"
 }

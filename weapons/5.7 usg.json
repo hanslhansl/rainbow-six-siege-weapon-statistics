@@ -1,9 +1,9 @@
 {
-  "type": "Pistol",
   "rpm": 480,
   "pellets": 1,
   "ads": 0.2,
   "laser": true,
+  "extra_ammo": 100,
   "extended_barrel": false,
   "capacity": [
     20,
@@ -52,5 +52,7 @@
     "39": 0,
     "40": 25
   },
-  "name": "5.7 USG"
+  "name": "5.7 USG",
+  "class": "Handgun",
+  "grip": false
 }

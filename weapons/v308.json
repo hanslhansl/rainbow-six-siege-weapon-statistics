@@ -1,10 +1,10 @@
 {
-  "type": "AR",
   "rpm": 700,
   "pellets": 1,
   "laser": true,
   "ads": 0.4,
   "extended_barrel": false,
+  "grip": true,
   "capacity": [
     50,
     1
@@ -52,5 +52,6 @@
     "39": 0,
     "40": 26
   },
-  "name": "V308"
+  "name": "V308",
+  "class": "AR"
 }

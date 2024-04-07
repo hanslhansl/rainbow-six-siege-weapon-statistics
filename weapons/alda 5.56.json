@@ -1,8 +1,8 @@
 {
-  "type": "LMG",
   "rpm": 900,
   "pellets": 1,
   "laser": true,
+  "grip": true,
   "ads": 0.45,
   "extended_barrel": false,
   "capacity": [
@@ -52,5 +52,6 @@
     "39": 23,
     "40": 23
   },
-  "name": "ALDA 5.56"
+  "name": "ALDA 5.56",
+  "class": "LMG"
 }
