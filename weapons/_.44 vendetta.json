@@ -48,9 +48,10 @@
     "40": 0
   },
   "extended_barrel": false,
+  "grip": false,
+  "laser": true,
   "name": ".44 Vendetta",
   "pellets": 1,
   "rpm": 0,
-  "type": "Pistol",
-  "grip": false
+  "type": "Pistol"
 }

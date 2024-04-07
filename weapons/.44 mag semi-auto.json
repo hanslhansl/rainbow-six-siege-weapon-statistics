@@ -48,9 +48,11 @@
     "40": 32
   },
   "extended_barrel": false,
+  "extra_ammo": 63,
+  "grip": false,
+  "laser": true,
   "name": ".44 Mag Semi-Auto",
   "pellets": 1,
   "rpm": 480,
-  "type": "Pistol",
-  "grip": false
+  "type": "Pistol"
 }

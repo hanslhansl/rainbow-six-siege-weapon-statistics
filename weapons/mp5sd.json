@@ -2,6 +2,7 @@
   "type": "SMG",
   "rpm": 800,
   "pellets": 1,
+  "laser": true,
   "ads": 0.3,
   "extended_barrel": false,
   "capacity": [

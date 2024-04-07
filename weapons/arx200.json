@@ -1,6 +1,7 @@
 {
   "type": "AR",
   "rpm": 700,
+  "laser": true,
   "pellets": 1,
   "ads": 0.4,
   "extended_barrel": false,

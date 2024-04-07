@@ -25,7 +25,7 @@ first_distance = 0
 last_distance = 40 
 
 # weapon types
-weapon_types = ("AR", "SMG", "MP", "LMG", "DMR", "SG", "Pistol", "Else")
+weapon_classes = ("AR", "SMG", "MP", "LMG", "DMR", "SG", "Pistol", "Else")
 
 # weapon type background colors
 background_colors = {"AR":"5083EA", "SMG":"B6668E", "MP":"76A5AE", "LMG":"8771BD", "DMR":"7CB563", "SG":"FFBC01", "Pistol":"A3A3A3", "Else":"F48020"}
@@ -102,11 +102,11 @@ def color_to_border_color(s : str):
 border_style = "thin"
 
 class Weapon:
-	types = weapon_types
+	classes = weapon_classes
 	operators : tuple[str,...]
 	distances = numpy.array([i for i in range(first_distance, last_distance+1)], numpy.int32)
 	
-	alignment = Alignment("center", "center")
+	alignment = Alignment("center", "center", wrapText=True)
 	border_color = "FF8CA5D0"
 
 	borders = {type_ : Border(
@@ -114,25 +114,29 @@ class Weapon:
 				right=Side(border_style=border_style, color=color_to_border_color(background_colors[type_])),
 				top=Side(border_style=border_style, color=color_to_border_color(background_colors[type_])),
 				bottom=Side(border_style=border_style, color=color_to_border_color(background_colors[type_]))
-				) for type_ in types}
+				) for type_ in classes}
 	
-	fills = {type_ : PatternFill(fgColor=background_colors[type_], fill_type = "solid") for type_ in types}
+	fills = {type_ : PatternFill(fgColor=background_colors[type_], fill_type = "solid") for type_ in classes}
 	
-	stylesABF = (lambda t=types, a=alignment, b=borders, f=fills: {type_ : NamedStyle(name=type_ + " ABF", alignment=a, border=b[type_], fill=f[type_]) for type_ in t})()
-	stylesBF = (lambda t=types, b=borders, f=fills: {type_ : NamedStyle(name=type_ + " BF", border=b[type_], fill=f[type_]) for type_ in t})()
-	stylesAB = (lambda t=types, a=alignment, b=borders: {type_ : NamedStyle(name=type_ + " AB", alignment=a, border=b[type_]) for type_ in t})()
+	stylesABF = (lambda t=classes, a=alignment, b=borders, f=fills: {type_ : NamedStyle(name=type_ + " ABF", alignment=a, border=b[type_], fill=f[type_]) for type_ in t})()
+	stylesBF = (lambda t=classes, b=borders, f=fills: {type_ : NamedStyle(name=type_ + " BF", border=b[type_], fill=f[type_]) for type_ in t})()
+	stylesAB = (lambda t=classes, a=alignment, b=borders: {type_ : NamedStyle(name=type_ + " AB", alignment=a, border=b[type_]) for type_ in t})()
 	stylesA = NamedStyle(name="A", alignment=alignment)
 
 	default_rpm = 0
 	default_ads = 0.
-	default_pellets = 0
+	default_pellets = 1
 	default_reload_times = (0., 0.)
 	default_capacity = (0, 0)
+	default_extra_ammo = 0
 	default_extended_barrel = False
 	default_grip = False
+	default_has_laser = False
 
 	extended_barrel_weapon_name = "+ extended barrel"
 	extended_barrel_damage_multiplier = 0.0
+	laser_ads_speed_multiplier = 0.0;
+	angled_grip_reload_speed_multiplier = 0.0;
 	
 	tdok_hps = (100, 110, 125, 120, 130, 145)
 
@@ -149,13 +153,15 @@ class Weapon:
 		
 		self._name = None
 		self._damages = None
-		self._type = None	# type string
+		self._class = None	# type string
 		self._rpm = None	# rounds per minute
 		self._reload_times = None	# time in seconds
 		self._ads = None	# time in seconds
 		self._pellets = None	# number of pellets
 		self._capacity = None	# (magazine, chamber)
+		self._extra_ammo = None	# extra ammo
 		self._grip = None	# whether the weapon has access to a grip attachment
+		self._has_laser = None	# whether the weapon has access to a laser attachment
 		
 		self._has_extended_barrel = None # whether the weapon has an extended barrel attachment
 		self.extended_barrel_weapon : Weapon = None	# the extended barrel version of this weapon
@@ -168,20 +174,20 @@ class Weapon:
 			raise Exception(f"Weapon '{self.name}' doesn't deserialize to a dict.")
 		
 		DPS = tuple([int(self.dps(i) + 0.5) for i in range(len(Weapon.distances))])
-		if self.type not in Weapon.lowest_highest_dps:
-			Weapon.lowest_highest_dps[self.type] = min(DPS), max(DPS)
+		if self.class_ not in Weapon.lowest_highest_dps:
+			Weapon.lowest_highest_dps[self.class_] = min(DPS), max(DPS)
 		else:
-			Weapon.lowest_highest_dps[self.type] = min(Weapon.lowest_highest_dps[self.type][0], min(DPS)), max(Weapon.lowest_highest_dps[self.type][1], max(DPS))
+			Weapon.lowest_highest_dps[self.class_] = min(Weapon.lowest_highest_dps[self.class_][0], min(DPS)), max(Weapon.lowest_highest_dps[self.class_][1], max(DPS))
 
 		for hp in self.tdok_hps:
 			if hp not in Weapon.lowest_highest_ttdok:
 				Weapon.lowest_highest_ttdok[hp] = {}
 				
 			TTDOK = tuple([int(self.ttdok(i, hp) + 0.5) for i in range(len(Weapon.distances))])
-			if self.type not in Weapon.lowest_highest_ttdok[hp]:
-				Weapon.lowest_highest_ttdok[hp][self.type] = min(TTDOK), max(TTDOK)
+			if self.class_ not in Weapon.lowest_highest_ttdok[hp]:
+				Weapon.lowest_highest_ttdok[hp][self.class_] = min(TTDOK), max(TTDOK)
 			else:
-				Weapon.lowest_highest_ttdok[hp][self.type] = min(Weapon.lowest_highest_ttdok[hp][self.type][0], min(TTDOK)), max(Weapon.lowest_highest_ttdok[hp][self.type][1], max(TTDOK))
+				Weapon.lowest_highest_ttdok[hp][self.class_] = min(Weapon.lowest_highest_ttdok[hp][self.class_][0], min(TTDOK)), max(Weapon.lowest_highest_ttdok[hp][self.class_][1], max(TTDOK))
 
 		print(self.name)
 
@@ -234,7 +240,7 @@ class Weapon:
 		elif first_nonzero_index == -1:
 			raise Exception(f"Weapon '{self.name}' has no damage values at all.")
 		else:
-			if self.type == "SG":	# special treatment for shotguns
+			if self.class_ == "SG":	# special treatment for shotguns
 				if first_nonzero_index <= 5:
 					for i in range(first_nonzero_index):
 						damages[i] = damages[first_nonzero_index]
@@ -263,17 +269,17 @@ class Weapon:
 		
 		return self._name
 	@property
-	def type(self) -> str:
-		if self._type == None:
+	def class_(self) -> str:
+		if self._class == None:
 			# get weapon type
-			if "type" not in self.json_content:
+			if "class" not in self.json_content:
 				raise Exception(f"Weapon '{self.name}' is missing a type.")
-			if type(self.json_content["type"]) != str:
+			if type(self.json_content["class"]) != str:
 				raise Exception(f"Weapon '{self.name}' has a type that doesn't deserialize to a string.")
-			if self.json_content["type"] not in self.types:
+			if self.json_content["class"] not in self.classes:
 				raise Exception(f"Weapon '{self.name}' has an invalid type.")
-			self._type = self.json_content["type"]
-		return self._type
+			self._class = self.json_content["class"]
+		return self._class
 	@property
 	def rpm(self) -> int:
 		if self._rpm == None:
@@ -288,7 +294,7 @@ class Weapon:
 				
 		return self._rpm
 	@property
-	def ads(self) -> float:
+	def ads_time(self) -> float:
 		if self._ads == None:
 			# get weapon ads time
 			if "ads" in self.json_content:
@@ -348,6 +354,19 @@ class Weapon:
 				
 		return self._capacity
 	@property
+	def extra_ammo(self) -> int:
+		if self._extra_ammo == None:
+			# get extra ammo
+			if "extra_ammo" in self.json_content:
+				if type(self.json_content["extra_ammo"]) != int:
+					raise Exception(f"Weapon '{self.name}' has an extra ammo value that doesn't deserialize to an integer.")
+				self._extra_ammo = self.json_content["extra_ammo"]
+			else:
+				print(f"{warning('Warning:')} Weapon '{warning(self.name)}' is missing an {warning('extra ammo value')}. Using default value ({self.default_extra_ammo}) instead.")
+				self._extra_ammo = self.default_extra_ammo
+				
+		return self._extra_ammo
+	@property
 	def damages(self) -> tuple[int,...]:
 		if self._damages == None:
 			# get weapon damages
@@ -403,7 +422,20 @@ class Weapon:
 
 		return self._has_extended_barrel
 	@property
-	def grip(self) -> bool:
+	def has_laser(self) -> bool:
+		if self._has_laser == None:
+			# get laser
+			if "laser" in self.json_content:
+				if type(self.json_content["laser"]) != bool:
+					raise Exception(f"Weapon '{self.name}' has a laser value that doesn't deserialize to a bool.")
+				self._has_laser = self.json_content["laser"]
+			else:
+				print(f"{warning('Warning:')} Weapon '{warning(self.name)}' is missing a {warning('laser')} value. Using default value ({self.default_has_laser}) instead.")
+				self._has_laser = self.default_has_laser
+			pass
+		return self._has_laser
+	@property
+	def has_grip(self) -> bool:
 		if self._grip == None:
 			# get weapon grip
 			if "grip" in self.json_content:
@@ -426,6 +458,24 @@ class Weapon:
 	@property
 	def rpms(self):
 		return self.rpm / 60000.
+	@property
+	def ads_time_with_laser(self):
+		if self.has_laser == True:
+			return self.ads_time / self.laser_ads_speed_multiplier
+		else:
+			raise Exception(f"Weapon '{self.name}' doesn't have a laser.")
+	@property
+	def reload_times_with_angled_grip(self):
+		if self.has_grip == True:
+			rt0 = self.reload_times[0]
+			rt1 = self.reload_times[1]
+			if rt0 != 0:
+				rt0 /= self.angled_grip_reload_speed_multiplier
+			if rt1 != 0:
+				rt1 /= self.angled_grip_reload_speed_multiplier
+			return rt0, rt1
+		else:
+			raise Exception(f"Weapon '{self.name}' doesn't have a grip.")
 	def damage_per_shot(self, index : int):
 		return self.damages[index] * self.pellets
 	def dps(self, index : int):
@@ -443,8 +493,8 @@ class Weapon:
 			return self.name, "Normal"
 		else:
 			return self.name, self.getStyleBF()
-	def getType(self):
-		return self.type, self.getStyleABF()
+	def getClass(self):
+		return self.class_, self.getStyleABF()
 	def getRPM(self):
 		return self.rpm, self.getStyleABF()
 	def getRPS(self):
@@ -463,15 +513,27 @@ class Weapon:
 		return int(self.ttdok(index, hp) + 0.5), self.getStyleAB()
 	def getCapacity(self):
 		return str(self.capacity[0]) + "+" + str(self.capacity[1]), self.getStyleABF()
+	def getExtraAmmo(self):
+		return self.extra_ammo, self.getStyleABF()
 	def getReloadTimes(self):
-		return str(self.reloadTimes[0]), str(self.reloadTimes[1]), self.getStyleABF()
+		return str(self.reload_times[0]), str(self.reload_times[1]), self.getStyleABF()
+	def getReloadTimesWithAngledGrip(self):
+		if self.has_grip == False:
+			return "", "", self.getStyleA()
+		else:
+			return str(self.reload_times_with_angled_grip[0]), str(self.reload_times_with_angled_grip[1]), self.getStyleABF()
 	def getPellets(self):
 		if self.pellets == 1:
 			return "", self.getStyleA()
 		else:
 			return self.pellets, self.getStyleABF()
 	def getADSTime(self):
-		return str(self.ads), self.getStyleABF()
+		return str(self.ads_time), self.getStyleABF()
+	def getADSTimeWithLaser(self):
+		if self.has_laser == False:
+			return "", self.getStyleA()
+		else:
+			return str(round(self.ads_time_with_laser, 3)), self.getStyleABF()
 	def getDamageToBaseDamagePercentage(self, index : int):
 		val = round(self.damages[index] / max(self.damages), 2)
 		if val == 1:
@@ -505,46 +567,46 @@ class Weapon:
 		return self.getStyleA()
 		
 	def getStyleABF(self):
-		return self.stylesABF[self.type]
+		return self.stylesABF[self.class_]
 	def getStyleAB(self):
-		return self.stylesAB[self.type]
+		return self.stylesAB[self.class_]
 	def getStyleBF(self):
-		return self.stylesBF[self.type]
+		return self.stylesBF[self.class_]
 	def getStyleA(self):
 		return self.stylesA
 	
 	def getDmgPerShotColorScaleRule(self):
 		if self.DmgPerShotColorScaleRule == None:
 			start_val, end_val = self.getDmgPerShotInterval()
-			end_col = background_colors[self.type]
+			end_col = background_colors[self.class_]
 			self.DmgPerShotColorScaleRule = ColorScaleRule(start_type="num", start_value=start_val, start_color="FFFFFF", end_type="num", end_value=end_val, end_color=end_col)
 
 		return self.DmgPerShotColorScaleRule
 	def getDPSColorScaleRule(self):
-		if self.type not in Weapon.DPSColorScaleRule:
+		if self.class_ not in Weapon.DPSColorScaleRule:
 			start_val, end_val = self.getDPSInterval()
-			end_col = background_colors[self.type]
-			Weapon.DPSColorScaleRule[self.type] = ColorScaleRule(start_type="num", start_value=start_val, start_color="FFFFFF", end_type="num", end_value=end_val, end_color=end_col)
+			end_col = background_colors[self.class_]
+			Weapon.DPSColorScaleRule[self.class_] = ColorScaleRule(start_type="num", start_value=start_val, start_color="FFFFFF", end_type="num", end_value=end_val, end_color=end_col)
 
-		return Weapon.DPSColorScaleRule[self.type]
+		return Weapon.DPSColorScaleRule[self.class_]
 	def getTTDOKColorScaleRule(self, hp : int):
 		if hp not in Weapon.TTDOKColorScaleRules:
 			Weapon.TTDOKColorScaleRules[hp] = {}
 			
-		if self.type not in Weapon.TTDOKColorScaleRules[hp]:
+		if self.class_ not in Weapon.TTDOKColorScaleRules[hp]:
 			start_val, end_val = self.getTTDOKInterval(hp)
-			start_col = background_colors[self.type]
-			Weapon.TTDOKColorScaleRules[hp][self.type] = ColorScaleRule(start_type="num", start_value=start_val, start_color=start_col, end_type="num", end_value=end_val, end_color="FFFFFF")
+			start_col = background_colors[self.class_]
+			Weapon.TTDOKColorScaleRules[hp][self.class_] = ColorScaleRule(start_type="num", start_value=start_val, start_color=start_col, end_type="num", end_value=end_val, end_color="FFFFFF")
 
-		return Weapon.TTDOKColorScaleRules[hp][self.type]
+		return Weapon.TTDOKColorScaleRules[hp][self.class_]
 	
 	# interval methods for excel conditional formatting
 	def getDmgPerShotInterval(self):
 		return min(self.damages) * self.pellets, max(self.damages) * self.pellets
 	def getDPSInterval(self):
-		return Weapon.lowest_highest_dps[self.type]
+		return Weapon.lowest_highest_dps[self.class_]
 	def getTTDOKInterval(self, hp : int):
-		return Weapon.lowest_highest_ttdok[hp][self.type]
+		return Weapon.lowest_highest_ttdok[hp][self.class_]
 
 	# other methods
 	def getDamageDropoffBorders(self):
@@ -578,7 +640,10 @@ class Weapon:
 
 		return lastInitialSTDOKIndex, firstEndSTDOKIndex
 	def getExtendedBarrelWeapon(self):
-		return self.extended_barrel_weapon
+		if self.has_extended_barrel == True:
+			return self.extended_barrel_weapon
+		else:
+			raise Exception(f"Weapon '{self.name}' doesn't have an extended barrel version.")
 
 
 def deserialize_json(file_name : str):
@@ -631,11 +696,12 @@ def get_operator_weapons(weapons : list[Weapon], file_name : str) -> None:
 
 def get_weapons_dict() -> list[Weapon]:
 	attachment_categories = deserialize_json(attachment_overview_file_name)
-	Weapon.extended_barrel_damage_multiplier = 1.0 + attachment_categories["Barrels"]["Extended barrel"]["damage increase"]
+	Weapon.extended_barrel_damage_multiplier = 1.0 + attachment_categories["Barrels"]["Extended barrel"]["damage bonus"]
+	Weapon.laser_ads_speed_multiplier = 1.0 + attachment_categories["Under Barrel"]["Laser"]["ads speed bonus"]
 
 	weapons : list[Weapon] = []
 	for file_name in os.listdir(weapon_data_dir):
-		file_path = os.path.join(weapon_data_dir, file_name)		
+		file_path = os.path.join(weapon_data_dir, file_name)
 
 		name, extension = os.path.splitext(file_name);		
 		if not extension == ".json":
@@ -649,7 +715,7 @@ def get_weapons_dict() -> list[Weapon]:
 	# get all operator weapons
 	get_operator_weapons(weapons, operator_weapons_file_name)
 	
-	weapons = sorted(weapons, key=lambda weapon: weapon_types.index(weapon.type), reverse=False)
+	weapons = sorted(weapons, key=lambda weapon: weapon_classes.index(weapon.class_), reverse=False)
 
 	return weapons
 
@@ -722,14 +788,14 @@ def add_worksheet_header(workbook : typing.Any, worksheet_name : str, stat_name 
 
 	return worksheet, row
 
-def add_stats_header(worksheet : typing.Any, row : int, col : int):
+def add_secondary_weapon_stats_header(worksheet : typing.Any, row : int, col : int):
 	worksheet.column_dimensions[get_column_letter(col)].width = 3
 
 	col += 1
 	c = worksheet.cell(row=row, column=col)
-	c.value = "Type"
+	c.value = "Class"
 	c.alignment = Weapon.alignment
-	worksheet.column_dimensions[get_column_letter(col)].width = 5
+	worksheet.column_dimensions[get_column_letter(col)].width = 6
 
 	col += 1
 	worksheet.column_dimensions[get_column_letter(col)].width = 3
@@ -748,9 +814,15 @@ def add_stats_header(worksheet : typing.Any, row : int, col : int):
 	
 	col += 1
 	c = worksheet.cell(row=row, column=col)
+	c.value = "Extra ammo"
+	c.alignment = Weapon.alignment
+	worksheet.column_dimensions[get_column_letter(col)].width = 7
+
+	col += 1
+	c = worksheet.cell(row=row, column=col)
 	c.value = "Pellets"
 	c.alignment = Weapon.alignment
-	worksheet.column_dimensions[get_column_letter(col)].width = 6
+	worksheet.column_dimensions[get_column_letter(col)].width = 7
 	
 	col += 1
 	worksheet.column_dimensions[get_column_letter(col)].width = 3
@@ -759,31 +831,49 @@ def add_stats_header(worksheet : typing.Any, row : int, col : int):
 	c = worksheet.cell(row=row, column=col)
 	c.value = "ADS time"
 	c.alignment = Weapon.alignment
-	worksheet.column_dimensions[get_column_letter(col)].width = 8
+	worksheet.column_dimensions[get_column_letter(col)].width = 6
+
+	col += 1
+	c = worksheet.cell(row=row, column=col)
+	c.value = "+ Laser"
+	c.alignment = Weapon.alignment
+	worksheet.column_dimensions[get_column_letter(col)].width = 7
 
 	col += 1
 	worksheet.column_dimensions[get_column_letter(col)].width = 3
 
 	col += 1
-	worksheet.merge_cells(start_row=row-1, end_row=row-1, start_column=col, end_column=col + 1)
-	c = worksheet.cell(row=row-1, column=col)
-	c.value = "Reload times"
-	c.alignment = Weapon.alignment
-	
 	c = worksheet.cell(row=row, column=col)
-	c.value = "Tactical"
+	c.value = "Tactical reload"
 	c.alignment = Weapon.alignment
 	worksheet.column_dimensions[get_column_letter(col)].width = 8
 	
 	col += 1
 	c = worksheet.cell(row=row, column=col)
-	c.value = "Full"
+	c.value = "Full reload"
 	c.alignment = Weapon.alignment
-	worksheet.column_dimensions[get_column_letter(col)].width = 4
+	worksheet.column_dimensions[get_column_letter(col)].width = 7
+	
+	col += 1
+	worksheet.merge_cells(start_row=row-1, end_row=row-1, start_column=col, end_column=col + 1)
+	c = worksheet.cell(row=row-1, column=col)
+	c.value = "+ Angled grip"
+	c.alignment = Weapon.alignment
+	
+	c = worksheet.cell(row=row, column=col)
+	c.value = "Tactical reload"
+	c.alignment = Weapon.alignment
+	worksheet.column_dimensions[get_column_letter(col)].width = 8
+	
+	col += 1
+	c = worksheet.cell(row=row, column=col)
+	c.value = "Full reload"
+	c.alignment = Weapon.alignment
+	worksheet.column_dimensions[get_column_letter(col)].width = 7
 
 def add_secondary_weapon_stats(worksheet : typing.Any, weapon : Weapon, row : int, col : int):
 	c = worksheet.cell(row=row, column=col)
-	c.value, c.style = weapon.getType()
+	c.value, c.style = weapon.getClass()
 		
 	col += 2
 	c = worksheet.cell(row=row, column=col)
@@ -795,18 +885,33 @@ def add_secondary_weapon_stats(worksheet : typing.Any, weapon : Weapon, row : in
 
 	col += 1
 	c = worksheet.cell(row=row, column=col)
+	c.value, c.style = weapon.getExtraAmmo()
+
+	col += 1
+	c = worksheet.cell(row=row, column=col)
 	c.value, c.style = weapon.getPellets()
 		
 	col += 2
 	c = worksheet.cell(row=row, column=col)
 	c.value, c.style = weapon.getADSTime()
+	
+	col += 1
+	c = worksheet.cell(row=row, column=col)
+	c.value, c.style = weapon.getADSTimeWithLaser()
 
-	# col += 1
-	# c1 = worksheet.cell(row=row, column=col)
-	# col += 1
-	# c2 = worksheet.cell(row=row, column=col)
-	# c1.value, c2.value, c1.style = weapon.getReloadTimes()
-	# c2.style = c1.style
+	col += 2
+	c1 = worksheet.cell(row=row, column=col)
+	col += 1
+	c2 = worksheet.cell(row=row, column=col)
+	c1.value, c2.value, c1.style = weapon.getReloadTimes()
+	c2.style = c1.style
+	
+	col += 1
+	c1 = worksheet.cell(row=row, column=col)
+	col += 1
+	c2 = worksheet.cell(row=row, column=col)
+	c1.value, c2.value, c1.style = weapon.getReloadTimesWithAngledGrip()
+	c2.style = c1.style
 
 	return
 
@@ -814,12 +919,13 @@ def add_stats_worksheet(workbook : typing.Any, weapons : list[Weapon], worksheet
 						sub_names : None | tuple[str,...], stat_method : typing.Any, format_method : typing.Any, additional_params : None | tuple[typing.Any]):
 	
 	worksheet, row = add_worksheet_header(workbook, worksheet_name, stat_name, stat_link, description, len(Weapon.distances))
-	add_stats_header(worksheet, row, len(Weapon.distances) + 2)
+	add_secondary_weapon_stats_header(worksheet, row, len(Weapon.distances) + 2)
 	worksheet.freeze_panes = worksheet.cell(row=row+1, column=2)
 
 	col = 1
 	c = worksheet.cell(row=row, column=col)
 	c.value = "Distance"
+	c.alignment = Weapon.alignment
 
 	for col in range(2, len(Weapon.distances) + 2):
 		c = worksheet.cell(row=row, column=col)
@@ -1087,11 +1193,11 @@ function changedStat() {
 	string += """<table><tr style="vertical-align:top">"""
 	current_type = ""
 	for weapon in weapons:
-		if current_type != weapon.type or weapon == weapons[0]:
+		if current_type != weapon.class_ or weapon == weapons[0]:
 			if weapon != weapons[0]:
-				current_type = weapon.type
+				current_type = weapon.class_
 				string += f"</fieldset></td>"
-			string += f"""<td><fieldset><legend>{weapon.type}{"" if weapon.type == "Else" else "s"}:</legend>"""
+			string += f"""<td><fieldset><legend>{weapon.class_}{"" if weapon.class_ == "Else" else "s"}:</legend>"""
 			
 		weapon_name = weapon.name
 		string += f"""<input type="checkbox" id="{weapon_name}" value="{weapon_name}" onchange="toggledCheckbox(event)"><label for="{weapon_name}">{weapon_name}</label><br>"""
@@ -1117,12 +1223,12 @@ function changedStat() {
 	string += """<th>&emsp;</th><th>Type</th><th>&emsp;</th><th>RPM</th><th>Capacity</th><th>Pellets</th><th>&emsp;</th><th>ADS time</th><th>&emsp;</th><td>Tactical</td><td>Full</td></tr>"""
 		
 	for weapon in weapons:
-		bg = f"background-color:#{background_colors[weapon.type]};"
+		bg = f"background-color:#{background_colors[weapon.class_]};"
 		string += f"""<tr id="row_{weapon.name}" style="visibility:collapse;"><td style="{bg}">{weapon.name}</td>"""
 		for i in range(len(Weapon.distances)):
 			string += f"""<td>{weapon.damages[i]}</td>"""
-		string += f"""<td></td><td style="{bg}">{weapon.type}</td><td></td><td style="{bg}">{weapon.rpm}</td><td style="{bg}">{weapon.capacity[0]}+{weapon.capacity[1]}</td>"""
-		string += f"""<td style="{bg}">{weapon.pellets}</td><td></td><td style="{bg}">{weapon.ads}</td><td></td><td>a</td><td>b</td></tr>"""
+		string += f"""<td></td><td style="{bg}">{weapon.class_}</td><td></td><td style="{bg}">{weapon.rpm}</td><td style="{bg}">{weapon.capacity[0]}+{weapon.capacity[1]}</td>"""
+		string += f"""<td style="{bg}">{weapon.pellets}</td><td></td><td style="{bg}">{weapon.ads_time}</td><td></td><td>a</td><td>b</td></tr>"""
 		string += "</tr>"
 	string += "</table>"
 

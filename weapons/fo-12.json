@@ -1,6 +1,7 @@
 {
   "type": "SG",
   "rpm": 400,
+  "laser": true,
   "pellets": 8,
   "ads": 0.25,
   "extended_barrel": true,

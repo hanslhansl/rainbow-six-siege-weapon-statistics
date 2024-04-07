@@ -2,6 +2,7 @@
   "type": "AR",
   "rpm": 740,
   "pellets": 1,
+  "laser": true,
   "ads": 0.4,
   "extended_barrel": true,
   "capacity": [
@@ -51,5 +52,6 @@
     "39": 0,
     "40": 22
   },
-  "name": "416-C CARBINE"
+  "name": "416-C CARBINE",
+  "grip":  true
 }

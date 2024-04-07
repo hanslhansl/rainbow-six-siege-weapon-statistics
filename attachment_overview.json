@@ -35,7 +35,7 @@
       "description": "Reduces the sound emitted from a weapon and removes bulled trails which allows for a stealthier playstyle."
     },
     "Extended barrel": {
-      "damage increase": 0.1,
+      "damage bonus": 0.1,
       "description": "Increases weapon base damage and reduces damage drop-off. This leads to a reduction of STDOK and TTDOK:"
     }
   },

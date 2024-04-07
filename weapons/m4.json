@@ -2,6 +2,7 @@
   "type": "AR",
   "rpm": 750,
   "pellets": 1,
+  "laser": true,
   "ads": 0.4,
   "extended_barrel": true,
   "capacity": [
