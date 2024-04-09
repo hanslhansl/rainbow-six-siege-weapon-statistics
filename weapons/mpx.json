@@ -3,8 +3,9 @@
   "pellets": 1,
   "grip": true,
   "laser": true,
-  "ads": 0.3,
+  "ads": 0.46,
   "extended_barrel": true,
+  "extra_ammo": 150,
   "capacity": [
     30,
     1

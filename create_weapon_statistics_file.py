@@ -19,7 +19,7 @@ xlsx_output_file_name = "rainbow-six-siege-weapon-statistics.xlsx"
 # the directory containing the weapon damage files
 weapon_data_dir = "weapons"
 
-# the distance the weapon damage stats start at (usually either 0 or 1)
+# the distance the weapon damage stats start at (usually 0)
 first_distance = 0
 # the distance the weapon damage stats end at (usually 40 because the of the Shooting Range limit)
 last_distance = 40 
@@ -28,7 +28,7 @@ last_distance = 40
 weapon_classes = ("AR", "SMG", "MP", "LMG", "DMR", "SR", "SG", "Slug SG", "Handgun", "Revolver", "Hand Canon")
 
 # weapon type background colors
-background_colors = {"AR":"5083EA", "SMG":"B6668E", "MP":"76A5AE", "LMG":"8771BD", "DMR":"7CB563", "SR":"", "SG":"FFBC01", "Slug SG":"", "Handgun":"A3A3A3", "Revolver":"", "Else":"F48020"}
+background_colors = {"AR":"5083EA", "SMG":"B6668E", "MP":"76A5AE", "LMG":"8771BD", "DMR":"7CB563", "SR":"DE2A00", "SG":"FFBC01", "Slug SG":"A64E06", "Handgun":"A3A3A3", "Revolver":"F48020", "Hand Canon":"FFFFFF"}
 
 
 ###################################################
@@ -927,7 +927,9 @@ def add_stats_worksheet(workbook : typing.Any, weapons : list[Weapon], worksheet
 	col = 1
 	c = worksheet.cell(row=row, column=col)
 	c.value = "Distance"
-	c.alignment = Weapon.alignment
+	al = copy.copy(Weapon.alignment)
+	al.horizontal = "left"
+	c.alignment = al
 
 	for col in range(2, len(Weapon.distances) + 2):
 		c = worksheet.cell(row=row, column=col)
@@ -1073,7 +1075,7 @@ def add_attachment_overview(workbook : typing.Any, weapons : list[Weapon]):
 				c.value = description
 				row += 1
 				
-			if "damage increase" in attachment:
+			if "damage bonus" in attachment:
 				row += 1
 				row = add_extended_barrel_overview(worksheet, weapons, row, 2, False)
 				

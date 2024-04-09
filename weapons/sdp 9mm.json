@@ -2,8 +2,9 @@
   "rpm": 480,
   "pellets": 1,
   "laser": true,
-  "ads": 0.2,
+  "ads": 0.24,
   "extended_barrel": false,
+  "extra_ammo": 96,
   "capacity": [
     16,
     1

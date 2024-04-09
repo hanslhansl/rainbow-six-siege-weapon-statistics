@@ -2,8 +2,9 @@
   "rpm": 650,
   "pellets": 1,
   "grip": true,
+  "extra_ammo": 150,
   "laser": true,
-  "ads": 0.4,
+  "ads": 0.52,
   "extended_barrel": true,
   "capacity": [
     30,

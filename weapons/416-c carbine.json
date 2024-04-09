@@ -3,7 +3,7 @@
   "pellets": 1,
   "grip": true,
   "laser": true,
-  "ads": 0.4,
+  "ads": 0.52,
   "extended_barrel": true,
   "capacity": [
     25,
@@ -53,6 +53,5 @@
     "40": 22
   },
   "name": "416-C CARBINE",
-  "grip": true,
   "class": "AR"
 }
