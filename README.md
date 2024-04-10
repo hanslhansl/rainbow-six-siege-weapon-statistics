@@ -19,19 +19,19 @@ Because collecting the extended barrel damage stats independently from the base 
 ## Bullets per shot - Pellet count
 This value is displayed in the shooting range. Most weapons shoot exactly one bullet per shot. The only exception are shotguns, most of which shoot 8 bullets per shot. For shotguns this metric is also called pellet count.
 ## Damage per shot
-The damage per shot calculates as $DmgPerShot = Damage * Pellets$. Only for shotguns this value varies from the damage per bullet. No measuring necessary.
+The damage per shot is calculated as $DmgPerShot = Damage * Pellets$. Only for shotguns this value varies from the damage per bullet. No measuring necessary.
 ## Fire rate
-Currently, for all fully automatic weapons I am using the fire rates listed in-game. For all other weapons I measure the fire rates myself. I am doing this by emptying a magazine of size $n$ and measuring the time $t$ (in milliseconds) between the ammo counter decreasing the first time and the ammo counter reaching 0. The fire rate in rounds per milliseconds calculates as ${n-1 \over t}rpms$, in rounds per second as $1000{n-1 \over t}rps$ and in rounds per minute as $60000{n-1 \over t}rpm$. It is important to subract $1$ from $n$ because the first bullet is shot immediatelly after pulling the trigger and therefor doesn't contribute to the measured time. If you didn't subtract $1$ you would get different fire rates for the same gun depending on how many bullets you shoot.
+Currently, for all fully automatic weapons I am using the fire rates listed in-game. For all other weapons I measure the fire rates myself. I am doing this by emptying a magazine of size $n$ and measuring the time $t$ (in milliseconds) between the ammo counter decreasing the first time and the ammo counter reaching 0. The fire rate in rounds per milliseconds is calculated as ${n-1 \over t}rpms$, in rounds per second as $1000{n-1 \over t}rps$ and in rounds per minute as $60000{n-1 \over t}rpm$. It is important to subract $1$ from $n$ because the first bullet is shot immediatelly after pulling the trigger and therefor doesn't contribute to the measured time. If you didn't subtract $1$ you would get different fire rates for the same gun depending on how many bullets you shoot.
 
 As [already mentioned](#time-measuring) my time measurements can vary up to 16.7ms from the real values. The actual fire rates are therefor in the interval defined by $60000{n-1 \over t \pm 16.7}rpm$. For example a measured fire rate of 800 rpm for a weapon with 31 bullets per magazine would mean an actual fire rate of something inbetween 794 rpm and 806 rpm. Because of this innaccuracy I am usually rounding the fire rate to a reasonable integer within said interval (e.g. measured 433.47 rpm become 430 rpm).
 
 At some point I will measure all fully automatic weapon's fire rates as well. Just to be sure. soon (tm).
 ## Damage per second - DPS
-The damage per second calculates as $DPS = DmgPerShot * RPS = DmgPerShot * RPM / 60$. No measuring necessary.
+The damage per second is calculated as $DPS = DmgPerShot * RPS = DmgPerShot * RPM / 60$. No measuring necessary.
 ## Shots to down or kill - STDOK
 For a target with $x$ hp the STDOK calculate as $\lceil {x \over Damage} \rceil$. No measuring necessary.
 ## Time to down or kill - TTDOK
-For a target with $x$ hp the TTDOK in milliseconds calculates as ${STDOK - 1 \over rpms}$. No measuring necessary.
+For a target with $x$ hp the TTDOK in milliseconds is calculated as ${STDOK - 1 \over rpms}$. No measuring necessary.
 ## Magazine capacity
 Most weapons have, in addition to the bullets loaded in the magazine, one bullet loaded in the chamber. For those weapons this value is displayed as $Capacity+1$ (e.g. $30+1$, $20+1$, etc.). For all other weapons without a bullet loaded in the chamber this value is displayed as $Capacity+0$ (e.g. $100+0$, $80+0$).
 ## Aim down sight time - ADS time
