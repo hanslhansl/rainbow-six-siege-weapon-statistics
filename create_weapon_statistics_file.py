@@ -37,7 +37,7 @@ background_colors = {"AR":"5083EA", "SMG":"B6668E", "MP":"76A5AE", "LMG":"8771BD
 ###################################################
 
 # install exception catcher
-from re import S
+#from re import S
 import sys, traceback
 
 def show_exception_and_exit(exc_type, exc_value, tb):
@@ -103,7 +103,7 @@ border_style = "thin"
 
 class Weapon:
 	classes = weapon_classes
-	operators : tuple[str,...]
+	operator_tuple : tuple[str,...]
 	distances = numpy.array([i for i in range(first_distance, last_distance+1)], numpy.int32)
 	
 	alignment = Alignment("center", "center", wrapText=True)
@@ -188,8 +188,6 @@ class Weapon:
 				Weapon.lowest_highest_ttdok[hp][self.class_] = min(TTDOK), max(TTDOK)
 			else:
 				Weapon.lowest_highest_ttdok[hp][self.class_] = min(Weapon.lowest_highest_ttdok[hp][self.class_][0], min(TTDOK)), max(Weapon.lowest_highest_ttdok[hp][self.class_][1], max(TTDOK))
-
-		print(self.name)
 
 		return
 
@@ -362,7 +360,7 @@ class Weapon:
 					raise Exception(f"Weapon '{self.name}' has an extra ammo value that doesn't deserialize to an integer.")
 				self._extra_ammo = self.json_content["extra_ammo"]
 			else:
-				print(f"{warning('Warning:')} Weapon '{warning(self.name)}' is missing an {warning('extra ammo value')}. Using default value ({self.default_extra_ammo}) instead.")
+				print(f"{warning('Warning:')} Weapon '{warning(self.name)}' is missing an {warning('extra ammo value')}. Using default value ({self.default_extra_ammo}) instead. {warning(", ".join(self.operators))}")
 				self._extra_ammo = self.default_extra_ammo
 				
 		return self._extra_ammo
@@ -449,7 +447,7 @@ class Weapon:
 		return self._grip
 	@property
 	def operators(self):
-		return tuple([self.operators[opIndex] for opIndex in self.operator_indices])
+		return tuple([Weapon.operator_tuple[opIndex] for opIndex in self.operator_indices])
 
 	# derived properties
 	@property
@@ -667,11 +665,11 @@ def get_operator_weapons(weapons : list[Weapon], file_name : str) -> None:
 		raise Exception(f"The weapon lists in file '{file_name}' don't deserialize to lists of strings.")
 	operator_weapons = typing.cast(dict[str, list[str]], json_content)
 
-	Weapon.operators = tuple(sorted(operator_weapons.keys()))
+	Weapon.operator_tuple = tuple(sorted(operator_weapons.keys()))
 
 	weapon_operatorIndex_dict : dict[str, list[int]] = {}
 	for operator, weapon_list in operator_weapons.items():
-		operatorIndex = Weapon.operators.index(operator)
+		operatorIndex = Weapon.operator_tuple.index(operator)
 
 		for weapon_name in weapon_list:
 			if weapon_name in weapon_operatorIndex_dict:

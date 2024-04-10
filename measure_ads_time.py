@@ -23,12 +23,12 @@ while(vid.isOpened()):
         
     elif all([np.allclose(frame[726+y, 1279+x], [0x21, 0x00, 0xDB], 0., 40.) for y, x in np.ndindex((5, 3))]):  # acog
         if state != 2:
-            print(f"acog [{(i - last_dot - 2)}, {i - last_dot}] fps = [{(i - last_dot - 2) / frame_rate}, {(i - last_dot) / frame_rate}] s")
+            print(f"acog \u0394t=[{(i - last_dot - 2)}, {i - last_dot}]fps=[{(i - last_dot - 2) / frame_rate}, {(i - last_dot) / frame_rate}]s @ {i}fps")
             state = 2
             
     elif all([np.allclose(frame[719+y, 1279+x], [0x27, 0x00, 0xE6], 0., 40.) for y, x in np.ndindex((2, 2))]):# red dot C
         if state != 3:
-            print(f"red dot C [{(i - last_dot - 2)}, {i - last_dot}] fps = [{(i - last_dot - 2) / frame_rate}, {(i - last_dot) / frame_rate}] s")
+            print(f"red dot C \u0394t=[{(i - last_dot - 2)}, {i - last_dot}]fps=[{(i - last_dot - 2) / frame_rate}, {(i - last_dot) / frame_rate}]s @ {i}fps")
             state = 3
 
     else:
