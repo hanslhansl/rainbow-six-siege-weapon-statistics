@@ -27,7 +27,7 @@ At some point I will measure all fully automatic weapon's fire rates as well. Ju
 ## Damage per second - DPS
 The damage per second is calculated as $DPS = DmgPerShot * RPS = DmgPerShot * RPM / 60$. No measuring necessary.
 ## Shots to down or kill - STDOK
-For a target with $x$ hp the STDOK calculate as $\lceil {x \over Damage} \rceil$. No measuring necessary.
+For a target with $x$ hp the STDOK is calculated as $\lceil {x \over Damage} \rceil$. No measuring necessary.
 ## Time to down or kill - TTDOK
 For a target with $x$ hp the TTDOK in milliseconds is calculated as ${STDOK - 1 \over rpms}$. No measuring necessary.
 ## Magazine capacity
