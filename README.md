@@ -15,7 +15,7 @@ There are three body hit areas in R6S: the head, the torso and the limbs. The to
 ## The extended barrel
 The only attachment that affects the damage per bullet is the extended barrel. It used to increase the damage by 10% at all distances but for inexplicable reasons Ubisoft changed how the extended barrel works sometime during Y8S3 without mentioning it in any patch notes. Up until the distance at which the damage starts to drop off without the extended barrel it still increases the damage by 10%. From this distance on it gets funky. It seems to delay and soften the damage drop-off at the same time but I couldn't figure out how it works exactly.
 
-Because collecting the extended barrel damage stats independently from the base stats would mean a huge additional effort and because the new extended barrel differs from the old extended barrel only slightly and only at higher distances I am still using the old extended barrel stats: Base stats increased by 10% and rounded up: $Damage=\lceil {Damage * 1.1} \rceil$.
+Because collecting the extended barrel damage stats independently from the base stats would mean a huge additional effort and because the new extended barrel differs from the old extended barrel only slightly and only at higher distances I am still using the old extended barrel stats: Base stats increased by 10% and rounded up. $Damage=\lceil {Damage * 1.1} \rceil$.
 ## Bullets per shot - Pellet count
 This value is displayed in the shooting range. Most weapons shoot exactly one bullet per shot. The only exception are shotguns, most of which shoot 8 bullets per shot. For shotguns this metric is also called pellet count.
 ## Damage per shot
