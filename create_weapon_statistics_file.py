@@ -360,7 +360,7 @@ class Weapon:
 					raise Exception(f"Weapon '{self.name}' has an extra ammo value that doesn't deserialize to an integer.")
 				self._extra_ammo = self.json_content["extra_ammo"]
 			else:
-				print(f"{warning('Warning:')} Weapon '{warning(self.name)}' is missing an {warning('extra ammo value')}. Using default value ({self.default_extra_ammo}) instead. {warning(", ".join(self.operators))}")
+				print(f"{warning('Warning:')} Weapon '{warning(self.name)}' is missing an {warning('extra ammo value')}. Using default value ({self.default_extra_ammo}) instead.")
 				self._extra_ammo = self.default_extra_ammo
 				
 		return self._extra_ammo
@@ -761,14 +761,14 @@ def add_worksheet_header(workbook : typing.Any, worksheet_name : str, stat_name 
 	row += 1
 	worksheet.merge_cells(start_row=row, end_row=row, start_column=2, end_column=1 + cols_inbetween)
 	c = worksheet.cell(row=row, column=2)
-	c.value = '=HYPERLINK("https://github.com/hanslhansl/R6S-Weapon-Statistics/", "A detailed explanation can be found here")'
+	c.value = '=HYPERLINK("https://github.com/hanslhansl/Rainbow-Six-Siege-Weapon-Statistics/", "A detailed explanation can be found here")'
 	c.font = Font(color = "FF0000FF")
 	
 	row += 2
 	worksheet.merge_cells(start_row=row, end_row=row, start_column=2, end_column=1 + cols_inbetween)
 	c = worksheet.cell(row=row, column=2)
 	if type(stat_link) == str:
-		c.value = f'=HYPERLINK("https://github.com/hanslhansl/R6S-Weapon-Statistics/#{stat_link}", "{stat_name}")'
+		c.value = f'=HYPERLINK("https://github.com/hanslhansl/Rainbow-Six-Siege-Weapon-Statistics/#{stat_link}", "{stat_name}")'
 		c.font = Font(color = "FF0000FF")
 	else:
 		c.value = stat_name
@@ -808,7 +808,7 @@ def add_secondary_weapon_stats_header(worksheet : typing.Any, row : int, col : i
 	c = worksheet.cell(row=row, column=col)
 	c.value = "Capacity"
 	c.alignment = Weapon.alignment
-	worksheet.column_dimensions[get_column_letter(col)].width = 8
+	worksheet.column_dimensions[get_column_letter(col)].width = 9
 	
 	col += 1
 	c = worksheet.cell(row=row, column=col)
@@ -835,7 +835,7 @@ def add_secondary_weapon_stats_header(worksheet : typing.Any, row : int, col : i
 	c = worksheet.cell(row=row, column=col)
 	c.value = "+ Laser"
 	c.alignment = Weapon.alignment
-	worksheet.column_dimensions[get_column_letter(col)].width = 7
+	worksheet.column_dimensions[get_column_letter(col)].width = 8
 
 	col += 1
 	worksheet.column_dimensions[get_column_letter(col)].width = 3
