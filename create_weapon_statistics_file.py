@@ -48,6 +48,8 @@ sys.excepthook = show_exception_and_exit
 
 #imports
 import os, numpy, json, typing, math, ctypes, copy
+from openpyxl.cell.text import InlineFont
+from openpyxl.cell.rich_text import TextBlock, CellRichText
 from openpyxl import Workbook
 from openpyxl.styles import PatternFill, Border, Alignment, NamedStyle, Side, Font
 from openpyxl.formatting.rule import ColorScaleRule
@@ -75,7 +77,7 @@ def message(s):
 
 exception = "\x1b[38;2;255;0;0mException:\033[0m"
 
-def color_to_border_color(s : str):
+def color_to_openpyxl_color(s : str):
 	r, g, b = int(s[0:2], 16) / 0xFF, int(s[2:4], 16) / 0xFF, int(s[4:6], 16) / 0xFF
 	
 	r = pow(r, 2.2)
@@ -103,17 +105,16 @@ border_style = "thin"
 
 class Weapon:
 	classes = weapon_classes
-	operator_tuple : tuple[str,...]
 	distances = numpy.array([i for i in range(first_distance, last_distance+1)], numpy.int32)
 	
 	alignment = Alignment("center", "center", wrapText=True)
 	border_color = "FF8CA5D0"
 
 	borders = {type_ : Border(
-				left = Side(border_style=border_style, color=color_to_border_color(background_colors[type_])),
-				right=Side(border_style=border_style, color=color_to_border_color(background_colors[type_])),
-				top=Side(border_style=border_style, color=color_to_border_color(background_colors[type_])),
-				bottom=Side(border_style=border_style, color=color_to_border_color(background_colors[type_]))
+				left = Side(border_style=border_style, color=color_to_openpyxl_color(background_colors[type_])),
+				right=Side(border_style=border_style, color=color_to_openpyxl_color(background_colors[type_])),
+				top=Side(border_style=border_style, color=color_to_openpyxl_color(background_colors[type_])),
+				bottom=Side(border_style=border_style, color=color_to_openpyxl_color(background_colors[type_]))
 				) for type_ in classes}
 	
 	fills = {type_ : PatternFill(fgColor=background_colors[type_], fill_type = "solid") for type_ in classes}
@@ -149,7 +150,7 @@ class Weapon:
 	def __init__(self, json_content_):
 		self.json_content =  json_content_
 
-		self.operator_indices : tuple[int,...]
+		self.operators : list[Operator] = []
 		
 		self._name = None
 		self._damages = None
@@ -382,8 +383,8 @@ class Weapon:
 	@property
 	def has_extended_barrel(self) -> bool:
 		if self._has_extended_barrel == None:
-			potential_eb = copy.deepcopy(self)
-		
+			potential_eb = copy.copy(self)
+
 			# get weapon extended barrel
 			if "extended_barrel" in self.json_content:
 				if type(self.json_content["extended_barrel"]) == bool:	# use default damage multiplier for extended barrel
@@ -430,7 +431,6 @@ class Weapon:
 			else:
 				print(f"{warning('Warning:')} Weapon '{warning(self.name)}' is missing a {warning('laser')} value. Using default value ({self.default_has_laser}) instead.")
 				self._has_laser = self.default_has_laser
-			pass
 		return self._has_laser
 	@property
 	def has_grip(self) -> bool:
@@ -445,9 +445,6 @@ class Weapon:
 				self._grip = self.default_grip
 			pass
 		return self._grip
-	@property
-	def operators(self):
-		return tuple([Weapon.operator_tuple[opIndex] for opIndex in self.operator_indices])
 
 	# derived properties
 	@property
@@ -545,6 +542,8 @@ class Weapon:
 			return 0, 0, self.getStyleA()
 		else:
 			return usefulness[0], int(usefulness[1] + 0.5), self.getStyleABF()
+	def getOperators(self):
+		return CellRichText(*(op.getName() for op in self.operators))
 
 	# excel styles
 	def getDamageStyle(self, index : int):
@@ -643,6 +642,49 @@ class Weapon:
 		else:
 			raise Exception(f"Weapon '{self.name}' doesn't have an extended barrel version.")
 
+class Operator:
+	attacker_color = color_to_openpyxl_color("198FEB")
+	defender_color = color_to_openpyxl_color("FB3636")
+
+	def __init__(self, json_content_, name : str, weapons : list[Weapon]):
+		self.json_content =  json_content_
+		self.name = name
+
+		if "side" not in self.json_content:
+			raise Exception(f"Operator '{self.name}' is missing a side.")
+		if type(self.json_content["side"]) != str:
+			raise Exception(f"Operator '{self.name}' has a side value that doesn't deserialize to a string.")
+		if self.json_content["side"] not in ("A", "D"):
+			raise Exception(f"Operator '{self.name}' has an invalid side value.")
+		self.side = bool(self.json_content["side"] == "D")	# False: attack, True: defense
+		
+		if "weapons" not in self.json_content:
+			raise Exception(f"Operator '{self.name}' is missing weapons.")
+		if type(self.json_content["weapons"]) != list:
+			raise Exception(f"Operator '{self.name}' has weapons that don't deserialize to a list.")
+		if not all(isinstance(weapon, str) for weapon in self.json_content["weapons"]):
+			raise Exception(f"Operator '{self.name}' has weapons that don't deserialize to strings.")
+		weapons_strings = list(self.json_content["weapons"])	# tuple of weapon names
+		
+		weapons_strings_copy = copy.copy(weapons_strings)
+		self.weapons = []
+		for weapons_string in weapons_strings:
+			for weapon in weapons:
+				if weapon.name == weapons_string:
+					self.weapons.append(weapon)
+					weapon.operators.append(self)
+					weapons_strings_copy.remove(weapons_string)
+					break
+
+		for fake_weapons_string in weapons_strings_copy:
+			print(f"{warning('Warning:')} Weapon '{warning(fake_weapons_string)}' found on operator '{self.name}' is {warning('not an actual weapon')}.")
+	
+		self._rich_text = TextBlock(InlineFont(color=Operator.defender_color if self.side else Operator.attacker_color), self.name)
+
+		return
+
+	def getName(self):
+		return self._rich_text
 
 def deserialize_json(file_name : str):
 	with open(file_name, "r") as file:
@@ -657,38 +699,12 @@ def get_operators(weapons : list[Weapon], file_name : str) -> None:
 	if type(json_content) != dict:
 		raise Exception(f"File '{file_name}' doesn't deserialize to a dict of operators and weapons lists.")
 
-	if not all(isinstance(operator, str) for operator in json_content):
-		raise Exception(f"The operators in file '{file_name}' don't deserialize to strings.")
-	if not all(isinstance(weapon_list, list) for weapon_list in json_content.values()):
-		raise Exception(f"The weapon lists in file '{file_name}' don't deserialize to lists.")
-	if not all(all(isinstance(weapon, str) for weapon in weapon_list) for weapon_list in json_content.values()):
-		raise Exception(f"The weapon lists in file '{file_name}' don't deserialize to lists of strings.")
-	operator_weapons = typing.cast(dict[str, list[str]], json_content)
+	if not all(isinstance(operator_name, str) for operator_name in json_content):
+		raise Exception(f"The operator names in file '{file_name}' don't deserialize to strings.")
+	if not all(isinstance(op, dict) for op in json_content.values()):
+		raise Exception(f"The operators in file '{file_name}' don't deserialize to dicts.")
 
-	Weapon.operator_tuple = tuple(sorted(operator_weapons.keys()))
-
-	weapon_operatorIndex_dict : dict[str, list[int]] = {}
-	for operator, weapon_list in operator_weapons.items():
-		operatorIndex = Weapon.operator_tuple.index(operator)
-
-		for weapon_name in weapon_list:
-			if weapon_name in weapon_operatorIndex_dict:
-				weapon_operatorIndex_dict[weapon_name].append(operatorIndex)
-			else:
-				weapon_operatorIndex_dict[weapon_name] = [operatorIndex]
-		pass
-
-	for weapon in weapons:
-		try:
-			operator_indices = weapon_operatorIndex_dict[weapon.name]
-		except KeyError:
-			raise Exception(f"File '{file_name}' is missing weapon '{weapon.name}'.")
-
-		weapon.operator_indices = tuple(sorted(operator_indices))
-		del weapon_operatorIndex_dict[weapon.name]
-
-	for fake_weapon_name in weapon_operatorIndex_dict:
-		print(f"{warning('Warning:')} Weapon '{warning(fake_weapon_name)}' found in file '{file_name}' is {warning('not an actual weapon')}.")
+	operators = [Operator(js, op_name, weapons) for (op_name, js) in json_content.items()]
 		
 	return
 
@@ -912,6 +928,14 @@ def add_secondary_weapon_stats(worksheet : typing.Any, weapon : Weapon, row : in
 	# c2 = worksheet.cell(row=row, column=col)
 	# c1.value, c2.value, c1.style = weapon.getReloadTimesWithAngledGrip()
 	# c2.style = c1.style
+	
+	rich_string1 = CellRichText('This is a test ', TextBlock(InlineFont(b=True), 'xxx'), 'yyy')
+
+	col += 2
+	c1 = worksheet.cell(row=row, column=col)
+	c1.value = rich_string1 #weapon.getOperators()
+	#c1 = rich_string1 #weapon.getOperators()
+	#worksheet["A1"] = rich_string1 #weapon.getOperators()
 
 	return
 
