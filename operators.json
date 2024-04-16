@@ -1,839 +1,626 @@
 {
   "Sledge": {
-    "weapons": {
-      "weapons": [
-        "M590A1",
-        "L85A2",
-        "P226 MK 25"
-      ],
-      "side": "A"
-    },
-    "side": "N/A"
+    "weapons": [
+      "M590A1",
+      "L85A2",
+      "P226 MK 25"
+    ],
+    "side": "A"
   },
   "Thatcher": {
-    "weapons": {
-      "weapons": [
-        "AR33",
-        "L85A2",
-        "M590A1"
-      ],
-      "side": "A"
-    },
-    "side": "N/A"
+    "weapons": [
+      "AR33",
+      "L85A2",
+      "M590A1"
+    ],
+    "side": "A"
   },
   "Ash": {
-    "weapons": {
-      "weapons": [
-        "G36C",
-        "R4-C",
-        "M45 MEUSOC",
-        "5.7 USG",
-        "M1014"
-      ],
-      "side": "A"
-    },
-    "side": "N/A"
+    "weapons": [
+      "G36C",
+      "R4-C",
+      "M45 MEUSOC",
+      "5.7 USG",
+      "M1014"
+    ],
+    "side": "A"
   },
   "Thermite": {
-    "weapons": {
-      "weapons": [
-        "556XI",
-        "M45 MEUSOC",
-        "5.7 USG"
-      ],
-      "side": "A"
-    },
-    "side": "N/A"
+    "weapons": [
+      "556XI",
+      "M45 MEUSOC",
+      "5.7 USG"
+    ],
+    "side": "A"
   },
   "Twitch": {
-    "weapons": {
-      "weapons": [
-        "F2",
-        "417",
-        "SG-CQB",
-        "P9",
-        "LFP586"
-      ],
-      "side": "A"
-    },
-    "side": "N/A"
+    "weapons": [
+      "F2",
+      "417",
+      "SG-CQB",
+      "P9",
+      "LFP586"
+    ],
+    "side": "A"
   },
   "Montagne": {
-    "weapons": {
-      "weapons": [
-        "P9",
-        "LFP586"
-      ],
-      "side": "A"
-    },
-    "side": "N/A"
+    "weapons": [
+      "P9",
+      "LFP586"
+    ],
+    "side": "A"
   },
   "Glaz": {
-    "weapons": {
-      "weapons": [
-        "OTs-03",
-        "PMM",
-        "GONNE-6",
-        "BEARING 9"
-      ],
-      "side": "A"
-    },
-    "side": "N/A"
+    "weapons": [
+      "OTs-03",
+      "PMM",
+      "GONNE-6",
+      "BEARING 9"
+    ],
+    "side": "A"
   },
   "Fuze": {
-    "weapons": {
-      "weapons": [
-        "6P41",
-        "AK-12",
-        "PMM",
-        "GSH-18"
-      ],
-      "side": "A"
-    },
-    "side": "N/A"
+    "weapons": [
+      "6P41",
+      "AK-12",
+      "PMM",
+      "GSH-18"
+    ],
+    "side": "A"
   },
   "Blitz": {
-    "weapons": {
-      "weapons": [
-        "P12"
-      ],
-      "side": "A"
-    },
-    "side": "N/A"
+    "weapons": [
+      "P12"
+    ],
+    "side": "A"
   },
   "IQ": {
-    "weapons": {
-      "weapons": [
-        "AUG A2",
-        "552 COMMANDO",
-        "G8A1",
-        "P12"
-      ],
-      "side": "A"
-    },
-    "side": "N/A"
+    "weapons": [
+      "AUG A2",
+      "552 COMMANDO",
+      "G8A1",
+      "P12"
+    ],
+    "side": "A"
   },
   "Buck": {
-    "weapons": {
-      "weapons": [
-        "C8-SFW",
-        "CAMRS",
-        "SKELETON KEY",
-        "MK1 9mm",
-        "GONNE-6"
-      ],
-      "side": "A"
-    },
-    "side": "N/A"
+    "weapons": [
+      "C8-SFW",
+      "CAMRS",
+      "SKELETON KEY",
+      "MK1 9mm",
+      "GONNE-6"
+    ],
+    "side": "A"
   },
   "Blackbeard": {
-    "weapons": {
-      "weapons": [
-        "MK17 CQB",
-        "SR-25",
-        "D-50"
-      ],
-      "side": "A"
-    },
-    "side": "N/A"
+    "weapons": [
+      "MK17 CQB",
+      "SR-25",
+      "D-50"
+    ],
+    "side": "A"
   },
   "Capitao": {
-    "weapons": {
-      "weapons": [
-        "PARA-308",
-        "M249",
-        "PRB92",
-        "GONNE-6"
-      ],
-      "side": "A"
-    },
-    "side": "N/A"
+    "weapons": [
+      "PARA-308",
+      "M249",
+      "PRB92",
+      "GONNE-6"
+    ],
+    "side": "A"
   },
   "Hibana": {
-    "weapons": {
-      "weapons": [
-        "TYPE-89",
-        "SUPERNOVA",
-        "P229",
-        "BEARING 9"
-      ],
-      "side": "A"
-    },
-    "side": "N/A"
+    "weapons": [
+      "TYPE-89",
+      "SUPERNOVA",
+      "P229",
+      "BEARING 9"
+    ],
+    "side": "A"
   },
   "Jackal": {
-    "weapons": {
-      "weapons": [
-        "C7E",
-        "PDW9",
-        "ITA12L",
-        "USP40",
-        "ITA12S"
-      ],
-      "side": "A"
-    },
-    "side": "N/A"
+    "weapons": [
+      "C7E",
+      "PDW9",
+      "ITA12L",
+      "USP40",
+      "ITA12S"
+    ],
+    "side": "A"
   },
   "Ying": {
-    "weapons": {
-      "weapons": [
-        "T-95 LSW",
-        "SIX12",
-        "Q-929"
-      ],
-      "side": "A"
-    },
-    "side": "N/A"
+    "weapons": [
+      "T-95 LSW",
+      "SIX12",
+      "Q-929"
+    ],
+    "side": "A"
   },
   "Zofia": {
-    "weapons": {
-      "weapons": [
-        "LMG-E",
-        "M762",
-        "RG15"
-      ],
-      "side": "A"
-    },
-    "side": "N/A"
+    "weapons": [
+      "LMG-E",
+      "M762",
+      "RG15"
+    ],
+    "side": "A"
   },
   "Dokkaebi": {
-    "weapons": {
-      "weapons": [
-        "Mk 14 EBR",
-        "BOSG.12.2",
-        "SMG-12",
-        "C75 Auto",
-        "GONNE-6"
-      ],
-      "side": "A"
-    },
-    "side": "N/A"
+    "weapons": [
+      "Mk 14 EBR",
+      "BOSG.12.2",
+      "SMG-12",
+      "C75 Auto",
+      "GONNE-6"
+    ],
+    "side": "A"
   },
   "Lion": {
-    "weapons": {
-      "weapons": [
-        "V308",
-        "417",
-        "SG-CQB",
-        "LFP586",
-        "P9",
-        "GONNE-6"
-      ],
-      "side": "A"
-    },
-    "side": "N/A"
+    "weapons": [
+      "V308",
+      "417",
+      "SG-CQB",
+      "LFP586",
+      "P9",
+      "GONNE-6"
+    ],
+    "side": "A"
   },
   "Finka": {
-    "weapons": {
-      "weapons": [
-        "SPEAR .308",
-        "6P41",
-        "SASG-12",
-        "PMM",
-        "GSH-18",
-        "GONNE-6"
-      ],
-      "side": "A"
-    },
-    "side": "N/A"
+    "weapons": [
+      "SPEAR .308",
+      "6P41",
+      "SASG-12",
+      "PMM",
+      "GSH-18",
+      "GONNE-6"
+    ],
+    "side": "A"
   },
   "Maverick": {
-    "weapons": {
-      "weapons": [
-        "AR-15.50",
-        "M4",
-        "1911 TACOPS"
-      ],
-      "side": "A"
-    },
-    "side": "N/A"
+    "weapons": [
+      "AR-15.50",
+      "M4",
+      "1911 TACOPS"
+    ],
+    "side": "A"
   },
   "Nomad": {
-    "weapons": {
-      "weapons": [
-        "AK-74M",
-        "ARX200",
-        ".44 Mag Semi-Auto",
-        "PRB92"
-      ],
-      "side": "A"
-    },
-    "side": "N/A"
+    "weapons": [
+      "AK-74M",
+      "ARX200",
+      ".44 Mag Semi-Auto",
+      "PRB92"
+    ],
+    "side": "A"
   },
   "Gridlock": {
-    "weapons": {
-      "weapons": [
-        "F90",
-        "M249 SAW",
-        "SUPER SHORTY",
-        "SDP 9mm",
-        "GONNE-6"
-      ],
-      "side": "A"
-    },
-    "side": "N/A"
+    "weapons": [
+      "F90",
+      "M249 SAW",
+      "SUPER SHORTY",
+      "SDP 9mm",
+      "GONNE-6"
+    ],
+    "side": "A"
   },
   "N\u00c3\u00b8kk": {
-    "weapons": {
-      "weapons": [
-        "FMG-9",
-        "SIX12 SD",
-        "5.7 USG",
-        "D-50"
-      ],
-      "side": "A"
-    },
-    "side": "N/A"
+    "weapons": [
+      "FMG-9",
+      "SIX12 SD",
+      "5.7 USG",
+      "D-50"
+    ],
+    "side": "A"
   },
   "Amaru": {
-    "weapons": {
-      "weapons": [
-        "G8A1",
-        "SUPERNOVA",
-        "SMG-11",
-        "ITA12S",
-        "GONNE-6"
-      ],
-      "side": "A"
-    },
-    "side": "N/A"
+    "weapons": [
+      "G8A1",
+      "SUPERNOVA",
+      "SMG-11",
+      "ITA12S",
+      "GONNE-6"
+    ],
+    "side": "A"
   },
   "Kali": {
-    "weapons": {
-      "weapons": [
-        "CSRX 300",
-        "SPSMG9",
-        "C75 Auto",
-        "P226 MK 25"
-      ],
-      "side": "A"
-    },
-    "side": "N/A"
+    "weapons": [
+      "CSRX 300",
+      "SPSMG9",
+      "C75 Auto",
+      "P226 MK 25"
+    ],
+    "side": "A"
   },
   "Iana": {
-    "weapons": {
-      "weapons": [
-        "ARX200",
-        "G36C",
-        "MK1 9mm"
-      ],
-      "side": "A"
-    },
-    "side": "N/A"
+    "weapons": [
+      "ARX200",
+      "G36C",
+      "MK1 9mm"
+    ],
+    "side": "A"
   },
   "Ace": {
-    "weapons": {
-      "weapons": [
-        "AK-12",
-        "M1014",
-        "P9"
-      ],
-      "side": "A"
-    },
-    "side": "N/A"
+    "weapons": [
+      "AK-12",
+      "M1014",
+      "P9"
+    ],
+    "side": "A"
   },
   "Zero": {
-    "weapons": {
-      "weapons": [
-        "SC3000K",
-        "MP7",
-        "5.7 USG",
-        "GONNE-6"
-      ],
-      "side": "A"
-    },
-    "side": "N/A"
+    "weapons": [
+      "SC3000K",
+      "MP7",
+      "5.7 USG",
+      "GONNE-6"
+    ],
+    "side": "A"
   },
   "Flores": {
-    "weapons": {
-      "weapons": [
-        "AR33",
-        "SR-25",
-        "GSH-18"
-      ],
-      "side": "A"
-    },
-    "side": "N/A"
+    "weapons": [
+      "AR33",
+      "SR-25",
+      "GSH-18"
+    ],
+    "side": "A"
   },
   "Osa": {
-    "weapons": {
-      "weapons": [
-        "556XI",
-        "PDW9",
-        "PMM"
-      ],
-      "side": "A"
-    },
-    "side": "N/A"
+    "weapons": [
+      "556XI",
+      "PDW9",
+      "PMM"
+    ],
+    "side": "A"
   },
   "Sens": {
-    "weapons": {
-      "weapons": [
-        "POF-9",
-        "417",
-        "SDP 9mm",
-        "GONNE-6"
-      ],
-      "side": "A"
-    },
-    "side": "N/A"
+    "weapons": [
+      "POF-9",
+      "417",
+      "SDP 9mm",
+      "GONNE-6"
+    ],
+    "side": "A"
   },
   "Grim": {
-    "weapons": {
-      "weapons": [
-        "552 COMMANDO",
-        "SG-CQB",
-        "P229",
-        "Bailiff 410"
-      ],
-      "side": "A"
-    },
-    "side": "N/A"
+    "weapons": [
+      "552 COMMANDO",
+      "SG-CQB",
+      "P229",
+      "Bailiff 410"
+    ],
+    "side": "A"
   },
   "Brava": {
-    "weapons": {
-      "weapons": [
-        "PARA-308",
-        "CAMRS",
-        "SUPER SHORTY",
-        "USP40"
-      ],
-      "side": "A"
-    },
-    "side": "N/A"
+    "weapons": [
+      "PARA-308",
+      "CAMRS",
+      "SUPER SHORTY",
+      "USP40"
+    ],
+    "side": "A"
   },
   "Ram": {
-    "weapons": {
-      "weapons": [
-        "R4-C",
-        "LMG-E",
-        "MK1 9mm",
-        "ITA12S"
-      ],
-      "side": "A"
-    },
-    "side": "N/A"
+    "weapons": [
+      "R4-C",
+      "LMG-E",
+      "MK1 9mm",
+      "ITA12S"
+    ],
+    "side": "A"
   },
   "Deimos": {
-    "weapons": {
-      "weapons": [
-        "AK-74M",
-        "M590A1",
-        ".44 Vendetta"
-      ],
-      "side": "A"
-    },
-    "side": "N/A"
+    "weapons": [
+      "AK-74M",
+      "M590A1",
+      ".44 Vendetta"
+    ],
+    "side": "A"
   },
   "Smoke": {
-    "weapons": {
-      "weapons": [
-        "FMG-9",
-        "M590A1",
-        "P226 MK 25",
-        "SMG-11"
-      ],
-      "side": "D"
-    },
-    "side": "N/A"
+    "weapons": [
+      "FMG-9",
+      "M590A1",
+      "P226 MK 25",
+      "SMG-11"
+    ],
+    "side": "D"
   },
   "Mute": {
-    "weapons": {
-      "weapons": [
-        "MP5K",
-        "M590A1",
-        "P226 MK 25",
-        "SMG-11"
-      ],
-      "side": "D"
-    },
-    "side": "N/A"
+    "weapons": [
+      "MP5K",
+      "M590A1",
+      "P226 MK 25",
+      "SMG-11"
+    ],
+    "side": "D"
   },
   "Castle": {
-    "weapons": {
-      "weapons": [
-        "UMP45",
-        "M1014",
-        "5.7 USG",
-        "SUPER SHORTY",
-        "M45 MEUSOC"
-      ],
-      "side": "D"
-    },
-    "side": "N/A"
+    "weapons": [
+      "UMP45",
+      "M1014",
+      "5.7 USG",
+      "SUPER SHORTY",
+      "M45 MEUSOC"
+    ],
+    "side": "D"
   },
   "Pulse": {
-    "weapons": {
-      "weapons": [
-        "M1014",
-        "UMP45",
-        "M45 MEUSOC",
-        "5.7 USG"
-      ],
-      "side": "D"
-    },
-    "side": "N/A"
+    "weapons": [
+      "M1014",
+      "UMP45",
+      "M45 MEUSOC",
+      "5.7 USG"
+    ],
+    "side": "D"
   },
   "Doc": {
-    "weapons": {
-      "weapons": [
-        "SG-CQB",
-        "MP5",
-        "P90",
-        "P9",
-        "LFP586",
-        "Bailiff 410"
-      ],
-      "side": "D"
-    },
-    "side": "N/A"
+    "weapons": [
+      "SG-CQB",
+      "MP5",
+      "P90",
+      "P9",
+      "LFP586",
+      "Bailiff 410"
+    ],
+    "side": "D"
   },
   "Rook": {
-    "weapons": {
-      "weapons": [
-        "P90",
-        "MP5",
-        "SG-CQB",
-        "LFP586",
-        "P9"
-      ],
-      "side": "D"
-    },
-    "side": "N/A"
+    "weapons": [
+      "P90",
+      "MP5",
+      "SG-CQB",
+      "LFP586",
+      "P9"
+    ],
+    "side": "D"
   },
   "Kapkan": {
-    "weapons": {
-      "weapons": [
-        "9x19VSN",
-        "SASG-12",
-        "PMM",
-        "GSH-18"
-      ],
-      "side": "D"
-    },
-    "side": "N/A"
+    "weapons": [
+      "9x19VSN",
+      "SASG-12",
+      "PMM",
+      "GSH-18"
+    ],
+    "side": "D"
   },
   "Tachanka": {
-    "weapons": {
-      "weapons": [
-        "DP27",
-        "9x19VSN",
-        "GSH-18",
-        "PMM",
-        "BEARING 9"
-      ],
-      "side": "D"
-    },
-    "side": "N/A"
+    "weapons": [
+      "DP27",
+      "9x19VSN",
+      "GSH-18",
+      "PMM",
+      "BEARING 9"
+    ],
+    "side": "D"
   },
   "J\u00c3\u00a4ger": {
-    "weapons": {
-      "weapons": [
-        "M870",
-        "416-C CARBINE",
-        "P12"
-      ],
-      "side": "D"
-    },
-    "side": "N/A"
+    "weapons": [
+      "M870",
+      "416-C CARBINE",
+      "P12"
+    ],
+    "side": "D"
   },
   "Bandit": {
-    "weapons": {
-      "weapons": [
-        "MP7",
-        "M870",
-        "P12"
-      ],
-      "side": "D"
-    },
-    "side": "N/A"
+    "weapons": [
+      "MP7",
+      "M870",
+      "P12"
+    ],
+    "side": "D"
   },
   "Frost": {
-    "weapons": {
-      "weapons": [
-        "SUPER 90",
-        "9mm C1",
-        "MK1 9mm",
-        "ITA12S"
-      ],
-      "side": "D"
-    },
-    "side": "N/A"
+    "weapons": [
+      "SUPER 90",
+      "9mm C1",
+      "MK1 9mm",
+      "ITA12S"
+    ],
+    "side": "D"
   },
   "Valkyrie": {
-    "weapons": {
-      "weapons": [
-        "MPX",
-        "SPAS-12",
-        "D-50"
-      ],
-      "side": "D"
-    },
-    "side": "N/A"
+    "weapons": [
+      "MPX",
+      "SPAS-12",
+      "D-50"
+    ],
+    "side": "D"
   },
   "Cavera": {
-    "weapons": {
-      "weapons": [
-        "M12",
-        "SPAS-15",
-        "LUISON"
-      ],
-      "side": "D"
-    },
-    "side": "N/A"
+    "weapons": [
+      "M12",
+      "SPAS-15",
+      "LUISON"
+    ],
+    "side": "D"
   },
   "Echo": {
-    "weapons": {
-      "weapons": [
-        "SUPERNOVA",
-        "MP5SD",
-        "P229",
-        "BEARING 9"
-      ],
-      "side": "D"
-    },
-    "side": "N/A"
+    "weapons": [
+      "SUPERNOVA",
+      "MP5SD",
+      "P229",
+      "BEARING 9"
+    ],
+    "side": "D"
   },
   "Mira": {
-    "weapons": {
-      "weapons": [
-        "VECTOR .45 ACP",
-        "ITA12L",
-        "USP40",
-        "ITA12S"
-      ],
-      "side": "D"
-    },
-    "side": "N/A"
+    "weapons": [
+      "VECTOR .45 ACP",
+      "ITA12L",
+      "USP40",
+      "ITA12S"
+    ],
+    "side": "D"
   },
   "Lesion": {
-    "weapons": {
-      "weapons": [
-        "SIX12 SD",
-        "T-5 SMG",
-        "Q-929"
-      ],
-      "side": "D"
-    },
-    "side": "N/A"
+    "weapons": [
+      "SIX12 SD",
+      "T-5 SMG",
+      "Q-929"
+    ],
+    "side": "D"
   },
   "Ela": {
-    "weapons": {
-      "weapons": [
-        "SCORPION EVO 3 A1",
-        "FO-12",
-        "RG15"
-      ],
-      "side": "D"
-    },
-    "side": "N/A"
+    "weapons": [
+      "SCORPION EVO 3 A1",
+      "FO-12",
+      "RG15"
+    ],
+    "side": "D"
   },
   "Vigil": {
-    "weapons": {
-      "weapons": [
-        "K1A",
-        "BOSG.12.2",
-        "C75 Auto",
-        "SMG-12"
-      ],
-      "side": "D"
-    },
-    "side": "N/A"
+    "weapons": [
+      "K1A",
+      "BOSG.12.2",
+      "C75 Auto",
+      "SMG-12"
+    ],
+    "side": "D"
   },
   "Maestro": {
-    "weapons": {
-      "weapons": [
-        "ALDA 5.56",
-        "ACS12",
-        "Bailiff 410",
-        "KERATOS .357"
-      ],
-      "side": "D"
-    },
-    "side": "N/A"
+    "weapons": [
+      "ALDA 5.56",
+      "ACS12",
+      "Bailiff 410",
+      "KERATOS .357"
+    ],
+    "side": "D"
   },
   "Alibi": {
-    "weapons": {
-      "weapons": [
-        "Mx4 Storm",
-        "ACS12",
-        "KERATOS .357",
-        "Bailiff 410"
-      ],
-      "side": "D"
-    },
-    "side": "N/A"
+    "weapons": [
+      "Mx4 Storm",
+      "ACS12",
+      "KERATOS .357",
+      "Bailiff 410"
+    ],
+    "side": "D"
   },
   "Clash": {
-    "weapons": {
-      "weapons": [
-        "SUPER SHORTY",
-        "SPSMG9",
-        "P-10C"
-      ],
-      "side": "D"
-    },
-    "side": "N/A"
+    "weapons": [
+      "SUPER SHORTY",
+      "SPSMG9",
+      "P-10C"
+    ],
+    "side": "D"
   },
   "Kaid": {
-    "weapons": {
-      "weapons": [
-        "AUG A3",
-        "TCSG12",
-        ".44 Mag Semi-Auto",
-        "LFP586"
-      ],
-      "side": "D"
-    },
-    "side": "N/A"
+    "weapons": [
+      "AUG A3",
+      "TCSG12",
+      ".44 Mag Semi-Auto",
+      "LFP586"
+    ],
+    "side": "D"
   },
   "Mozzie": {
-    "weapons": {
-      "weapons": [
-        "COMMANDO 9",
-        "P10 RONI",
-        "SDP 9mm"
-      ],
-      "side": "D"
-    },
-    "side": "N/A"
+    "weapons": [
+      "COMMANDO 9",
+      "P10 RONI",
+      "SDP 9mm"
+    ],
+    "side": "D"
   },
   "Warden": {
-    "weapons": {
-      "weapons": [
-        "M590A1",
-        "MPX",
-        "P-10C",
-        "SMG-12"
-      ],
-      "side": "D"
-    },
-    "side": "N/A"
+    "weapons": [
+      "M590A1",
+      "MPX",
+      "P-10C",
+      "SMG-12"
+    ],
+    "side": "D"
   },
   "Goyo": {
-    "weapons": {
-      "weapons": [
-        "VECTOR .45 ACP",
-        "TCSG12",
-        "P229"
-      ],
-      "side": "D"
-    },
-    "side": "N/A"
+    "weapons": [
+      "VECTOR .45 ACP",
+      "TCSG12",
+      "P229"
+    ],
+    "side": "D"
   },
   "Wamai": {
-    "weapons": {
-      "weapons": [
-        "AUG A2",
-        "MP5K",
-        "KERATOS .357",
-        "P12"
-      ],
-      "side": "D"
-    },
-    "side": "N/A"
+    "weapons": [
+      "AUG A2",
+      "MP5K",
+      "KERATOS .357",
+      "P12"
+    ],
+    "side": "D"
   },
   "Oryx": {
-    "weapons": {
-      "weapons": [
-        "T-5 SMG",
-        "SPAS-12",
-        "Bailiff 410",
-        "USP40"
-      ],
-      "side": "D"
-    },
-    "side": "N/A"
+    "weapons": [
+      "T-5 SMG",
+      "SPAS-12",
+      "Bailiff 410",
+      "USP40"
+    ],
+    "side": "D"
   },
   "Melusi": {
-    "weapons": {
-      "weapons": [
-        "MP5",
-        "SUPER 90",
-        "RG15"
-      ],
-      "side": "D"
-    },
-    "side": "N/A"
+    "weapons": [
+      "MP5",
+      "SUPER 90",
+      "RG15"
+    ],
+    "side": "D"
   },
   "Aruni": {
-    "weapons": {
-      "weapons": [
-        "P10 RONI",
-        "Mk 14 EBR",
-        "PRB92"
-      ],
-      "side": "D"
-    },
-    "side": "N/A"
+    "weapons": [
+      "P10 RONI",
+      "Mk 14 EBR",
+      "PRB92"
+    ],
+    "side": "D"
   },
   "Thunderbird": {
-    "weapons": {
-      "weapons": [
-        "SPEAR .308",
-        "SPAS-15",
-        "Q-929",
-        "BEARING 9"
-      ],
-      "side": "D"
-    },
-    "side": "N/A"
+    "weapons": [
+      "SPEAR .308",
+      "SPAS-15",
+      "Q-929",
+      "BEARING 9"
+    ],
+    "side": "D"
   },
   "Thorn": {
-    "weapons": {
-      "weapons": [
-        "UZK50GI",
-        "M870",
-        "1911 TACOPS",
-        "C75 Auto"
-      ],
-      "side": "D"
-    },
-    "side": "N/A"
+    "weapons": [
+      "UZK50GI",
+      "M870",
+      "1911 TACOPS",
+      "C75 Auto"
+    ],
+    "side": "D"
   },
   "Azami": {
-    "weapons": {
-      "weapons": [
-        "9x19VSN",
-        "ACS12",
-        "D-50"
-      ],
-      "side": "D"
-    },
-    "side": "N/A"
+    "weapons": [
+      "9x19VSN",
+      "ACS12",
+      "D-50"
+    ],
+    "side": "D"
   },
   "Solis": {
-    "weapons": {
-      "weapons": [
-        "P90",
-        "ITA12L",
-        "SMG-11"
-      ],
-      "side": "D"
-    },
-    "side": "N/A"
+    "weapons": [
+      "P90",
+      "ITA12L",
+      "SMG-11"
+    ],
+    "side": "D"
   },
   "Fenrir": {
-    "weapons": {
-      "weapons": [
-        "MP7",
-        "SASG-12",
-        "Bailiff 410",
-        "5.7 USG"
-      ],
-      "side": "D"
-    },
-    "side": "N/A"
+    "weapons": [
+      "MP7",
+      "SASG-12",
+      "Bailiff 410",
+      "5.7 USG"
+    ],
+    "side": "D"
   },
   "Tuberao": {
-    "weapons": {
-      "weapons": [
-        "MPX",
-        "AR-15.50",
-        "P226 MK 25"
-      ],
-      "side": "D"
-    },
-    "side": "N/A"
+    "weapons": [
+      "MPX",
+      "AR-15.50",
+      "P226 MK 25"
+    ],
+    "side": "D"
   }
 }
