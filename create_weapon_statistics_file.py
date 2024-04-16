@@ -543,7 +543,13 @@ class Weapon:
 		else:
 			return usefulness[0], int(usefulness[1] + 0.5), self.getStyleABF()
 	def getOperators(self):
-		return CellRichText(*(op.getName() for op in self.operators))
+		elements = [op.getName() for op in self.operators]
+		n = 1
+		i = n
+		while i < len(elements):
+			elements.insert(i, ', ')
+			i += (n+1)
+		return CellRichText(*elements)
 
 	# excel styles
 	def getDamageStyle(self, index : int):
@@ -686,16 +692,18 @@ class Operator:
 	def getName(self):
 		return self._rich_text
 
+
 def deserialize_json(file_name : str):
-	with open(file_name, "r") as file:
+	with open(file_name, "r", encoding='utf-8') as file:
 		try:
 			content = json.load(file)
 		except json.JSONDecodeError:
 			raise Exception(f"The json deserialization of file '{file_name}' failed.")
 	return content
 
-def get_operators(weapons : list[Weapon], file_name : str) -> None:
+def get_operators_list(weapons : list[Weapon], file_name : str) -> None:
 	json_content = deserialize_json(file_name)
+
 	if type(json_content) != dict:
 		raise Exception(f"File '{file_name}' doesn't deserialize to a dict of operators and weapons lists.")
 
@@ -708,7 +716,7 @@ def get_operators(weapons : list[Weapon], file_name : str) -> None:
 		
 	return
 
-def get_weapons_dict() -> list[Weapon]:
+def get_weapons_list() -> list[Weapon]:
 	attachment_categories = deserialize_json(attachment_overview_file_name)
 	Weapon.extended_barrel_damage_multiplier = 1.0 + attachment_categories["Barrels"]["Extended barrel"]["damage bonus"]
 	Weapon.laser_ads_speed_multiplier = 1.0 + attachment_categories["Under Barrel"]["Laser"]["ads speed bonus"]
@@ -727,7 +735,7 @@ def get_weapons_dict() -> list[Weapon]:
 		weapons.append(Weapon(deserialize_json(file_path)))
 		
 	# get all operator weapons
-	get_operators(weapons, operators_file_name)
+	get_operators_list(weapons, operators_file_name)
 	
 	weapons = sorted(weapons, key=lambda weapon: weapon_classes.index(weapon.class_), reverse=False)
 
@@ -884,6 +892,17 @@ def add_secondary_weapon_stats_header(worksheet : typing.Any, row : int, col : i
 	c.value = "Full reload"
 	c.alignment = Weapon.alignment
 	worksheet.column_dimensions[get_column_letter(col)].width = 7
+	
+	col += 1
+	worksheet.column_dimensions[get_column_letter(col)].width = 3
+	
+	col += 1
+	c = worksheet.cell(row=row, column=col)
+	c.value = "Operators"
+	al = copy.copy(Weapon.alignment)
+	al.horizontal = "left"
+	c.alignment = al
+	worksheet.column_dimensions[get_column_letter(col)].width = 45
 
 def add_secondary_weapon_stats(worksheet : typing.Any, weapon : Weapon, row : int, col : int):
 	c = worksheet.cell(row=row, column=col)
@@ -913,8 +932,6 @@ def add_secondary_weapon_stats(worksheet : typing.Any, weapon : Weapon, row : in
 	c = worksheet.cell(row=row, column=col)
 	c.value, c.style = weapon.getADSTimeWithLaser()
 
-	weapon.has_grip
-
 	col += 2
 	# c1 = worksheet.cell(row=row, column=col)
 	col += 1
@@ -929,13 +946,9 @@ def add_secondary_weapon_stats(worksheet : typing.Any, weapon : Weapon, row : in
 	# c1.value, c2.value, c1.style = weapon.getReloadTimesWithAngledGrip()
 	# c2.style = c1.style
 	
-	rich_string1 = CellRichText('This is a test ', TextBlock(InlineFont(b=True), 'xxx'), 'yyy')
-
 	col += 2
 	c1 = worksheet.cell(row=row, column=col)
-	c1.value = rich_string1 #weapon.getOperators()
-	#c1 = rich_string1 #weapon.getOperators()
-	#worksheet["A1"] = rich_string1 #weapon.getOperators()
+	c1.value = weapon.getOperators()
 
 	return
 
@@ -1282,7 +1295,7 @@ def save_to_output_files(weapons : list[Weapon]):
 	return
 
 
-weapons = get_weapons_dict()
+weapons = get_weapons_list()
 save_to_output_files(weapons)
 
 input("\nCompleted!")
