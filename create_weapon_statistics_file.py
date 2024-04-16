@@ -5,7 +5,7 @@
 ###################################################
 
 # the file containing the weapons each operator has access to
-operator_weapons_file_name = "operator_weapons.json"
+operators_file_name = "operators.json"
 
 # the file containing the attachment overview
 attachment_overview_file_name = "attachment_overview.json"
@@ -54,8 +54,8 @@ from openpyxl.formatting.rule import ColorScaleRule
 from openpyxl.utils import get_column_letter
 
 # check if the settings are correct
-if not os.path.isfile(operator_weapons_file_name):
-	raise Exception(f"'{operator_weapons_file_name}' is not a valid file path.")
+if not os.path.isfile(operators_file_name):
+	raise Exception(f"'{operators_file_name}' is not a valid file path.")
 
 if not os.path.isdir(weapon_data_dir):
 	raise Exception(f"'{weapon_data_dir}' is not a valid directory.")
@@ -652,7 +652,7 @@ def deserialize_json(file_name : str):
 			raise Exception(f"The json deserialization of file '{file_name}' failed.")
 	return content
 
-def get_operator_weapons(weapons : list[Weapon], file_name : str) -> None:
+def get_operators(weapons : list[Weapon], file_name : str) -> None:
 	json_content = deserialize_json(file_name)
 	if type(json_content) != dict:
 		raise Exception(f"File '{file_name}' doesn't deserialize to a dict of operators and weapons lists.")
@@ -711,7 +711,7 @@ def get_weapons_dict() -> list[Weapon]:
 		weapons.append(Weapon(deserialize_json(file_path)))
 		
 	# get all operator weapons
-	get_operator_weapons(weapons, operator_weapons_file_name)
+	get_operators(weapons, operators_file_name)
 	
 	weapons = sorted(weapons, key=lambda weapon: weapon_classes.index(weapon.class_), reverse=False)
 
