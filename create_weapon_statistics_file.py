@@ -28,7 +28,8 @@ last_distance = 40
 weapon_classes = ("AR", "SMG", "MP", "LMG", "DMR", "SR", "SG", "Slug SG", "Handgun", "Revolver", "Hand Canon")
 
 # weapon type background colors
-background_colors = {"AR":"5083EA", "SMG":"B6668E", "MP":"76A5AE", "LMG":"8771BD", "DMR":"7CB563", "SR":"DE2A00", "SG":"FFBC01", "Slug SG":"A64E06", "Handgun":"A3A3A3", "Revolver":"F48020", "Hand Canon":"FFFFFF"}
+background_colors = {"AR":"5083EA", "SMG":"B6668E", "MP":"76A5AE", "LMG":"8771BD", "DMR":"7CB563", "SR":"DE2A00",
+					 "SG":"FFBC01", "Slug SG":"A64E06", "Handgun":"A3A3A3", "Revolver":"F48020", "Hand Canon":"948A54"}
 
 
 ###################################################
@@ -130,8 +131,8 @@ class Weapon:
 	default_reload_times = (0., 0.)
 	default_capacity = (0, 0)
 	default_extra_ammo = 0
-	default_extended_barrel = False
-	default_grip = False
+	default_has_extended_barrel = False
+	default_has_grip = False
 	default_has_laser = False
 
 	extended_barrel_weapon_name = "+ extended barrel"
@@ -141,45 +142,168 @@ class Weapon:
 	
 	tdok_hps = (100, 110, 125, 120, 130, 145)
 
-	lowest_highest_dps : dict[str, tuple[int, int]] = {}	# type : (lowest dps, highest dps)
-	lowest_highest_ttdok : dict[int, dict[str, tuple[int, int]]] = {}	# hp : {type : (lowest ttdok, highest ttdok)}
+	lowest_highest_dps : dict[str, tuple[int, int]] = {}	# class : (lowest dps, highest dps)
+	lowest_highest_ttdok : dict[int, dict[str, tuple[int, int]]] = {}	# hp : {class : (lowest ttdok, highest ttdok)}
 	
-	DPSColorScaleRule : dict[str, typing.Any] = {}	# type : ColorScaleRule
-	TTDOKColorScaleRules : dict[int, dict[str, typing.Any]] = {}	# hp : {type : ColorScaleRule}
+	DPSColorScaleRule : dict[str, typing.Any] = {}	# class : ColorScaleRule
+	TTDOKColorScaleRules : dict[int, dict[str, typing.Any]] = {}	# hp : {class : ColorScaleRule}
 
 	def __init__(self, json_content_):
 		self.json_content =  json_content_
 
 		self.operators : list[Operator] = []
-		
-		self._name = None
-		self._damages = None
-		self._class = None	# type string
-		self._rpm = None	# rounds per minute
-		self._reload_times = None	# time in seconds
-		self._ads = None	# time in seconds
-		self._pellets = None	# number of pellets
-		self._capacity = None	# (magazine, chamber)
-		self._extra_ammo = None	# extra ammo
-		self._grip = None	# whether the weapon has access to a grip attachment
-		self._has_laser = None	# whether the weapon has access to a laser attachment
-		
-		self._has_extended_barrel = None # whether the weapon has an extended barrel attachment
-		self.extended_barrel_weapon : Weapon = None	# the extended barrel version of this weapon
-		self.is_extended_barrel = False	# whether this is an extended barrel version
-		self.extended_barrel_parent : None | Weapon = None	# the base weapon object if this is an extended barrel version
-		
 		self.DmgPerShotColorScaleRule = None
 
 		if type(self.json_content) != dict:
 			raise Exception(f"Weapon '{self.name}' doesn't deserialize to a dict.")
 		
-		DPS = tuple([int(self.dps(i) + 0.5) for i in range(len(Weapon.distances))])
+		# get weapon name
+		if "name" not in self.json_content:
+			raise Exception(f"Weapon is missing its name.")
+		if type(self.json_content["name"]) != str:
+			raise Exception(f"Weapon has a name that doesn't deserialize to a string.")
+		self.name = self.json_content["name"]
+		
+		# get weapon class
+		if "class" not in self.json_content:
+			raise Exception(f"Weapon '{self.name}' is missing a type.")
+		if type(self.json_content["class"]) != str:
+			raise Exception(f"Weapon '{self.name}' has a type that doesn't deserialize to a string.")
+		if self.json_content["class"] not in self.classes:
+			raise Exception(f"Weapon '{self.name}' has an invalid type.")
+		self.class_ = self.json_content["class"]
+
+		# get weapon fire rate
+		if "rpm" in self.json_content:
+			if type(self.json_content["rpm"]) != int:
+				raise Exception(f"Weapon '{self.name}' has a fire rate that doesn't deserialize to an int.")
+			self.rpm = self.json_content["rpm"]
+		else:
+			print(f"{warning('Warning:')} Weapon '{warning(self.name)}' is missing a {warning('fire rate')}. Using default value ({self.default_rpm}) instead.")
+			self.rpm = self.default_rpm
+
+		# get weapon ads time
+		if "ads" in self.json_content:
+			if type(self.json_content["ads"]) != float:
+				raise Exception(f"Weapon '{self.name}' has an ads time that doesn't deserialize to a float.")
+			self.ads_time = self.json_content["ads"]
+		else:
+			print(f"{warning('Warning:')} Weapon '{warning(self.name)}' is missing an {warning('ads time')}. Using default value ({self.default_ads}) instead.")
+			self.ads_time = self.default_ads
+
+		# get weapon pellet count
+		if "pellets" in self.json_content:
+			if type(self.json_content["pellets"]) != int:
+				raise Exception(f"Weapon '{self.name}' has a pellet count that doesn't deserialize to an integer.")
+			self.pellets = self.json_content["pellets"]
+		else:
+			print(f"{warning('Warning:')} Weapon '{warning(self.name)}' is missing a {warning('pellet count')}. Using default value ({self.default_pellets}) instead.")
+			self.pellets = self.default_pellets
+
+		# get weapon magazine capacity (magazine, chamber)
+		if "capacity" in self.json_content:
+			if type(self.json_content["capacity"]) != list:
+				raise Exception(f"Weapon '{self.name}' has a magazine capacity that doesn't deserialize to a list.")
+			if len(self.json_content["capacity"]) != 2:
+				raise Exception(f"Weapon '{self.name}' doesn't have exactly 2 magazine capacity values.")
+			if type(self.json_content["capacity"][0]) != int or type(self.json_content["capacity"][1]) != int:
+				raise Exception(f"Weapon '{self.name}' has magazine capacities that don't deserialize to integers.")
+			self.capacity = (self.json_content["capacity"][0], self.json_content["capacity"][1])
+		else:
+			print(f"{warning('Warning:')} Weapon '{warning(self.name)}' is missing the {warning('magazine capacity')}. Using default value ({self.default_capacity}) instead.")
+			self.capacity = self.default_capacity
+
+		# get extra ammo
+		if "extra_ammo" in self.json_content:
+			if type(self.json_content["extra_ammo"]) != int:
+				raise Exception(f"Weapon '{self.name}' has an extra ammo value that doesn't deserialize to an integer.")
+			self.extra_ammo = self.json_content["extra_ammo"]
+		else:
+			print(f"{warning('Warning:')} Weapon '{warning(self.name)}' is missing an {warning('extra ammo value')}. Using default value ({self.default_extra_ammo}) instead.")
+			self.extra_ammo = self.default_extra_ammo
+
+		# get weapon damages
+		if "damages" not in self.json_content:
+			raise Exception(f"Weapon '{self.name}' is missing damage values.")
+		if type(self.json_content["damages"]) != dict:
+			raise Exception(f"Weapon '{self.name}' has damage values that don't deserialize to a dict.")
+		if not all(isinstance(damage, int) for damage in self.json_content["damages"].values()):
+			raise Exception(f"Weapon '{self.name}' has damage values that don't deserialize to integers.")
+		distance_damage_dict = {int(distance) : int(damage) for distance, damage in self.json_content["damages"].items()}
+		self.damages = self.validate_damages(distance_damage_dict)
+
+		# get weapon extended barrel
+		potential_eb = copy.copy(self)
+		self.is_extended_barrel = False	# whether this is an extended barrel version
+		if "extended_barrel" in self.json_content:
+			if type(self.json_content["extended_barrel"]) == bool:	# use default damage multiplier for extended barrel
+				self.has_extended_barrel = self.json_content["extended_barrel"]
+				if self.has_extended_barrel == True:
+					potential_eb.damages = tuple(math.ceil(dmg * self.extended_barrel_damage_multiplier) for dmg in self.damages)
+			elif type(self.json_content["extended_barrel"]) == dict:	# use custom damages for extended barrel
+				if not all(isinstance(damage, int) for damage in self.json_content["extended_barrel"].values()):
+					raise Exception(f"Weapon '{self.name}' has damage values that don't deserialize to integers.")
+				self.has_extended_barrel = True
+				potential_eb.damages = self.validate_damages({int(distance) : int(damage) for distance, damage in self.json_content["extended_barrel"].items()})
+			else:
+				raise Exception(f"Weapon '{self.name}' has an extended barrel value that doesn't deserialize to a bool or a dict.")
+		else:
+			print(f"{warning('Warning:')} Weapon '{warning(self.name)}' is missing an {warning('extended barrel')} value. Using default value ({self.default_has_extended_barrel}) instead.")
+			self.has_extended_barrel = Weapon.default_has_extended_barrel
+				
+		if self.has_extended_barrel == True:
+			potential_eb.json_content = None
+			potential_eb.name = Weapon.extended_barrel_weapon_name
+
+			potential_eb.has_extended_barrel = False
+			potential_eb.extended_barrel_weapon = None
+			potential_eb.is_extended_barrel = True
+			potential_eb.extended_barrel_parent = self
+		
+			potential_eb.DmgPerShotColorScaleRule = None
+				
+			self.extended_barrel_weapon = potential_eb
+
+		# get laser
+		if "laser" in self.json_content:
+			if type(self.json_content["laser"]) != bool:
+				raise Exception(f"Weapon '{self.name}' has a laser value that doesn't deserialize to a bool.")
+			self.has_laser = self.json_content["laser"]
+		else:
+			print(f"{warning('Warning:')} Weapon '{warning(self.name)}' is missing a {warning('laser')} value. Using default value ({self.default_has_laser}) instead.")
+			self.has_laser = self.default_has_laser
+
+		# get weapon grip
+		if "grip" in self.json_content:
+			if type(self.json_content["grip"]) != bool:
+				raise Exception(f"Weapon '{self.name}' has a grip value that doesn't deserialize to a bool.")
+			self.has_grip = self.json_content["grip"]
+		else:
+			print(f"{warning('Warning:')} Weapon '{warning(self.name)}' is missing a {warning('grip')} value. Using default value ({self.default_has_grip}) instead.")
+			self.has_grip = self.default_has_grip
+
+		# get weapon reload times in seconds
+		# if "reload_times" in self.json_content:
+		# 	if type(self.json_content["reload_times"]) != list:
+		# 		raise Exception(f"Weapon '{self.name}' has reload times that don't deserialize to a list.")
+		# 	if len(self.json_content["reload_times"]) != 2:
+		# 		raise Exception(f"Weapon '{self.name}' doesn't have exactly 2 reload times.")
+		# 	if type(self.json_content["reload_times"][0]) != float or type(self.json_content["reload_times"][1]) != float:
+		# 		raise Exception(f"Weapon '{self.name}' has reload times that don't deserialize to floats.")
+		# 	self.reload_times = (self.json_content["reload_times"][0], self.json_content["reload_times"][1])
+		# else:
+		# 	print(f"{warning('Warning:')} Weapon '{warning(self.name)}' is missing the {warning('reload times')}. Using default value ({self.default_reload_times}) instead.")
+		# 	self.reload_times = self.default_reload_times
+				
+
+		# adjust Weapon.lowest_highest_dps
+		DPS = tuple(int(self.dps(i) + 0.5) for i in range(len(Weapon.distances)))
 		if self.class_ not in Weapon.lowest_highest_dps:
 			Weapon.lowest_highest_dps[self.class_] = min(DPS), max(DPS)
 		else:
 			Weapon.lowest_highest_dps[self.class_] = min(Weapon.lowest_highest_dps[self.class_][0], min(DPS)), max(Weapon.lowest_highest_dps[self.class_][1], max(DPS))
 
+		# adjust Weapon.lowest_highest_ttdok
 		for hp in self.tdok_hps:
 			if hp not in Weapon.lowest_highest_ttdok:
 				Weapon.lowest_highest_ttdok[hp] = {}
@@ -232,6 +356,9 @@ class Weapon:
 
 		# get index to first non-zero damage
 		first_nonzero_index = next((i for i, damage in enumerate(damages) if damage != 0), -1)
+		
+		if first_nonzero_index > 5:
+			raise Exception(f"First non-zero damage value for weapon '{self.name}' is at {Weapon.distances[first_nonzero_index]}m. Should be at 5m or less.")
 
 		# extrapolate first 5 meters. damages will be continuous in [0;4]
 		if first_nonzero_index == 0:
@@ -254,197 +381,6 @@ class Weapon:
 
 		# return the damage stats
 		return tuple(damages)
-
-	# primary properties
-	@property
-	def name(self) -> str:
-		if self._name == None:
-			# get weapon name
-			if "name" not in self.json_content:
-				raise Exception(f"Weapon is missing its name.")
-			if type(self.json_content["name"]) != str:
-				raise Exception(f"Weapon has a name that doesn't deserialize to a string.")
-			self._name = self.json_content["name"]
-		
-		return self._name
-	@property
-	def class_(self) -> str:
-		if self._class == None:
-			# get weapon type
-			if "class" not in self.json_content:
-				raise Exception(f"Weapon '{self.name}' is missing a type.")
-			if type(self.json_content["class"]) != str:
-				raise Exception(f"Weapon '{self.name}' has a type that doesn't deserialize to a string.")
-			if self.json_content["class"] not in self.classes:
-				raise Exception(f"Weapon '{self.name}' has an invalid type.")
-			self._class = self.json_content["class"]
-		return self._class
-	@property
-	def rpm(self) -> int:
-		if self._rpm == None:
-			# get weapon fire rate
-			if "rpm" in self.json_content:
-				if type(self.json_content["rpm"]) != int:
-					raise Exception(f"Weapon '{self.name}' has a fire rate that doesn't deserialize to an int.")
-				self._rpm = self.json_content["rpm"]
-			else:
-				print(f"{warning('Warning:')} Weapon '{warning(self.name)}' is missing a {warning('fire rate')}. Using default value ({self.default_rpm}) instead.")
-				self._rpm = self.default_rpm
-				
-		return self._rpm
-	@property
-	def ads_time(self) -> float:
-		if self._ads == None:
-			# get weapon ads time
-			if "ads" in self.json_content:
-				if type(self.json_content["ads"]) != float:
-					raise Exception(f"Weapon '{self.name}' has an ads time that doesn't deserialize to a float.")
-				self._ads = self.json_content["ads"]
-			else:
-				print(f"{warning('Warning:')} Weapon '{warning(self.name)}' is missing an {warning('ads time')}. Using default value ({self.default_ads}) instead.")
-				self._ads = self.default_ads
-			
-		return self._ads
-	@property
-	def pellets(self) -> int:
-		if self._pellets == None:
-			# get weapon pellet count
-			if "pellets" in self.json_content:
-				if type(self.json_content["pellets"]) != int:
-					raise Exception(f"Weapon '{self.name}' has a pellet count that doesn't deserialize to an integer.")
-				self._pellets = self.json_content["pellets"]
-			else:
-				print(f"{warning('Warning:')} Weapon '{warning(self.name)}' is missing a {warning('pellet count')}. Using default value ({self.default_pellets}) instead.")
-				self._pellets = self.default_pellets
-				
-		return self._pellets
-	@property
-	def reload_times(self) -> tuple[float, float]:
-		if self._reload_times == None:
-			# get weapon reload times
-			if "reload_times" in self.json_content:
-				if type(self.json_content["reload_times"]) != list:
-					raise Exception(f"Weapon '{self.name}' has reload times that don't deserialize to a list.")
-				if len(self.json_content["reload_times"]) != 2:
-					raise Exception(f"Weapon '{self.name}' doesn't have exactly 2 reload times.")
-				if type(self.json_content["reload_times"][0]) != float or type(self.json_content["reload_times"][1]) != float:
-					raise Exception(f"Weapon '{self.name}' has reload times that don't deserialize to floats.")
-				self._reload_times = (self.json_content["reload_times"][0], self.json_content["reload_times"][1])
-			else:
-				print(f"{warning('Warning:')} Weapon '{warning(self.name)}' is missing the {warning('reload times')}. Using default value ({self.default_reload_times}) instead.")
-				self._reload_times = self.default_reload_times
-				
-		return self._reload_times
-	@property
-	def capacity(self) -> tuple[int, int]:
-		if self._capacity == None:
-			# get weapon magazine capacity
-			if "capacity" in self.json_content:
-				if type(self.json_content["capacity"]) != list:
-					raise Exception(f"Weapon '{self.name}' has a magazine capacity that doesn't deserialize to a list.")
-				if len(self.json_content["capacity"]) != 2:
-					raise Exception(f"Weapon '{self.name}' doesn't have exactly 2 magazine capacity values.")
-				if type(self.json_content["capacity"][0]) != int or type(self.json_content["capacity"][1]) != int:
-					raise Exception(f"Weapon '{self.name}' has magazine capacities that don't deserialize to integers.")
-				self._capacity = (self.json_content["capacity"][0], self.json_content["capacity"][1])
-			else:
-				print(f"{warning('Warning:')} Weapon '{warning(self.name)}' is missing the {warning('magazine capacity')}. Using default value ({self.default_capacity}) instead.")
-				self._capacity = self.default_capacity
-				
-		return self._capacity
-	@property
-	def extra_ammo(self) -> int:
-		if self._extra_ammo == None:
-			# get extra ammo
-			if "extra_ammo" in self.json_content:
-				if type(self.json_content["extra_ammo"]) != int:
-					raise Exception(f"Weapon '{self.name}' has an extra ammo value that doesn't deserialize to an integer.")
-				self._extra_ammo = self.json_content["extra_ammo"]
-			else:
-				print(f"{warning('Warning:')} Weapon '{warning(self.name)}' is missing an {warning('extra ammo value')}. Using default value ({self.default_extra_ammo}) instead.")
-				self._extra_ammo = self.default_extra_ammo
-				
-		return self._extra_ammo
-	@property
-	def damages(self) -> tuple[int,...]:
-		if self._damages == None:
-			# get weapon damages
-			if "damages" not in self.json_content:
-				raise Exception(f"Weapon '{self.name}' is missing damage values.")
-			if type(self.json_content["damages"]) != dict:
-				raise Exception(f"Weapon '{self.name}' has damage values that don't deserialize to a dict.")
-			if not all(isinstance(damage, int) for damage in self.json_content["damages"].values()):
-				raise Exception(f"Weapon '{self.name}' has damage values that don't deserialize to integers.")
-			distance_damage_dict = {int(distance) : int(damage) for distance, damage in self.json_content["damages"].items()}
-			
-			self._damages = self.validate_damages(distance_damage_dict)
-
-		return self._damages
-	@property
-	def has_extended_barrel(self) -> bool:
-		if self._has_extended_barrel == None:
-			potential_eb = copy.copy(self)
-
-			# get weapon extended barrel
-			if "extended_barrel" in self.json_content:
-				if type(self.json_content["extended_barrel"]) == bool:	# use default damage multiplier for extended barrel
-					self._has_extended_barrel = self.json_content["extended_barrel"]
-					if self._has_extended_barrel == True:
-						potential_eb._damages = tuple(math.ceil(dmg * self.extended_barrel_damage_multiplier) for dmg in self.damages)
-					
-				elif type(self.json_content["extended_barrel"]) == dict:	# use custom damages for extended barrel
-					if not all(isinstance(damage, int) for damage in self.json_content["extended_barrel"].values()):
-						raise Exception(f"Weapon '{self.name}' has damage values that don't deserialize to integers.")
-					distance_damage_dict = {int(distance) : int(damage) for distance, damage in self.json_content["extended_barrel"].items()}
-					potential_eb._damages = self.validate_damages(distance_damage_dict)
-					self._has_extended_barrel = True
-				else:
-					raise Exception(f"Weapon '{self.name}' has an extended barrel value that doesn't deserialize to a bool or a dict.")
-
-			else:
-				print(f"{warning('Warning:')} Weapon '{warning(self.name)}' is missing an {warning('extended barrel')} value. Using default value ({self.default_has_extended_barrel}) instead.")
-				self._has_extended_barrel = self.default_has_extended_barrel
-				
-			if self._has_extended_barrel == True:
-				potential_eb.json_content = None
-				
-				potential_eb._name = self.extended_barrel_weapon_name
-
-				potential_eb._has_extended_barrel = False
-				potential_eb.extended_barrel_weapon = None
-				potential_eb.is_extended_barrel = True
-				potential_eb.extended_barrel_parent = self
-		
-				potential_eb.DmgPerShotColorScaleRule = None
-				
-				self.extended_barrel_weapon = potential_eb
-
-		return self._has_extended_barrel
-	@property
-	def has_laser(self) -> bool:
-		if self._has_laser == None:
-			# get laser
-			if "laser" in self.json_content:
-				if type(self.json_content["laser"]) != bool:
-					raise Exception(f"Weapon '{self.name}' has a laser value that doesn't deserialize to a bool.")
-				self._has_laser = self.json_content["laser"]
-			else:
-				print(f"{warning('Warning:')} Weapon '{warning(self.name)}' is missing a {warning('laser')} value. Using default value ({self.default_has_laser}) instead.")
-				self._has_laser = self.default_has_laser
-		return self._has_laser
-	@property
-	def has_grip(self) -> bool:
-		if self._grip == None:
-			# get weapon grip
-			if "grip" in self.json_content:
-				if type(self.json_content["grip"]) != bool:
-					raise Exception(f"Weapon '{self.name}' has a grip value that doesn't deserialize to a bool.")
-				self._grip = self.json_content["grip"]
-			else:
-				print(f"{warning('Warning:')} Weapon '{warning(self.name)}' is missing a {warning('grip')} value. Using default value ({self.default_grip}) instead.")
-				self._grip = self.default_grip
-			pass
-		return self._grip
 
 	# derived properties
 	@property
@@ -543,7 +479,7 @@ class Weapon:
 		else:
 			return usefulness[0], int(usefulness[1] + 0.5), self.getStyleABF()
 	def getOperators(self):
-		elements = [op.getName() for op in self.operators]
+		elements = [op.rich_text_name for op in self.operators]
 		n = 1
 		i = n
 		while i < len(elements):
@@ -562,7 +498,7 @@ class Weapon:
 			return self.getStyleA()
 	def getSTDOKStyle(self, index : int, hp : int):
 		# if this is the extended barrel version of a weapon
-		if self.extended_barrel_parent != None:
+		if self.is_extended_barrel:
 			# if the stdok of the extended barrel version is different from the stdok of the normal version
 			if self.stdok(index, hp) != self.extended_barrel_parent.stdok(index, hp):
 				return self.getStyleABF()
@@ -685,12 +621,9 @@ class Operator:
 		for fake_weapons_string in weapons_strings_copy:
 			print(f"{warning('Warning:')} Weapon '{warning(fake_weapons_string)}' found on operator '{self.name}' is {warning('not an actual weapon')}.")
 	
-		self._rich_text = TextBlock(InlineFont(color=Operator.defender_color if self.side else Operator.attacker_color), self.name)
+		self.rich_text_name = TextBlock(InlineFont(color=Operator.defender_color if self.side else Operator.attacker_color), self.name)
 
 		return
-
-	def getName(self):
-		return self._rich_text
 
 
 def deserialize_json(file_name : str):
@@ -817,7 +750,7 @@ def add_secondary_weapon_stats_header(worksheet : typing.Any, row : int, col : i
 	c = worksheet.cell(row=row, column=col)
 	c.value = "Class"
 	c.alignment = Weapon.alignment
-	worksheet.column_dimensions[get_column_letter(col)].width = 9
+	worksheet.column_dimensions[get_column_letter(col)].width = 11
 
 	col += 1
 	worksheet.column_dimensions[get_column_letter(col)].width = 3
@@ -826,13 +759,13 @@ def add_secondary_weapon_stats_header(worksheet : typing.Any, row : int, col : i
 	c = worksheet.cell(row=row, column=col)
 	c.value = "RPM"
 	c.alignment = Weapon.alignment
-	worksheet.column_dimensions[get_column_letter(col)].width = 5
+	worksheet.column_dimensions[get_column_letter(col)].width = 6
 
 	col += 1
 	c = worksheet.cell(row=row, column=col)
 	c.value = "Capacity"
 	c.alignment = Weapon.alignment
-	worksheet.column_dimensions[get_column_letter(col)].width = 9
+	worksheet.column_dimensions[get_column_letter(col)].width = 10
 	
 	col += 1
 	c = worksheet.cell(row=row, column=col)
@@ -844,7 +777,7 @@ def add_secondary_weapon_stats_header(worksheet : typing.Any, row : int, col : i
 	c = worksheet.cell(row=row, column=col)
 	c.value = "Pellets"
 	c.alignment = Weapon.alignment
-	worksheet.column_dimensions[get_column_letter(col)].width = 7
+	worksheet.column_dimensions[get_column_letter(col)].width = 8
 	
 	col += 1
 	worksheet.column_dimensions[get_column_letter(col)].width = 3
@@ -859,7 +792,7 @@ def add_secondary_weapon_stats_header(worksheet : typing.Any, row : int, col : i
 	c = worksheet.cell(row=row, column=col)
 	c.value = "+ Laser"
 	c.alignment = Weapon.alignment
-	worksheet.column_dimensions[get_column_letter(col)].width = 8
+	worksheet.column_dimensions[get_column_letter(col)].width = 9
 
 	col += 1
 	worksheet.column_dimensions[get_column_letter(col)].width = 3
@@ -902,7 +835,7 @@ def add_secondary_weapon_stats_header(worksheet : typing.Any, row : int, col : i
 	al = copy.copy(Weapon.alignment)
 	al.horizontal = "left"
 	c.alignment = al
-	worksheet.column_dimensions[get_column_letter(col)].width = 45
+	worksheet.column_dimensions[get_column_letter(col)].width = 41
 
 def add_secondary_weapon_stats(worksheet : typing.Any, weapon : Weapon, row : int, col : int):
 	c = worksheet.cell(row=row, column=col)

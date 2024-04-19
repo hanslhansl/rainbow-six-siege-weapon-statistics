@@ -161,8 +161,7 @@
       "417",
       "SG-CQB",
       "LFP586",
-      "P9",
-      "GONNE-6"
+      "P9"
     ],
     "side": "A"
   },
@@ -172,8 +171,7 @@
       "6P41",
       "SASG-12",
       "PMM",
-      "GSH-18",
-      "GONNE-6"
+      "GSH-18"
     ],
     "side": "A"
   },
@@ -199,8 +197,7 @@
       "F90",
       "M249 SAW",
       "SUPER SHORTY",
-      "SDP 9mm",
-      "GONNE-6"
+      "SDP 9mm"
     ],
     "side": "A"
   },
@@ -236,7 +233,8 @@
     "weapons": [
       "ARX200",
       "G36C",
-      "MK1 9mm"
+      "MK1 9mm",
+      "GONNE-6"
     ],
     "side": "A"
   },
@@ -277,8 +275,7 @@
     "weapons": [
       "POF-9",
       "417",
-      "SDP 9mm",
-      "GONNE-6"
+      "SDP 9mm"
     ],
     "side": "A"
   },
