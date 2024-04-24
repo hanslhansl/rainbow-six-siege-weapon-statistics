@@ -48,7 +48,7 @@ def show_exception_and_exit(exc_type, exc_value, tb):
 sys.excepthook = show_exception_and_exit
 
 #imports
-import os, numpy, json, typing, math, ctypes, copy
+import os, numpy, json, typing, math, ctypes, copy, lxml
 from openpyxl.cell.text import InlineFont
 from openpyxl.cell.rich_text import TextBlock, CellRichText
 from openpyxl import Workbook
@@ -716,20 +716,30 @@ def add_worksheet_header(workbook : typing.Any, worksheet_name : str, stat_name 
 	c.font = Font(bold=True)
 
 	row += 1
-	worksheet.merge_cells(start_row=row, end_row=row, start_column=2, end_column=1 + cols_inbetween)
+	worksheet.merge_cells(start_row=row, end_row=row, start_column=2, end_column=6)
 	c = worksheet.cell(row=row, column=2)
-	c.value = '=HYPERLINK("https://github.com/hanslhansl/Rainbow-Six-Siege-Weapon-Statistics/", "A detailed explanation can be found here")'
+	c.value = '=HYPERLINK("https://github.com/hanslhansl/Rainbow-Six-Siege-Weapon-Statistics/", "Detailed explanation")'
 	c.font = Font(color = "FF0000FF")
 	
+	worksheet.merge_cells(start_row=row, end_row=row, start_column=8, end_column=14)
+	c = worksheet.cell(row=row, column=8)
+	c.value = '=HYPERLINK("https://docs.google.com/spreadsheets/d/1QgbGALNZGLlvf6YyPLtywZnvgIHkstCwGl1tvCt875Q", "Spreadsheet on Google Sheets")'
+	c.font = Font(color = "FF0000FF")
+	
+	worksheet.merge_cells(start_row=row, end_row=row, start_column=16, end_column=1 + cols_inbetween)
+	c = worksheet.cell(row=row, column=16)
+	c.value = '=HYPERLINK("https://docs.google.com/spreadsheets/d/e/2PACX-1vQ1KitQsZksdVP9YPDInxK3xE2gtu1mpUxV5_PNyE8sSm-vFINdbiL8vo9RA2CRSIbIUePLVA1GCTWZ/pubhtml", "Spreadsheet on Google Drive")'
+	c.font = Font(color = "FF0000FF")
+
 	row += 2
 	worksheet.merge_cells(start_row=row, end_row=row, start_column=2, end_column=1 + cols_inbetween)
 	c = worksheet.cell(row=row, column=2)
 	if type(stat_link) == str:
 		c.value = f'=HYPERLINK("https://github.com/hanslhansl/Rainbow-Six-Siege-Weapon-Statistics/#{stat_link}", "{stat_name}")'
-		c.font = Font(color = "FF0000FF")
+		c.font = Font(color = "FF0000FF", bold=True)
 	else:
 		c.value = stat_name
-	c.font = Font(bold=True)
+		c.font = Font(bold=True)
 	
 	if type(description) == str:
 		description = (description, )
