@@ -1,4 +1,13 @@
 {
+  "Striker": {
+    "weapons": [
+      "M4",
+      "M249",
+      "5.7 USG",
+      "ITA12S"
+    ],
+    "side": "A"
+  },
   "Sledge": {
     "weapons": [
       "M590A1",
@@ -88,8 +97,7 @@
       "C8-SFW",
       "CAMRS",
       "SKELETON KEY",
-      "MK1 9mm",
-      "GONNE-6"
+      "MK1 9mm"
     ],
     "side": "A"
   },
@@ -313,6 +321,15 @@
       ".44 Vendetta"
     ],
     "side": "A"
+  },
+  "Sentry": {
+    "weapons": [
+      "COMMANDO 9",
+      "M870",
+      "C75 Auto",
+      "SUPER SHORTY"
+    ],
+    "side": "D"
   },
   "Smoke": {
     "weapons": [
@@ -557,7 +574,8 @@
     "weapons": [
       "MP5",
       "SUPER 90",
-      "RG15"
+      "RG15",
+      "ITA12S"
     ],
     "side": "D"
   },
