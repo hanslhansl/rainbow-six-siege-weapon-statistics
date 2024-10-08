@@ -50,7 +50,7 @@
   },
   "extended_barrel": false,
   "extra_ammo": 160,
-  "grip": false,
+  "grip": true,
   "laser": true,
   "name": "AK-74M",
   "pellets": 1,
