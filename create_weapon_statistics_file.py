@@ -674,42 +674,11 @@ def get_weapons_list() -> list[Weapon]:
 
 	return weapons
 
-def add_weapon_to_worksheet(worksheet : typing.Any, weapon : Weapon, sub_name : None | str, stat_method : typing.Any, format_method : typing.Any,
-							additional_param : None | typing.Any, row : int, cond_formats : dict[typing.Any, str]):
-	if sub_name != None:
-		c = worksheet.cell(row=row, column=1)
-		c.value = sub_name
-	
-	if additional_param == None:
-		for col in range(2, len(Weapon.distances) + 2):
-			c = worksheet.cell(row=row, column=col)
-			c.value, c.style = stat_method(weapon, col - 2)
-		if format_method != None:
-			cond_format = format_method(weapon)
-			if cond_format in cond_formats:
-				cond_formats[cond_format] += f" {get_column_letter(2)}{row}:{get_column_letter(len(Weapon.distances)+2)}{row}"
-			else:
-				cond_formats[cond_format] = f"{get_column_letter(2)}{row}:{get_column_letter(len(Weapon.distances)+2)}{row}"
-		
-	else:
-		for col in range(2, len(Weapon.distances) + 2):
-			c = worksheet.cell(row=row, column=col)
-			c.value, c.style = stat_method(weapon, col - 2, additional_param)
-		if format_method != None:
-			cond_format = format_method(weapon, additional_param)
-			if cond_format in cond_formats:
-				cond_formats[cond_format] += f" {get_column_letter(2)}{row}:{get_column_letter(len(Weapon.distances)+2)}{row}"
-			else:
-				cond_formats[cond_format] = f"{get_column_letter(2)}{row}:{get_column_letter(len(Weapon.distances)+2)}{row}"
-		
-	return
 
-def add_worksheet_header(workbook : typing.Any, worksheet_name : str, stat_name : str, stat_link : str | None, description : str | tuple[str,...], cols_inbetween : int):
-	worksheet = workbook.create_sheet(worksheet_name)
+def add_worksheet_header(worksheet : typing.Any, stat_name : str, stat_link : str | None, description : str | tuple[str,...], row : int, cols_inbetween : int):
 	
-	worksheet.column_dimensions[get_column_letter(1)].width = 20.5
+	worksheet.column_dimensions[get_column_letter(1)].width = 22
 	
-	row = 1
 	worksheet.merge_cells(start_row=row, end_row=row, start_column=2, end_column=1 + cols_inbetween)
 	c = worksheet.cell(row=row, column=2)
 	c.value = "created by hanslhansl"
@@ -749,18 +718,63 @@ def add_worksheet_header(workbook : typing.Any, worksheet_name : str, stat_name 
 		c = worksheet.cell(row=row, column=2)
 		c.value = desc
 	
-	row += 1
+	return row
 
-	return worksheet, row
+
+def add_weapon_to_worksheet(worksheet : typing.Any, weapon : Weapon, sub_name : None | str, stat_method : typing.Any, format_method : typing.Any,
+							additional_param : None | typing.Any, row : int, cond_formats : dict[typing.Any, str]):
+	if sub_name != None:
+		c = worksheet.cell(row=row, column=1)
+		c.value = sub_name
+	
+	if additional_param == None:
+		for col in range(2, len(Weapon.distances) + 2):
+			c = worksheet.cell(row=row, column=col)
+			c.value, c.style = stat_method(weapon, col - 2)
+		if format_method != None:
+			cond_format = format_method(weapon)
+			if cond_format in cond_formats:
+				cond_formats[cond_format] += f" {get_column_letter(2)}{row}:{get_column_letter(len(Weapon.distances)+2)}{row}"
+			else:
+				cond_formats[cond_format] = f"{get_column_letter(2)}{row}:{get_column_letter(len(Weapon.distances)+2)}{row}"
+		
+	else:
+		for col in range(2, len(Weapon.distances) + 2):
+			c = worksheet.cell(row=row, column=col)
+			c.value, c.style = stat_method(weapon, col - 2, additional_param)
+		if format_method != None:
+			cond_format = format_method(weapon, additional_param)
+			if cond_format in cond_formats:
+				cond_formats[cond_format] += f" {get_column_letter(2)}{row}:{get_column_letter(len(Weapon.distances)+2)}{row}"
+			else:
+				cond_formats[cond_format] = f"{get_column_letter(2)}{row}:{get_column_letter(len(Weapon.distances)+2)}{row}"
+		
+	return
 
 def add_secondary_weapon_stats_header(worksheet : typing.Any, row : int, col : int):
+	
+	worksheet.freeze_panes = worksheet.cell(row=row+1, column=2)
+
+	c = worksheet.cell(row=row, column=col)
+	c.value = "Distance"
+	al = copy.copy(Weapon.alignment)
+	al.horizontal = "left"
+	c.alignment = al
+
+	for col in range(2, len(Weapon.distances) + 2):
+		c = worksheet.cell(row=row, column=col)
+		c.value = Weapon.distances[col - 2]
+		c.alignment = Weapon.alignment
+		worksheet.column_dimensions[get_column_letter(col)].width = 4.8
+		
+	col += 1
 	worksheet.column_dimensions[get_column_letter(col)].width = 3
 
 	col += 1
 	c = worksheet.cell(row=row, column=col)
 	c.value = "Class"
 	c.alignment = Weapon.alignment
-	worksheet.column_dimensions[get_column_letter(col)].width = 11
+	worksheet.column_dimensions[get_column_letter(col)].width = 10
 
 	col += 1
 	worksheet.column_dimensions[get_column_letter(col)].width = 3
@@ -779,9 +793,9 @@ def add_secondary_weapon_stats_header(worksheet : typing.Any, row : int, col : i
 	
 	col += 1
 	c = worksheet.cell(row=row, column=col)
-	c.value = "Extra ammo"
+	c.value = "Ammo"
 	c.alignment = Weapon.alignment
-	worksheet.column_dimensions[get_column_letter(col)].width = 7
+	worksheet.column_dimensions[get_column_letter(col)].width = 8
 
 	col += 1
 	c = worksheet.cell(row=row, column=col)
@@ -794,7 +808,7 @@ def add_secondary_weapon_stats_header(worksheet : typing.Any, row : int, col : i
 	
 	col += 1
 	c = worksheet.cell(row=row, column=col)
-	c.value = "ADS time"
+	c.value = "ADS"
 	c.alignment = Weapon.alignment
 	worksheet.column_dimensions[get_column_letter(col)].width = 6
 
@@ -808,32 +822,26 @@ def add_secondary_weapon_stats_header(worksheet : typing.Any, row : int, col : i
 	worksheet.column_dimensions[get_column_letter(col)].width = 3
 
 	col += 1
+
 	c = worksheet.cell(row=row, column=col)
-	c.value = "Tactical reload"
+	c.value = "Full reload"
+	c.alignment = Weapon.alignment
+	worksheet.column_dimensions[get_column_letter(col)].width = 11
+	
+	col += 1
+	c = worksheet.cell(row=row, column=col)
+	c.value = "Tactical"
 	c.alignment = Weapon.alignment
 	worksheet.column_dimensions[get_column_letter(col)].width = 8
 	
 	col += 1
+	worksheet.merge_cells(start_row=row, end_row=row, start_column=col, end_column=col + 1)
 	c = worksheet.cell(row=row, column=col)
-	c.value = "Full reload"
-	c.alignment = Weapon.alignment
-	worksheet.column_dimensions[get_column_letter(col)].width = 7
-	
-	col += 1
-	worksheet.merge_cells(start_row=row-1, end_row=row-1, start_column=col, end_column=col + 1)
-	c = worksheet.cell(row=row-1, column=col)
 	c.value = "+ Angled grip"
 	c.alignment = Weapon.alignment
-	
-	c = worksheet.cell(row=row, column=col)
-	c.value = "Tactical reload"
-	c.alignment = Weapon.alignment
-	worksheet.column_dimensions[get_column_letter(col)].width = 8
-	
+	worksheet.column_dimensions[get_column_letter(col)].width = 7
+
 	col += 1
-	c = worksheet.cell(row=row, column=col)
-	c.value = "Full reload"
-	c.alignment = Weapon.alignment
 	worksheet.column_dimensions[get_column_letter(col)].width = 7
 	
 	col += 1
@@ -845,7 +853,9 @@ def add_secondary_weapon_stats_header(worksheet : typing.Any, row : int, col : i
 	al = copy.copy(Weapon.alignment)
 	al.horizontal = "left"
 	c.alignment = al
-	worksheet.column_dimensions[get_column_letter(col)].width = 41
+	worksheet.column_dimensions[get_column_letter(col)].width = 50
+
+	return row
 
 def add_secondary_weapon_stats(worksheet : typing.Any, weapon : Weapon, row : int, col : int):
 	c = worksheet.cell(row=row, column=col)
@@ -897,27 +907,17 @@ def add_secondary_weapon_stats(worksheet : typing.Any, weapon : Weapon, row : in
 
 def add_stats_worksheet(workbook : typing.Any, weapons : list[Weapon], worksheet_name : str, stat_name : str, stat_link : str, description : str,
 						sub_names : None | tuple[str,...], stat_method : typing.Any, format_method : typing.Any, additional_params : None | tuple[typing.Any]):
-	
-	worksheet, row = add_worksheet_header(workbook, worksheet_name, stat_name, stat_link, description, len(Weapon.distances))
-	add_secondary_weapon_stats_header(worksheet, row, len(Weapon.distances) + 2)
-	worksheet.freeze_panes = worksheet.cell(row=row+1, column=2)
-
-	col = 1
-	c = worksheet.cell(row=row, column=col)
-	c.value = "Distance"
-	al = copy.copy(Weapon.alignment)
-	al.horizontal = "left"
-	c.alignment = al
-
-	for col in range(2, len(Weapon.distances) + 2):
-		c = worksheet.cell(row=row, column=col)
-		c.value = Weapon.distances[col - 2]
-		c.alignment = Weapon.alignment
-		worksheet.column_dimensions[get_column_letter(col)].width = 4.8
-
-	cond_formats : dict[typing.Any, str] = {}
+	worksheet = workbook.create_sheet(worksheet_name)
+	row = 0
 
 	row += 1
+	row = add_secondary_weapon_stats_header(worksheet, row, 1)
+
+	row += 2
+	row = add_worksheet_header(worksheet, stat_name, stat_link, description, row, len(Weapon.distances))
+	
+	row += 2
+	cond_formats : dict[typing.Any, str] = {}
 	for i in range(len(weapons)):
 		weapon = weapons[i]
 
@@ -958,6 +958,7 @@ def add_stats_worksheet(workbook : typing.Any, weapons : list[Weapon], worksheet
 		worksheet.conditional_formatting.add(rng, cond_format)
 	
 	return
+
 
 def add_extended_barrel_overview(worksheet : typing.Any, weapons : list[Weapon], row : int, col : int, with_secondary_weapon_stats : bool):
 	col_names = ("1 (100)", "2 (110)", "3 (125)", "1R (120)", "2R (130)", "3R (145)")
@@ -1024,8 +1025,9 @@ def add_attachment_overview(workbook : typing.Any, weapons : list[Weapon]):
 		raise Exception(f"File '{attachment_overview_file_name}' doesn't deserialize to a dictionary.")
 	attachment_categories : dict[str, typing.Any] = json_content
 
-	worksheet, row = add_worksheet_header(workbook, "Attachments", "Attachment overview", None, "A short overview over all available attachments.", 19)
-	worksheet.freeze_panes = worksheet.cell(row=row, column=2)
+	worksheet = workbook.create_sheet("Attachments")
+	row = add_worksheet_header(worksheet, "Attachment overview", None, "A short overview over all available attachments.", 1, 19)
+	#worksheet.freeze_panes = worksheet.cell(row=row, column=2)
 
 	for attachment_category, attachment_dict in attachment_categories.items():
 		if not isinstance(attachment_dict, dict):
@@ -1060,6 +1062,7 @@ def add_attachment_overview(workbook : typing.Any, weapons : list[Weapon]):
 			row += 1
 			
 		row += 1
+
 
 def save_to_xlsx_file(weapons : list[Weapon], stat_names : tuple[str,...], stat_links : tuple[str,...]):
 	""" https://openpyxl.readthedocs.io/en/stable/ """
