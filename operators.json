@@ -321,6 +321,14 @@
     ],
     "side": "A"
   },
+  "Rauora": {
+    "weapons": [
+      "417",
+      "M249",
+      "Reaper MK2"
+    ],
+    "side": "A"
+  },
   "Sentry": {
     "weapons": [
       "COMMANDO 9",
