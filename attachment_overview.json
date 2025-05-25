@@ -36,7 +36,7 @@
     },
     "Extended barrel": {
       "damage bonus": 0.1,
-      "description": "Increases weapon base damage and reduces damage drop-off. This leads to a reduction of STDOK and TTDOK:"
+      "description": "Increases weapon base damage and reduces damage drop-off. At point blank this leads to a reduction in STDOK and TTDOK:"
     }
   },
 
