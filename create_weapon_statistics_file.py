@@ -140,7 +140,8 @@ class Weapon:
 	laser_ads_speed_multiplier = 0.0;
 	angled_grip_reload_speed_multiplier = 0.0;
 	
-	tdok_hps = (100, 110, 125, 120, 130, 145)
+	with_rook = (False, False, False, True, True, True)
+	hp_levels = (100, 110, 125, 120, 130, 145)
 
 	lowest_highest_dps : dict[str, tuple[int, int]] = {}	# class : (lowest dps, highest dps)
 	lowest_highest_ttdok : dict[int, dict[str, tuple[int, int]]] = {}	# hp : {class : (lowest ttdok, highest ttdok)}
@@ -304,7 +305,7 @@ class Weapon:
 			Weapon.lowest_highest_dps[self.class_] = min(Weapon.lowest_highest_dps[self.class_][0], min(DPS)), max(Weapon.lowest_highest_dps[self.class_][1], max(DPS))
 
 		# adjust Weapon.lowest_highest_ttdok
-		for hp in self.tdok_hps:
+		for hp in self.hp_levels:
 			if hp not in Weapon.lowest_highest_ttdok:
 				Weapon.lowest_highest_ttdok[hp] = {}
 				
@@ -721,8 +722,8 @@ def add_worksheet_header(worksheet : typing.Any, stat_name : str, stat_link : st
 	return row
 
 
-def add_weapon_to_worksheet(worksheet : typing.Any, weapon : Weapon, sub_name : None | str, stat_method : typing.Any, format_method : typing.Any,
-							additional_param : None | typing.Any, row : int, cond_formats : dict[typing.Any, str]):
+def add_weapon_to_worksheet(worksheet : typing.Any, weapon : Weapon, stat_method : typing.Any, format_method : typing.Any,
+							sub_name : None | str, additional_param : None | tuple[str | typing.Any], row : int, cond_formats : dict[typing.Any, str]):
 	if sub_name != None:
 		c = worksheet.cell(row=row, column=1)
 		c.value = sub_name
@@ -906,7 +907,7 @@ def add_secondary_weapon_stats(worksheet : typing.Any, weapon : Weapon, row : in
 	return
 
 def add_stats_worksheet(workbook : typing.Any, weapons : list[Weapon], worksheet_name : str, stat_name : str, stat_link : str, description : str,
-						sub_names : None | tuple[str,...], stat_method : typing.Any, format_method : typing.Any, additional_params : None | tuple[typing.Any]):
+						stat_method : typing.Any, format_method : typing.Any, additional_params : None | tuple[tuple[str, typing.Any],...]):
 	worksheet = workbook.create_sheet(worksheet_name)
 	row = 0
 
@@ -926,33 +927,38 @@ def add_stats_worksheet(workbook : typing.Any, weapons : list[Weapon], worksheet
 
 		add_secondary_weapon_stats(worksheet, weapon, row, len(Weapon.distances) + 3)
 
-		if sub_names == None and additional_params == None:
-			add_weapon_to_worksheet(worksheet, weapon, None, stat_method, format_method, None, row, cond_formats)
+		if additional_params == None:
+			add_weapon_to_worksheet(worksheet, weapon, stat_method, format_method, None, None, row, cond_formats)
 			row += 1
 			
 			if (weapon.has_extended_barrel):
 				extended_barrel_weapon = weapon.getExtendedBarrelWeapon()
-				add_weapon_to_worksheet(worksheet, extended_barrel_weapon, Weapon.extended_barrel_weapon_name, stat_method, format_method, None, row, cond_formats)
+				add_weapon_to_worksheet(worksheet, extended_barrel_weapon, stat_method, format_method, Weapon.extended_barrel_weapon_name, None, row, cond_formats)
 				row += 1
 				
-		elif type(sub_names) == tuple and type(additional_params) == tuple: 
-			if len(sub_names) != len(additional_params):
-				raise Exception(f"Parameters are tuples of different length.")
-
+		else: 
 			worksheet.merge_cells(start_row=row, end_row=row, start_column=2, end_column=1 + len(Weapon.distances))
 			row += 1
+			
+			# eb in between: 100hp, eb, 110hp, eb, 125hp, eb, 120hp, eb, 130hp, eb, 145hp
+			# if (weapon.has_extended_barrel):
+			# 	extended_barrel_weapon = weapon.getExtendedBarrelWeapon()
+			# for sub_name, additional_param in additional_params:
+			# 	add_weapon_to_worksheet(worksheet, weapon, stat_method, format_method, sub_name, additional_param, row, cond_formats)
+			# 	row += 1
+			# 	if (weapon.has_extended_barrel):
+			# 		add_weapon_to_worksheet(worksheet, extended_barrel_weapon, stat_method, format_method, Weapon.extended_barrel_weapon_name, additional_param, row, cond_formats)
+			# 		row += 1
 
+			# eb afterwards: 100hp, 110hp, 125hp, 120hp, 130hp, 145hp, eb, eb, eb, eb, eb, eb
+			for sub_name, additional_param in additional_params:
+				add_weapon_to_worksheet(worksheet, weapon, stat_method, format_method, sub_name, additional_param, row, cond_formats)
+				row += 1
 			if (weapon.has_extended_barrel):
 				extended_barrel_weapon = weapon.getExtendedBarrelWeapon()
-			for sub_name, additional_param in zip(sub_names, additional_params):
-				add_weapon_to_worksheet(worksheet, weapon, sub_name, stat_method, format_method, additional_param, row, cond_formats)
-				row += 1
-				if (weapon.has_extended_barrel):
-					add_weapon_to_worksheet(worksheet, extended_barrel_weapon, Weapon.extended_barrel_weapon_name, stat_method, format_method, additional_param, row, cond_formats)
+				for sub_name, additional_param in additional_params:
+					add_weapon_to_worksheet(worksheet, extended_barrel_weapon, stat_method, format_method, Weapon.extended_barrel_weapon_name, additional_param, row, cond_formats)
 					row += 1
-					
-		else:
-			raise Exception(f"Parameters aren't both None or tuples.")
 		
 	for cond_format, rng in cond_formats.items():
 		worksheet.conditional_formatting.add(rng, cond_format)
@@ -1007,7 +1013,7 @@ def add_extended_barrel_overview(worksheet : typing.Any, weapons : list[Weapon],
 		if with_secondary_weapon_stats:
 			add_secondary_weapon_stats(worksheet, weapon, row, col+15)
 
-		for hp in Weapon.tdok_hps:
+		for hp in Weapon.hp_levels:
 			col += 1
 			c1 = worksheet.cell(row=row, column=col)
 			c2 = worksheet.cell(row=row, column=col + len(col_names) + 1)
@@ -1076,28 +1082,28 @@ def save_to_xlsx_file(weapons : list[Weapon], stat_names : tuple[str,...], stat_
 		"The colored areas show where the extended barrel attachment actually affects the STDOK.",
 		"The color gradient illustrates the TTDOK compared to the lowest TTDOK of the weapon's type against the same armor rating (excluding extended barrel stats).")
 
-	sub_names = ("1 armor (100 hp)", "2 armor (110 hp)", "3 armor (125 hp)",
-	  "1 armor + Rook (120 hp)", "2 armor + Rook (130 hp)", "3 armor + Rook (145 hp)")
 	
+	tdok_additional_params = [(f"{int(i/2)+1} armor {"+ Rook " if with_rook else ""}({hp} hp)", hp) for i, (hp, with_rook) in enumerate(zip(Weapon.hp_levels, Weapon.with_rook))]
+
 	# excel file
 	workbook = Workbook()
 
 	workbook.remove(workbook.active)
 		
 	add_stats_worksheet(workbook, weapons, sheet_names[0], stat_names[0], stat_links[0],
-		explanations[0], None, Weapon.getDamage, None, None)
+		explanations[0], Weapon.getDamage, None, None)
 
 	add_stats_worksheet(workbook, weapons, sheet_names[1], stat_names[1], stat_links[1],
-		explanations[1], None, Weapon.getDamagePerShot, Weapon.getDmgPerShotColorScaleRule, None)
+		explanations[1], Weapon.getDamagePerShot, Weapon.getDmgPerShotColorScaleRule, None)
 
 	add_stats_worksheet(workbook, weapons, sheet_names[2], stat_names[2], stat_links[2],
-		explanations[2], None, Weapon.getDPS, Weapon.getDPSColorScaleRule, None)
+		explanations[2], Weapon.getDPS, Weapon.getDPSColorScaleRule, None)
 
 	add_stats_worksheet(workbook, weapons, sheet_names[4], stat_names[4], stat_links[4],
-		explanations[4], sub_names, Weapon.getSTDOK, None, Weapon.tdok_hps)
+		explanations[4], Weapon.getSTDOK, None, tdok_additional_params)
 
 	add_stats_worksheet(workbook, weapons, sheet_names[5], stat_names[5], stat_links[5],
-		explanations[5], sub_names, Weapon.getTTDOK, Weapon.getTTDOKColorScaleRule, Weapon.tdok_hps)
+		explanations[5], Weapon.getTTDOK, Weapon.getTTDOKColorScaleRule, tdok_additional_params)
 	
 	add_attachment_overview(workbook, weapons)
 
