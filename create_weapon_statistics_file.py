@@ -104,6 +104,23 @@ def color_to_openpyxl_color(s : str):
 
 border_style = "thin"
 
+def get_non_stagnant_intervals(data) -> tuple[tuple[int, int],...]:
+    intervals = []
+    start = None
+    for i in range(len(data) - 1):
+        if data[i] > data[i + 1]:
+            if start is None:
+                start = i
+        else:
+            if start is not None:
+                intervals.append((start, i))
+                start = None
+    if start is not None:
+        intervals.append((start, len(data) - 1))
+    return tuple(intervals)
+def is_index_in_intervals(index, intervals):
+    return any(start <= index <= end for start, end in intervals)
+
 class Weapon:
 	classes = weapon_classes
 	distances = numpy.array([i for i in range(first_distance, last_distance+1)], numpy.int32)
@@ -361,7 +378,7 @@ class Weapon:
 		if first_nonzero_index > 5:
 			raise Exception(f"First non-zero damage value for weapon '{self.name}' is at {Weapon.distances[first_nonzero_index]}m. Should be at 5m or less.")
 
-		# extrapolate first 5 meters. damages will be continuous in [0;4]
+		# extrapolate first 5 meters. damages will be continuous in [0;40]
 		if first_nonzero_index == 0:
 			pass	# no extrapolation needed
 		elif first_nonzero_index == -1:
@@ -490,13 +507,10 @@ class Weapon:
 
 	# excel styles
 	def getDamageStyle(self, index : int):
-		a, b = self.getDamageDropoffBorders()
-		if index <= a:
-			return self.getStyleABF()
-		elif index >= b:
-			return self.getStyleABF()
-		else:
+		if is_index_in_intervals(index, self.getDamageDropoffBorders()):
 			return self.getStyleA()
+		else:
+			return self.getStyleABF()
 	def getSTDOKStyle(self, index : int, hp : int):
 		# if this is the extended barrel version of a weapon
 		if self.is_extended_barrel:
@@ -550,35 +564,9 @@ class Weapon:
 
 	# other methods
 	def getDamageDropoffBorders(self):
-		lastInitialDamageIndex = -1
-		firstEndDamageIndex = -1
-		
-		for i in range(1, len(self.damages)):
-			if self.damages[i] != self.damages[i-1]:
-				lastInitialDamageIndex = i-1
-				break
-			
-		for i in range(len(self.damages)-2, -1, -1):
-			if self.damages[i] != self.damages[i+1]:
-				firstEndDamageIndex = i+1
-				break
-
-		return lastInitialDamageIndex, firstEndDamageIndex
+		return get_non_stagnant_intervals(self.damages)
 	def getTDOKBorders(self, hp):
-		lastInitialSTDOKIndex = -1
-		firstEndSTDOKIndex = -1
-
-		for i in range(1, len(self.damages)):
-			if self.stdok(i, hp) != self.stdok(i-1, hp):
-				lastInitialSTDOKIndex = i-1
-				break
-			
-		for i in range(len(self.damages)-2, -1, -1):
-			if self.stdok(i, hp) != self.stdok(i+1, hp):
-				firstEndSTDOKIndex = i+1
-				break
-
-		return lastInitialSTDOKIndex, firstEndSTDOKIndex
+		return get_non_stagnant_intervals(self.stdok(i-1, hp) for i in range(1, len(self.damages)))
 	def getExtendedBarrelWeapon(self):
 		if self.has_extended_barrel == True:
 			return self.extended_barrel_weapon
