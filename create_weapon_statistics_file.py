@@ -260,7 +260,7 @@ class Weapon:
 			if type(self.json_content["extended_barrel"]) == bool:	# use default damage multiplier for extended barrel
 				self.has_extended_barrel = self.json_content["extended_barrel"]
 				if self.has_extended_barrel == True:
-					print(f"{message('Message:')} Using {message('approximated')} extended barrel stats for weapon '{message(self.name)}'.")
+					print(f"{warning('Warning:')} Using {warning('approximated')} extended barrel stats for weapon '{warning(self.name)}'.")
 					potential_eb.damages = tuple(math.ceil(dmg * self.extended_barrel_damage_multiplier) for dmg in self.damages)
 					
 					# borders = self.getDamageDropoffBorders()
