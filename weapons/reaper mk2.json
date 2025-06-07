@@ -48,7 +48,7 @@
     "39": 0,
     "40": 18
   },
-  "extended_barrel": true,
+  "extended_barrel": false,
   "extra_ammo": 96,
   "grip": false,
   "laser": true,

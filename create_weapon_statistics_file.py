@@ -118,8 +118,11 @@ def get_non_stagnant_intervals(data) -> tuple[tuple[int, int],...]:
     if start is not None:
         intervals.append((start, len(data) - 1))
     return tuple(intervals)
-def is_index_in_intervals(index, intervals):
-    return any(start <= index <= end for start, end in intervals)
+def is_index_in_intervals(index : int, intervals : tuple[tuple[int, int],...]):
+	for start, end in intervals:
+		if start <= index <= end:
+			return start, end
+	return None
 
 class Weapon:
 	classes = weapon_classes
@@ -257,10 +260,27 @@ class Weapon:
 			if type(self.json_content["extended_barrel"]) == bool:	# use default damage multiplier for extended barrel
 				self.has_extended_barrel = self.json_content["extended_barrel"]
 				if self.has_extended_barrel == True:
+					print(f"{message('Message:')} Using {message('approximated')} extended barrel stats for weapon '{message(self.name)}'.")
 					potential_eb.damages = tuple(math.ceil(dmg * self.extended_barrel_damage_multiplier) for dmg in self.damages)
+					
+					# borders = self.getDamageDropoffBorders()
+					# damages = [None] * len(self.damages)
+					# damages[0] = math.ceil(self.damages[0] * self.extended_barrel_damage_multiplier)
+
+					# for i in range(1, len(damages)):
+					# 	interval = is_index_in_intervals(i+1, borders)
+					# 	if interval == is_index_in_intervals(i-3, borders) != None:
+					# 		ADi = interval[0] + 2
+					# 		ANi = interval[1] + 0
+					# 		print(i, ADi, ANi)
+					# 	else:
+					# 		damages[i] = damages[i-1]
+					# print()
+
 			elif type(self.json_content["extended_barrel"]) == dict:	# use custom damages for extended barrel
 				if not all(isinstance(damage, int) for damage in self.json_content["extended_barrel"].values()):
 					raise Exception(f"Weapon '{self.name}' has damage values that don't deserialize to integers.")
+				print(f"{message('Message:')} Using {message('exact')} extended barrel stats for weapon '{message(self.name)}'.")
 				self.has_extended_barrel = True
 				potential_eb.damages = self.validate_damages({int(distance) : int(damage) for distance, damage in self.json_content["extended_barrel"].items()})
 			else:
@@ -507,10 +527,10 @@ class Weapon:
 
 	# excel styles
 	def getDamageStyle(self, index : int):
-		if is_index_in_intervals(index, self.getDamageDropoffBorders()):
-			return self.getStyleA()
-		else:
+		if is_index_in_intervals(index, self.getDamageDropoffBorders()) is None:
 			return self.getStyleABF()
+		else:
+			return self.getStyleA()
 	def getSTDOKStyle(self, index : int, hp : int):
 		# if this is the extended barrel version of a weapon
 		if self.is_extended_barrel:
@@ -564,9 +584,16 @@ class Weapon:
 
 	# other methods
 	def getDamageDropoffBorders(self):
-		return get_non_stagnant_intervals(self.damages)
+		
+
+		intervals = get_non_stagnant_intervals(self.damages)
+		if self.class_ == "SG":
+			if len(intervals) != 2:
+				raise Exception(f"A {self.class_} should have exactly 2 damage dropoff intervals but weapon '{self.name}' has {len(intervals)}.")
+			return intervals
+		return (intervals[0][0], intervals[-1][-1]),
 	def getTDOKBorders(self, hp):
-		return get_non_stagnant_intervals(self.stdok(i-1, hp) for i in range(1, len(self.damages)))
+		return get_non_stagnant_intervals(self.stdok(i, hp) for i in range(1, len(self.damages)))
 	def getExtendedBarrelWeapon(self):
 		if self.has_extended_barrel == True:
 			return self.extended_barrel_weapon
