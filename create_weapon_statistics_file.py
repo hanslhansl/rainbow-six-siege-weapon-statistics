@@ -48,7 +48,7 @@ def show_exception_and_exit(exc_type, exc_value, tb):
 sys.excepthook = show_exception_and_exit
 
 #imports
-import os, numpy, json, typing, math, ctypes, copy, lxml
+import os, numpy, json, typing, math, ctypes, copy, matplotlib.pyplot as plt, sys, itertools, operator
 from openpyxl.cell.text import InlineFont
 from openpyxl.cell.rich_text import TextBlock, CellRichText
 from openpyxl import Workbook
@@ -1262,7 +1262,116 @@ def save_to_output_files(weapons : list[Weapon]):
 	return
 
 
+# get all weapons from the files
 weapons = get_weapons_list()
-save_to_output_files(weapons)
 
+# # group weapons by class
+# weapons_sorted = sorted(weapons, key=operator.attrgetter('class_'))
+# grouped = [list(group) for _, group in itertools.groupby(weapons_sorted, key=operator.attrgetter('class_'))]
+# for group in grouped:
+# 	for i, w1 in enumerate(group):
+# 		d1 = w1.damages
+# 		for j in range(i + 1, len(group)):
+# 			w2 = group[j]
+# 			d2 = w2.damages
+# 			if d1 != d2 and any(a == b for a, b in zip(d1, d2)):
+# 				plt.plot(d1, label=w1.name)
+# 				plt.plot(d2, label=w2.name)
+# 				plt.grid(True)
+# 				plt.legend()
+# 				plt.title("same class and partly but not fully identical damage values")
+# 				plt.show()
+# 				raise Exception(f"Weapon '{w1.name}' and '{w2.name}' have the same class and partly but not fully identical damage values.")
+
+
+# group weapons by class and by first damage value
+weapons_sorted = sorted(weapons, key=lambda obj: (obj.class_, obj.damages[0]))
+# only keep groups were all damages are identical
+grouped = []
+for _, group in itertools.groupby(weapons_sorted, key=lambda o: (o.class_, o.damages[0])):
+    group_list = list(group)
+    param3_values = [obj.damages for obj in group_list]
+    if len(param3_values) == len(set(param3_values)):
+        grouped.append(group_list)
+# display weapons with same base damage but different damage drop-off
+for group in grouped:
+	if len(group) > 1:
+		for i, weapon in enumerate(group):
+			plt.plot(weapon.damages, label=weapon.name)
+		plt.grid(True)
+		plt.legend()
+		plt.title("weapons with same base damage have different damage drop-off")
+		plt.show()
+
+# save to excel file
+save_to_output_files(weapons)
 input("\nCompleted!")
+
+
+# f(x, a, c) = a - round(x*g(a, c))
+
+def inverse_floor(n : int):
+	"""return a, b so that a <= x < b fulfills n = floor(x)"""
+	return (n + 0., n + 1.)
+def inverse_round(n : int):
+	"""return a, b so that a <= x < b fulfills n = round(x)"""
+	return (n - 0.5, n + 0.5)
+
+
+
+
+sys.exit()
+import numpy as np, cvxpy as cp
+ars = [weapon for weapon in weapons if weapon.class_ == "AR"]
+datasets = np.array([ar.damages for ar in ars])[:,24:36]
+
+# Convert datasets into rows of [i, a, x_i]
+data = []
+for dataset in datasets:
+    a = dataset[0]
+    for i, xi in enumerate(dataset):
+        data.append((i, a, xi))
+
+X = np.array([[i, a, 1] for i, a, xi in data])  # [i, a, 1] for bias term (c)
+y = np.array([xi for i, a, xi in data])
+
+def get_interval(y, mode):
+    if mode == "round":
+        return y - 0.5, y + 0.5
+    elif mode == "floor":
+        return y, y + 1 - 1e-8
+    elif mode == "ceil":
+        return y - 1 + 1e-8, y
+    else:
+        raise ValueError("Unknown rounding mode")
+
+
+def fit_model(X, y, mode="round"):
+    beta = cp.Variable(3)  # [k, d, c]
+    lower, upper = get_interval(y, mode)
+    preds = X @ beta
+    constraints = [
+        preds >= lower,
+        preds <= upper
+    ]
+    prob = cp.Problem(cp.Minimize(cp.norm(preds - y, 2)), constraints)
+    prob.solve()
+    if prob.status == 'optimal':
+        return beta.value, prob.value
+    else:
+        print(f"{prob.status = }")
+        return None, None
+
+best_fit = None
+for mode in ["round", "floor", "ceil"]:
+    coeffs, err = fit_model(X, y, mode)
+    if coeffs is not None:
+        print(f"Mode: {mode}, Coeffs: {coeffs}, Error: {err}")
+        if best_fit is None or err < best_fit[1]:
+            best_fit = (mode, coeffs, err)
+
+if best_fit:
+    mode, coeffs, err = best_fit
+    print(f"\nBest match: {mode} with f(i, a) = {coeffs[0]:.3f} * i + {coeffs[1]:.3f} * a + {coeffs[2]:.3f}")
+else:
+    print("No consistent linear model found.")
