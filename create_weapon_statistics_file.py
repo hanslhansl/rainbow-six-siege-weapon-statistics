@@ -38,7 +38,6 @@ background_colors = {"AR":"5083EA", "SMG":"B6668E", "MP":"76A5AE", "LMG":"8771BD
 ###################################################
 
 # install exception catcher
-#from re import S
 import sys, traceback
 
 def show_exception_and_exit(exc_type, exc_value, tb):
@@ -48,7 +47,7 @@ def show_exception_and_exit(exc_type, exc_value, tb):
 sys.excepthook = show_exception_and_exit
 
 #imports
-import os, numpy, json, typing, math, ctypes, copy, matplotlib.pyplot as plt, sys, itertools, operator
+import os, numpy, json, typing, math, ctypes, copy, matplotlib.pyplot as plt, sys, itertools, operator, numpy as np, cvxpy as cp
 from openpyxl.cell.text import InlineFont
 from openpyxl.cell.rich_text import TextBlock, CellRichText
 from openpyxl import Workbook
@@ -58,25 +57,26 @@ from openpyxl.utils import get_column_letter
 
 # check if the settings are correct
 if not os.path.isfile(operators_file_name):
-	raise Exception(f"'{operators_file_name}' is not a valid file path.")
+	raise Exception(f"{error()}: '{operators_file_name}' is not a valid file path.")
 
 if not os.path.isdir(weapon_data_dir):
-	raise Exception(f"'{weapon_data_dir}' is not a valid directory.")
+	raise Exception(f"{error()}: '{weapon_data_dir}' is not a valid directory.")
 
 if not 0 <= first_distance:
-	raise Exception(f"'first_distance' must be >=0 but is {first_distance}.")
+	raise Exception(f"{error()}: 'first_distance' must be >=0 but is {first_distance}.")
 if not first_distance <= last_distance:
-	raise Exception(f"'last_distance' must be >='first_distance'={first_distance} but is {last_distance}.")
+	raise Exception(f"{error()}: 'last_distance' must be >='first_distance'={first_distance} but is {last_distance}.")
 
 kernel32 = ctypes.windll.kernel32
 kernel32.SetConsoleMode(kernel32.GetStdHandle(-11), 7)
 
-def warning(s):
+def warning(s = "Warning"):
 	return f"\x1b[38;2;255;255;0m{s}\033[0m"
-def message(s):
+def message(s = "Message"):
 	return f"\x1b[38;2;83;141;213m{s}\033[0m"
+def error(s = "Error"):
+	return f"\x1b[38;2;255;0;0m{s}\033[0m"
 
-exception = "\x1b[38;2;255;0;0mException:\033[0m"
 
 def color_to_openpyxl_color(s : str):
 	r, g, b = int(s[0:2], 16) / 0xFF, int(s[2:4], 16) / 0xFF, int(s[4:6], 16) / 0xFF
@@ -126,7 +126,7 @@ def is_index_in_intervals(index : int, intervals : tuple[tuple[int, int],...]):
 
 class Weapon:
 	classes = weapon_classes
-	distances = numpy.array([i for i in range(first_distance, last_distance+1)], numpy.int32)
+	distances = list(range(first_distance, last_distance+1))
 	
 	alignment = Alignment("center", "center", wrapText=True)
 	border_color = "FF8CA5D0"
@@ -176,28 +176,28 @@ class Weapon:
 		self.DmgPerShotColorScaleRule = None
 
 		if type(self.json_content) != dict:
-			raise Exception(f"Weapon '{self.name}' doesn't deserialize to a dict.")
+			raise Exception(f"{error()}: Weapon '{self.name}' doesn't deserialize to a dict.")
 		
 		# get weapon name
 		if "name" not in self.json_content:
-			raise Exception(f"Weapon is missing its name.")
+			raise Exception(f"{error()}: Weapon is missing its name.")
 		if type(self.json_content["name"]) != str:
-			raise Exception(f"Weapon has a name that doesn't deserialize to a string.")
+			raise Exception(f"{error()}: Weapon has a name that doesn't deserialize to a string.")
 		self.name = self.json_content["name"]
 		
 		# get weapon class
 		if "class" not in self.json_content:
-			raise Exception(f"Weapon '{self.name}' is missing a type.")
+			raise Exception(f"{error()}: Weapon '{self.name}' is missing a type.")
 		if type(self.json_content["class"]) != str:
-			raise Exception(f"Weapon '{self.name}' has a type that doesn't deserialize to a string.")
+			raise Exception(f"{error()}: Weapon '{self.name}' has a type that doesn't deserialize to a string.")
 		if self.json_content["class"] not in self.classes:
-			raise Exception(f"Weapon '{self.name}' has an invalid type.")
+			raise Exception(f"{error()}: Weapon '{self.name}' has an invalid type.")
 		self.class_ = self.json_content["class"]
 
 		# get weapon fire rate
 		if "rpm" in self.json_content:
 			if type(self.json_content["rpm"]) != int:
-				raise Exception(f"Weapon '{self.name}' has a fire rate that doesn't deserialize to an int.")
+				raise Exception(f"{error()}: Weapon '{self.name}' has a fire rate that doesn't deserialize to an int.")
 			self.rpm = self.json_content["rpm"]
 		else:
 			print(f"{warning('Warning:')} Weapon '{warning(self.name)}' is missing a {warning('fire rate')}. Using default value ({self.default_rpm}) instead.")
@@ -206,7 +206,7 @@ class Weapon:
 		# get weapon ads time
 		if "ads" in self.json_content:
 			if type(self.json_content["ads"]) != float:
-				raise Exception(f"Weapon '{self.name}' has an ads time that doesn't deserialize to a float.")
+				raise Exception(f"{error()}: Weapon '{self.name}' has an ads time that doesn't deserialize to a float.")
 			self.ads_time = self.json_content["ads"]
 		else:
 			print(f"{warning('Warning:')} Weapon '{warning(self.name)}' is missing an {warning('ads time')}. Using default value ({self.default_ads}) instead.")
@@ -215,7 +215,7 @@ class Weapon:
 		# get weapon pellet count
 		if "pellets" in self.json_content:
 			if type(self.json_content["pellets"]) != int:
-				raise Exception(f"Weapon '{self.name}' has a pellet count that doesn't deserialize to an integer.")
+				raise Exception(f"{error()}: Weapon '{self.name}' has a pellet count that doesn't deserialize to an integer.")
 			self.pellets = self.json_content["pellets"]
 		else:
 			print(f"{warning('Warning:')} Weapon '{warning(self.name)}' is missing a {warning('pellet count')}. Using default value ({self.default_pellets}) instead.")
@@ -224,11 +224,11 @@ class Weapon:
 		# get weapon magazine capacity (magazine, chamber)
 		if "capacity" in self.json_content:
 			if type(self.json_content["capacity"]) != list:
-				raise Exception(f"Weapon '{self.name}' has a magazine capacity that doesn't deserialize to a list.")
+				raise Exception(f"{error()}: Weapon '{self.name}' has a magazine capacity that doesn't deserialize to a list.")
 			if len(self.json_content["capacity"]) != 2:
-				raise Exception(f"Weapon '{self.name}' doesn't have exactly 2 magazine capacity values.")
+				raise Exception(f"{error()}: Weapon '{self.name}' doesn't have exactly 2 magazine capacity values.")
 			if type(self.json_content["capacity"][0]) != int or type(self.json_content["capacity"][1]) != int:
-				raise Exception(f"Weapon '{self.name}' has magazine capacities that don't deserialize to integers.")
+				raise Exception(f"{error()}: Weapon '{self.name}' has magazine capacities that don't deserialize to integers.")
 			self.capacity = (self.json_content["capacity"][0], self.json_content["capacity"][1])
 		else:
 			print(f"{warning('Warning:')} Weapon '{warning(self.name)}' is missing the {warning('magazine capacity')}. Using default value ({self.default_capacity}) instead.")
@@ -237,7 +237,7 @@ class Weapon:
 		# get extra ammo
 		if "extra_ammo" in self.json_content:
 			if type(self.json_content["extra_ammo"]) != int:
-				raise Exception(f"Weapon '{self.name}' has an extra ammo value that doesn't deserialize to an integer.")
+				raise Exception(f"{error()}: Weapon '{self.name}' has an extra ammo value that doesn't deserialize to an integer.")
 			self.extra_ammo = self.json_content["extra_ammo"]
 		else:
 			print(f"{warning('Warning:')} Weapon '{warning(self.name)}' is missing an {warning('extra ammo value')}. Using default value ({self.default_extra_ammo}) instead.")
@@ -245,11 +245,11 @@ class Weapon:
 
 		# get weapon damages
 		if "damages" not in self.json_content:
-			raise Exception(f"Weapon '{self.name}' is missing damage values.")
+			raise Exception(f"{error()}: Weapon '{self.name}' is missing damage values.")
 		if type(self.json_content["damages"]) != dict:
-			raise Exception(f"Weapon '{self.name}' has damage values that don't deserialize to a dict.")
+			raise Exception(f"{error()}: Weapon '{self.name}' has damage values that don't deserialize to a dict.")
 		if not all(isinstance(damage, int) for damage in self.json_content["damages"].values()):
-			raise Exception(f"Weapon '{self.name}' has damage values that don't deserialize to integers.")
+			raise Exception(f"{error()}: Weapon '{self.name}' has damage values that don't deserialize to integers.")
 		distance_damage_dict = {int(distance) : int(damage) for distance, damage in self.json_content["damages"].items()}
 		self.damages = self.validate_damages(distance_damage_dict)
 
@@ -262,29 +262,15 @@ class Weapon:
 				if self.has_extended_barrel == True:
 					print(f"{warning('Warning:')} Using {warning('approximated')} extended barrel stats for weapon '{warning(self.name)}'.")
 					potential_eb.damages = tuple(math.ceil(dmg * self.extended_barrel_damage_multiplier) for dmg in self.damages)
-					
-					# borders = self.getDamageDropoffBorders()
-					# damages = [None] * len(self.damages)
-					# damages[0] = math.ceil(self.damages[0] * self.extended_barrel_damage_multiplier)
-
-					# for i in range(1, len(damages)):
-					# 	interval = is_index_in_intervals(i+1, borders)
-					# 	if interval == is_index_in_intervals(i-3, borders) != None:
-					# 		ADi = interval[0] + 2
-					# 		ANi = interval[1] + 0
-					# 		print(i, ADi, ANi)
-					# 	else:
-					# 		damages[i] = damages[i-1]
-					# print()
 
 			elif type(self.json_content["extended_barrel"]) == dict:	# use custom damages for extended barrel
 				if not all(isinstance(damage, int) for damage in self.json_content["extended_barrel"].values()):
-					raise Exception(f"Weapon '{self.name}' has damage values that don't deserialize to integers.")
-				print(f"{message('Message:')} Using {message('exact')} extended barrel stats for weapon '{message(self.name)}'.")
+					raise Exception(f"{error()}: Weapon '{self.name}' has damage values that don't deserialize to integers.")
+				#print(f"{message('Message:')} Using {message('exact')} extended barrel stats for weapon '{message(self.name)}'.")
 				self.has_extended_barrel = True
 				potential_eb.damages = self.validate_damages({int(distance) : int(damage) for distance, damage in self.json_content["extended_barrel"].items()})
 			else:
-				raise Exception(f"Weapon '{self.name}' has an extended barrel value that doesn't deserialize to a bool or a dict.")
+				raise Exception(f"{error()}: Weapon '{self.name}' has an extended barrel value that doesn't deserialize to a bool or a dict.")
 		else:
 			print(f"{warning('Warning:')} Weapon '{warning(self.name)}' is missing an {warning('extended barrel')} value. Using default value ({self.default_has_extended_barrel}) instead.")
 			self.has_extended_barrel = Weapon.default_has_extended_barrel
@@ -305,7 +291,7 @@ class Weapon:
 		# get laser
 		if "laser" in self.json_content:
 			if type(self.json_content["laser"]) != bool:
-				raise Exception(f"Weapon '{self.name}' has a laser value that doesn't deserialize to a bool.")
+				raise Exception(f"{error()}: Weapon '{self.name}' has a laser value that doesn't deserialize to a bool.")
 			self.has_laser = self.json_content["laser"]
 		else:
 			print(f"{warning('Warning:')} Weapon '{warning(self.name)}' is missing a {warning('laser')} value. Using default value ({self.default_has_laser}) instead.")
@@ -314,7 +300,7 @@ class Weapon:
 		# get weapon grip
 		if "grip" in self.json_content:
 			if type(self.json_content["grip"]) != bool:
-				raise Exception(f"Weapon '{self.name}' has a grip value that doesn't deserialize to a bool.")
+				raise Exception(f"{error()}: Weapon '{self.name}' has a grip value that doesn't deserialize to a bool.")
 			self.has_grip = self.json_content["grip"]
 		else:
 			print(f"{warning('Warning:')} Weapon '{warning(self.name)}' is missing a {warning('grip')} value. Using default value ({self.default_has_grip}) instead.")
@@ -323,11 +309,11 @@ class Weapon:
 		# get weapon reload times in seconds
 		# if "reload_times" in self.json_content:
 		# 	if type(self.json_content["reload_times"]) != list:
-		# 		raise Exception(f"Weapon '{self.name}' has reload times that don't deserialize to a list.")
+		# 		raise Exception(f"{error()}: Weapon '{self.name}' has reload times that don't deserialize to a list.")
 		# 	if len(self.json_content["reload_times"]) != 2:
-		# 		raise Exception(f"Weapon '{self.name}' doesn't have exactly 2 reload times.")
+		# 		raise Exception(f"{error()}: Weapon '{self.name}' doesn't have exactly 2 reload times.")
 		# 	if type(self.json_content["reload_times"][0]) != float or type(self.json_content["reload_times"][1]) != float:
-		# 		raise Exception(f"Weapon '{self.name}' has reload times that don't deserialize to floats.")
+		# 		raise Exception(f"{error()}: Weapon '{self.name}' has reload times that don't deserialize to floats.")
 		# 	self.reload_times = (self.json_content["reload_times"][0], self.json_content["reload_times"][1])
 		# else:
 		# 	print(f"{warning('Warning:')} Weapon '{warning(self.name)}' is missing the {warning('reload times')}. Using default value ({self.default_reload_times}) instead.")
@@ -367,12 +353,12 @@ class Weapon:
 		damages = list(distance_damage_dict.values())
 		
 		#if Weapon.distances != distances:
-		if not numpy.array_equal(Weapon.distances, distances):
-			raise Exception(f"Weapon '{self.name}' has incorrect distance values.")
+		if Weapon.distances != distances:
+			raise Exception(f"{error()}: Weapon '{self.name}' has incorrect distance values.")
 
 		# make sure the last damage value is given. otherwise the extrapolation will be wrong
 		if damages[-1] == 0:
-			raise Exception(f"Weapon '{self.name}' is missing a damage value at {distances[-1]}m.")
+			raise Exception(f"{error()}: Weapon '{self.name}' is missing a damage value at {distances[-1]}m.")
 
 		# make sure damages only stagnate or decrease and zeros are surrounded by identical non-zero damages
 		# interpolate gaps. damages will be continuous in [5;40]
@@ -385,9 +371,9 @@ class Weapon:
 				
 			else:	# this damage value is given
 				if damages[i] > previous_real_damage and previous_real_damage != 0:
-					raise Exception(f"Weapon '{self.name}' has a damage increase from '{previous_real_damage}' to '{damages[i]}' at {Weapon.distances[i]}m.")
+					raise Exception(f"{error()}: Weapon '{self.name}' has a damage increase from '{previous_real_damage}' to '{damages[i]}' at {Weapon.distances[i]}m.")
 				if previous_real_damage != 0 and previous_was_interpolated == True and damages[i] != previous_real_damage:
-					raise Exception(f"Tried to interpolate between two unequal damage values '{previous_real_damage}' and '{damages[i]}' at {Weapon.distances[i]}m for weapon '{self.name}'.")
+					raise Exception(f"{error()}: Tried to interpolate between two unequal damage values '{previous_real_damage}' and '{damages[i]}' at {Weapon.distances[i]}m for weapon '{self.name}'.")
 				
 				previous_real_damage = damages[i]
 				previous_was_interpolated = False
@@ -396,26 +382,26 @@ class Weapon:
 		first_nonzero_index = next((i for i, damage in enumerate(damages) if damage != 0), -1)
 		
 		if first_nonzero_index > 5:
-			raise Exception(f"First non-zero damage value for weapon '{self.name}' is at {Weapon.distances[first_nonzero_index]}m. Should be at 5m or less.")
+			raise Exception(f"{error()}: First non-zero damage value for weapon '{self.name}' is at {Weapon.distances[first_nonzero_index]}m. Should be at 5m or less.")
 
 		# extrapolate first 5 meters. damages will be continuous in [0;40]
 		if first_nonzero_index == 0:
 			pass	# no extrapolation needed
 		elif first_nonzero_index == -1:
-			raise Exception(f"Weapon '{self.name}' has no damage values at all.")
+			raise Exception(f"{error()}: Weapon '{self.name}' has no damage values at all.")
 		else:
 			if self.class_ == "SG":	# special treatment for shotguns
 				if first_nonzero_index <= 5:
 					for i in range(first_nonzero_index):
 						damages[i] = damages[first_nonzero_index]
 				else:
-					raise Exception(f"Can't extrapolate first {first_nonzero_index} meters for shotgun '{self.name}'.")
+					raise Exception(f"{error()}: Can't extrapolate first {first_nonzero_index} meters for shotgun '{self.name}'.")
 			else:
 				if damages[first_nonzero_index] == damages[first_nonzero_index+1] == damages[first_nonzero_index+2]:
 					for i in range(first_nonzero_index):
 						damages[i] = damages[first_nonzero_index]
 				else:
-					raise Exception(f"Can't extrapolate first {first_nonzero_index} meters for weapon '{self.name}'.")
+					raise Exception(f"{error()}: Can't extrapolate first {first_nonzero_index} meters for weapon '{self.name}'.")
 
 		# return the damage stats
 		return tuple(damages)
@@ -432,7 +418,7 @@ class Weapon:
 		if self.has_laser == True:
 			return self.ads_time / self.laser_ads_speed_multiplier
 		else:
-			raise Exception(f"Weapon '{self.name}' doesn't have a laser.")
+			raise Exception(f"{error()}: Weapon '{self.name}' doesn't have a laser.")
 	@property
 	def reload_times_with_angled_grip(self):
 		if self.has_grip == True:
@@ -444,7 +430,7 @@ class Weapon:
 				rt1 /= self.angled_grip_reload_speed_multiplier
 			return rt0, rt1
 		else:
-			raise Exception(f"Weapon '{self.name}' doesn't have a grip.")
+			raise Exception(f"{error()}: Weapon '{self.name}' doesn't have a grip.")
 	def damage_per_shot(self, index : int):
 		return self.damages[index] * self.pellets
 	def dps(self, index : int):
@@ -589,7 +575,7 @@ class Weapon:
 		intervals = get_non_stagnant_intervals(self.damages)
 		if self.class_ == "SG":
 			if len(intervals) != 2:
-				raise Exception(f"A {self.class_} should have exactly 2 damage dropoff intervals but weapon '{self.name}' has {len(intervals)}.")
+				raise Exception(f"{error()}: A {self.class_} should have exactly 2 damage dropoff intervals but weapon '{self.name}' has {len(intervals)}.")
 			return intervals
 		return (intervals[0][0], intervals[-1][-1]),
 	def getTDOKBorders(self, hp):
@@ -598,7 +584,7 @@ class Weapon:
 		if self.has_extended_barrel == True:
 			return self.extended_barrel_weapon
 		else:
-			raise Exception(f"Weapon '{self.name}' doesn't have an extended barrel version.")
+			raise Exception(f"{error()}: Weapon '{self.name}' doesn't have an extended barrel version.")
 
 class Operator:
 	attacker_color = color_to_openpyxl_color("198FEB")
@@ -609,19 +595,19 @@ class Operator:
 		self.name = name
 
 		if "side" not in self.json_content:
-			raise Exception(f"Operator '{self.name}' is missing a side.")
+			raise Exception(f"{error()}: Operator '{self.name}' is missing a side.")
 		if type(self.json_content["side"]) != str:
-			raise Exception(f"Operator '{self.name}' has a side value that doesn't deserialize to a string.")
+			raise Exception(f"{error()}: Operator '{self.name}' has a side value that doesn't deserialize to a string.")
 		if self.json_content["side"] not in ("A", "D"):
-			raise Exception(f"Operator '{self.name}' has an invalid side value.")
+			raise Exception(f"{error()}: Operator '{self.name}' has an invalid side value.")
 		self.side = bool(self.json_content["side"] == "D")	# False: attack, True: defense
 		
 		if "weapons" not in self.json_content:
-			raise Exception(f"Operator '{self.name}' is missing weapons.")
+			raise Exception(f"{error()}: Operator '{self.name}' is missing weapons.")
 		if type(self.json_content["weapons"]) != list:
-			raise Exception(f"Operator '{self.name}' has weapons that don't deserialize to a list.")
+			raise Exception(f"{error()}: Operator '{self.name}' has weapons that don't deserialize to a list.")
 		if not all(isinstance(weapon, str) for weapon in self.json_content["weapons"]):
-			raise Exception(f"Operator '{self.name}' has weapons that don't deserialize to strings.")
+			raise Exception(f"{error()}: Operator '{self.name}' has weapons that don't deserialize to strings.")
 		weapons_strings = list(self.json_content["weapons"])	# tuple of weapon names
 		
 		weapons_strings_copy = copy.copy(weapons_strings)
@@ -647,19 +633,19 @@ def deserialize_json(file_name : str):
 		try:
 			content = json.load(file)
 		except json.JSONDecodeError:
-			raise Exception(f"The json deserialization of file '{file_name}' failed.")
+			raise Exception(f"{error()}: The json deserialization of file '{file_name}' failed.")
 	return content
 
 def get_operators_list(weapons : list[Weapon], file_name : str) -> None:
 	json_content = deserialize_json(file_name)
 
 	if type(json_content) != dict:
-		raise Exception(f"File '{file_name}' doesn't deserialize to a dict of operators and weapons lists.")
+		raise Exception(f"{error()}: File '{file_name}' doesn't deserialize to a dict of operators and weapons lists.")
 
 	if not all(isinstance(operator_name, str) for operator_name in json_content):
-		raise Exception(f"The operator names in file '{file_name}' don't deserialize to strings.")
+		raise Exception(f"{error()}: The operator names in file '{file_name}' don't deserialize to strings.")
 	if not all(isinstance(op, dict) for op in json_content.values()):
-		raise Exception(f"The operators in file '{file_name}' don't deserialize to dicts.")
+		raise Exception(f"{error()}: The operators in file '{file_name}' don't deserialize to dicts.")
 
 	operators = [Operator(js, op_name, weapons) for (op_name, js) in json_content.items()]
 		
@@ -1043,7 +1029,7 @@ def add_attachment_overview(workbook : typing.Any, weapons : list[Weapon]):
 	json_content = deserialize_json(attachment_overview_file_name)
 	
 	if not isinstance(json_content, dict):
-		raise Exception(f"File '{attachment_overview_file_name}' doesn't deserialize to a dictionary.")
+		raise Exception(f"{error()}: File '{attachment_overview_file_name}' doesn't deserialize to a dictionary.")
 	attachment_categories : dict[str, typing.Any] = json_content
 
 	worksheet = workbook.create_sheet("Attachments")
@@ -1052,7 +1038,7 @@ def add_attachment_overview(workbook : typing.Any, weapons : list[Weapon]):
 
 	for attachment_category, attachment_dict in attachment_categories.items():
 		if not isinstance(attachment_dict, dict):
-			raise Exception(f"An attachment category in file '{attachment_overview_file_name}' doesn't deserialize to a dictionary but to '{type(attachment_dict)}'.")
+			raise Exception(f"{error()}: An attachment category in file '{attachment_overview_file_name}' doesn't deserialize to a dictionary but to '{type(attachment_dict)}'.")
 		attachment_dict : dict[str, typing.Any]
 
 		c = worksheet.cell(row=row, column=1)
@@ -1061,7 +1047,7 @@ def add_attachment_overview(workbook : typing.Any, weapons : list[Weapon]):
 		
 		for attachment_name, attachment in attachment_dict.items():
 			if not isinstance(attachment, dict):
-				raise Exception(f"An attachment in file '{attachment_overview_file_name}' doesn't deserialize to a dictionary but to '{type(attachment)}'.")
+				raise Exception(f"{error()}: An attachment in file '{attachment_overview_file_name}' doesn't deserialize to a dictionary but to '{type(attachment)}'.")
 
 			worksheet.merge_cells(start_row=row, end_row=row, start_column=2, end_column=1 + 19)
 			c = worksheet.cell(row=row, column=2)
@@ -1265,113 +1251,71 @@ def save_to_output_files(weapons : list[Weapon]):
 # get all weapons from the files
 weapons = get_weapons_list()
 
-# # group weapons by class
-# weapons_sorted = sorted(weapons, key=operator.attrgetter('class_'))
-# grouped = [list(group) for _, group in itertools.groupby(weapons_sorted, key=operator.attrgetter('class_'))]
-# for group in grouped:
-# 	for i, w1 in enumerate(group):
-# 		d1 = w1.damages
-# 		for j in range(i + 1, len(group)):
-# 			w2 = group[j]
-# 			d2 = w2.damages
-# 			if d1 != d2 and any(a == b for a, b in zip(d1, d2)):
-# 				plt.plot(d1, label=w1.name)
-# 				plt.plot(d2, label=w2.name)
-# 				plt.grid(True)
-# 				plt.legend()
-# 				plt.title("same class and partly but not fully identical damage values")
-# 				plt.show()
-# 				raise Exception(f"Weapon '{w1.name}' and '{w2.name}' have the same class and partly but not fully identical damage values.")
-
-
-# group weapons by class and by first damage value
+# group weapons by class and by base damage
 weapons_sorted = sorted(weapons, key=lambda obj: (obj.class_, obj.damages[0]))
-# only keep groups were all damages are identical
-grouped = []
-for _, group in itertools.groupby(weapons_sorted, key=lambda o: (o.class_, o.damages[0])):
-    group_list = list(group)
-    param3_values = [obj.damages for obj in group_list]
-    if len(param3_values) == len(set(param3_values)):
-        grouped.append(group_list)
-# display weapons with same base damage but different damage drop-off
+grouped = [list(group) for key, group in itertools.groupby(weapons_sorted, key=lambda o: (o.class_, o.damages[0]))]
+# find all weapons with the same base damage but different damage drop-off
+failed = False
 for group in grouped:
 	if len(group) > 1:
-		for i, weapon in enumerate(group):
-			plt.plot(weapon.damages, label=weapon.name)
-		plt.grid(True)
-		plt.legend()
-		plt.title("weapons with same base damage have different damage drop-off")
-		plt.show()
+		for i, distance in enumerate(Weapon.distances):
+			if len(set(weapon.damages[i] for weapon in group)) > 1:
+				print(f"{warning()}: These {group[0].class_}s have the {warning("same base damage")} ({group[0].damages[0]}) but {warning("different damages")} at {distance}m:")
+				for weapon in group:
+					print(f"{weapon.name}: {weapon.damages[i]}")
+				failed = True
+if failed: raise Exception(f"{error()}: See above warnings.")
+
 
 # save to excel file
 save_to_output_files(weapons)
 input("\nCompleted!")
 
 
-# f(x, a, c) = a - round(x*g(a, c))
+# try to reverse engineer the damage drop-off formula for ARs
 
-def inverse_floor(n : int):
-	"""return a, b so that a <= x < b fulfills n = floor(x)"""
-	return (n + 0., n + 1.)
-def inverse_round(n : int):
-	"""return a, b so that a <= x < b fulfills n = round(x)"""
-	return (n - 0.5, n + 0.5)
+# # f(x, a, c) = a - round(x*g(a, c)) = round(a - x*g(a, c))
+# # f(c, a, c) = round(0.6*a)
 
-
-
-
-sys.exit()
-import numpy as np, cvxpy as cp
-ars = [weapon for weapon in weapons if weapon.class_ == "AR"]
-datasets = np.array([ar.damages for ar in ars])[:,24:36]
-
-# Convert datasets into rows of [i, a, x_i]
-data = []
-for dataset in datasets:
-    a = dataset[0]
-    for i, xi in enumerate(dataset):
-        data.append((i, a, xi))
-
-X = np.array([[i, a, 1] for i, a, xi in data])  # [i, a, 1] for bias term (c)
-y = np.array([xi for i, a, xi in data])
-
-def get_interval(y, mode):
-    if mode == "round":
-        return y - 0.5, y + 0.5
-    elif mode == "floor":
-        return y, y + 1 - 1e-8
-    elif mode == "ceil":
-        return y - 1 + 1e-8, y
-    else:
-        raise ValueError("Unknown rounding mode")
+# def inverse_floor(n : int):
+# 	"""return a, b so that a <= x < b fulfills n = floor(x)"""
+# 	return (n + 0., n + 1.)
+# def inverse_round(n : int):
+# 	"""return a, b so that a <= x < b fulfills n = round(x)"""
+# 	return (n - 0.5, n + 0.5)
 
 
-def fit_model(X, y, mode="round"):
-    beta = cp.Variable(3)  # [k, d, c]
-    lower, upper = get_interval(y, mode)
-    preds = X @ beta
-    constraints = [
-        preds >= lower,
-        preds <= upper
-    ]
-    prob = cp.Problem(cp.Minimize(cp.norm(preds - y, 2)), constraints)
-    prob.solve()
-    if prob.status == 'optimal':
-        return beta.value, prob.value
-    else:
-        print(f"{prob.status = }")
-        return None, None
+# def f_(x, a, c):
+# 	return a * (1 - x / c * 0.4)
+# def ffloor(x, a, c) :
+# 	return np.floor(f_(x, a, c))
+# def fround(x, a, c) :
+# 	return np.round(f_(x, a, c))
+# def iffloor(x, a, c) :
+# 	return inverse_floor(ffloor(x, a, c))
+# def ifround(x, a, c) :
+# 	return inverse_round(fround(x, a, c))
 
-best_fit = None
-for mode in ["round", "floor", "ceil"]:
-    coeffs, err = fit_model(X, y, mode)
-    if coeffs is not None:
-        print(f"Mode: {mode}, Coeffs: {coeffs}, Error: {err}")
-        if best_fit is None or err < best_fit[1]:
-            best_fit = (mode, coeffs, err)
+# c = 11
+# ai = 24
+# ars = [weapon for weapon in weapons if weapon.class_ == "AR"]
+# datasets = np.array([ar.damages for ar in ars])[:,ai:ai+c]
+# print(datasets.shape)
 
-if best_fit:
-    mode, coeffs, err = best_fit
-    print(f"\nBest match: {mode} with f(i, a) = {coeffs[0]:.3f} * i + {coeffs[1]:.3f} * a + {coeffs[2]:.3f}")
-else:
-    print("No consistent linear model found.")
+# for i, dataset in enumerate(datasets):
+# 	plt.plot(Weapon.distances[ai:ai+c], dataset)
+	
+# 	arr1 = np.array(iffloor(np.arange(len(dataset)), dataset[0], c))
+# 	if not np.all((arr1[0] <= dataset) & (dataset <= arr1[1])):
+# 		plt.plot(Weapon.distances[ai:ai+c], arr1[0], color="red", label="floor", ls="--")
+# 		plt.plot(Weapon.distances[ai:ai+c], arr1[1], color="red", ls="--")
+		
+# 	arr2 = np.array(ifround(np.arange(len(dataset)), dataset[0], c))
+# 	if not np.all((arr2[0] <= dataset) & (dataset <= arr2[1])):
+# 		plt.plot(Weapon.distances[ai:ai+c], arr2[0], color="blue", label="round", ls="--")
+# 		plt.plot(Weapon.distances[ai:ai+c], arr2[1], color="blue", ls="--")
+
+# 	plt.grid(True)
+# 	plt.legend()
+# 	plt.title(ars[i].name)
+# 	plt.show()
