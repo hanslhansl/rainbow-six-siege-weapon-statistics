@@ -64,7 +64,7 @@ patch_version = sys.argv[1] if len(sys.argv) > 1 else "Y_S_"
 
 operators_file_name += ".json"
 attachment_overview_file_name += ".json"
-xlsx_output_file_name += f"-{patch_version}.xlsx"
+xlsx_output_file_name += ".xlsx"
 
 # check if the settings are correct
 if not os.path.isfile(operators_file_name):
