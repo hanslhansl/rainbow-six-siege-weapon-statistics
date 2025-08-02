@@ -51,7 +51,7 @@ def error(s = "Error"):
 	return f"\x1b[38;2;255;0;0m{s}\033[0m"
 
 #imports
-import os, json, typing, math, ctypes, copy, sys, itertools
+import os, json, typing, math, ctypes, copy, sys, itertools, colorama
 from openpyxl.cell.text import InlineFont
 from openpyxl.cell.rich_text import TextBlock, CellRichText
 from openpyxl import Workbook
@@ -71,9 +71,9 @@ if not 0 <= first_distance:
 if not first_distance <= last_distance:
 	raise Exception(f"{error()}: 'last_distance' must be >='first_distance'={first_distance} but is {last_distance}.")
 
-kernel32 = ctypes.windll.kernel32
-kernel32.SetConsoleMode(kernel32.GetStdHandle(-11), 7)
-
+# kernel32 = ctypes.windll.kernel32
+# kernel32.SetConsoleMode(kernel32.GetStdHandle(-11), 7)
+colorama.just_fix_windows_console()
 
 def color_to_openpyxl_color(s : str):
 	r, g, b = int(s[0:2], 16) / 0xFF, int(s[2:4], 16) / 0xFF, int(s[4:6], 16) / 0xFF
