@@ -1132,7 +1132,7 @@ for group in grouped:
 	if len(group) > 1:
 		for i, distance in enumerate(Weapon.distances):
 			if len(set(weapon.damages[i] for weapon in group)) > 1:
-				print(f"{warning()}: These {group[0].class_}s have the {warning("same base damage")} ({group[0].damages[0]}) but {warning("different damages")} at {distance}m:")
+				print(f"{warning()}: These {group[0].class_}s have the {warning('same base damage')} ({group[0].damages[0]}) but {warning('different damages')} at {distance}m:")
 				for weapon in group:
 					print(f"{weapon.name}: {weapon.damages[i]}")
 				failed = True
