@@ -1,5 +1,5 @@
 #  Rainbow Six Siege Weapon Statistics
-Provides detailed statistics for all weapons in Tom Clancy's Rainbow Six Siege. This includes the weapon's damage at distances up to 40 meters, fire rate, damage per second, shots to down or kill, ADS time, etc. After every game patch a spreadsheet of the important stats is [released](releases/). The most recent version can also be found on [Google Sheets](https://docs.google.com/spreadsheets/d/1QgbGALNZGLlvf6YyPLtywZnvgIHkstCwGl1tvCt875Q) and as a stand-alone website on [Google Drive](https://docs.google.com/spreadsheets/d/e/2PACX-1vQ1KitQsZksdVP9YPDInxK3xE2gtu1mpUxV5_PNyE8sSm-vFINdbiL8vo9RA2CRSIbIUePLVA1GCTWZ/pubhtml).
+Provides detailed statistics for all weapons in Tom Clancy's Rainbow Six Siege. This includes the weapon's damage at distances up to 40 meters, fire rate, damage per second, shots to down or kill, ADS time, etc. After every game patch a spreadsheet of the important stats is [released](https://github.com/hanslhansl/rainbow-six-siege-weapon-statistics/releases). The most recent version can also be found on [Google Sheets](https://docs.google.com/spreadsheets/d/1QgbGALNZGLlvf6YyPLtywZnvgIHkstCwGl1tvCt875Q) and as a stand-alone website on [Google Drive](https://docs.google.com/spreadsheets/d/e/2PACX-1vQ1KitQsZksdVP9YPDInxK3xE2gtu1mpUxV5_PNyE8sSm-vFINdbiL8vo9RA2CRSIbIUePLVA1GCTWZ/pubhtml).
 # About how the data is collected
 Generally speaking I am trying to collect as much of the data myself and by hand because Ubisoft has proven to be an unreliable source for statistics. At the same time I am trying to cut corners where possible.
 ## Time measuring
@@ -34,5 +34,6 @@ Most weapons have, in addition to the bullets loaded in the magazine, one bullet
 The time in seconds it takes to aim down sight while standing still. The laser attachment increases the ads speed by $10\\%$. The reduced ads time with laser is calculated as $ads \over 1.1$.
 ## Reload time
 soon (tm)
+
 
 
