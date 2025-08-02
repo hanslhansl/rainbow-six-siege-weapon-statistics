@@ -5,13 +5,13 @@
 ###################################################
 
 # the file containing the weapons each operator has access to
-operators_file_name = "operators.json"
+operators_file_name = "operators"
 
 # the file containing the attachment overview
-attachment_overview_file_name = "attachment_overview.json"
+attachment_overview_file_name = "attachment_overview"
 
 # the file name of the xlsx output file
-xlsx_output_file_name = "rainbow-six-siege-weapon-statistics.xlsx"
+xlsx_output_file_name = "rainbow-six-siege-weapon-statistics"
 
 # the directory containing the weapon damage files
 weapon_data_dir = "weapons"
@@ -60,14 +60,17 @@ from openpyxl.formatting.rule import ColorScaleRule
 from openpyxl.utils import get_column_letter
 
 colorama.just_fix_windows_console()
+patch_version = sys.argv[1] if len(sys.argv) > 1 else "Y_S_"
+
+operators_file_name += ".json"
+attachment_overview_file_name += ".json"
+xlsx_output_file_name += f"-{patch_version}.xlsx"
 
 # check if the settings are correct
 if not os.path.isfile(operators_file_name):
 	raise Exception(f"{error()}: '{operators_file_name}' is not a valid file path.")
-
 if not os.path.isdir(weapon_data_dir):
 	raise Exception(f"{error()}: '{weapon_data_dir}' is not a valid directory.")
-
 if not 0 <= first_distance:
 	raise Exception(f"{error()}: 'first_distance' must be >=0 but is {first_distance}.")
 if not first_distance <= last_distance:

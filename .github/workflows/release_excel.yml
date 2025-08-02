@@ -26,7 +26,7 @@ jobs:
           pip install -r requirements.txt
 
       - name: Run Python Script
-        run: python create_weapon_statistics_file.py
+        run: python create_weapon_statistics_file.py ${{ github.event.inputs.tag_name }}
 
       - name: Create Release
         uses: softprops/action-gh-release@v2
