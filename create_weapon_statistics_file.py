@@ -71,8 +71,6 @@ if not 0 <= first_distance:
 if not first_distance <= last_distance:
 	raise Exception(f"{error()}: 'last_distance' must be >='first_distance'={first_distance} but is {last_distance}.")
 
-# kernel32 = ctypes.windll.kernel32
-# kernel32.SetConsoleMode(kernel32.GetStdHandle(-11), 7)
 colorama.just_fix_windows_console()
 
 def color_to_openpyxl_color(s : str):
