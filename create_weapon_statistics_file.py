@@ -681,7 +681,7 @@ def add_worksheet_header(worksheet : typing.Any, stat_name : str, stat_link : st
 	
 	worksheet.merge_cells(start_row=row, end_row=row, start_column=2, end_column=1 + cols_inbetween)
 	c = worksheet.cell(row=row, column=2)
-	c.value = "created by hanslhansl"
+	c.value = f"created by hanslhansl, updated for {patch_version}"
 	c.font = Font(bold=True)
 
 	row += 1
