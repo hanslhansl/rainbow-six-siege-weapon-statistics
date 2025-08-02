@@ -10,9 +10,6 @@ operators_file_name = "operators.json"
 # the file containing the attachment overview
 attachment_overview_file_name = "attachment_overview.json"
 
-# the file name of the html output file
-html_output_file_name = "rainbow-six-siege-weapon-statistics.html"
-
 # the file name of the xlsx output file
 xlsx_output_file_name = "rainbow-six-siege-weapon-statistics.xlsx"
 
@@ -46,8 +43,15 @@ def show_exception_and_exit(exc_type, exc_value, tb):
 	sys.exit(-1)
 sys.excepthook = show_exception_and_exit
 
+def warning(s = "Warning"):
+	return f"\x1b[38;2;255;255;0m{s}\033[0m"
+def message(s = "Message"):
+	return f"\x1b[38;2;83;141;213m{s}\033[0m"
+def error(s = "Error"):
+	return f"\x1b[38;2;255;0;0m{s}\033[0m"
+
 #imports
-import os, numpy, json, typing, math, ctypes, copy, matplotlib.pyplot as plt, sys, itertools, operator, numpy as np, cvxpy as cp
+import os, json, typing, math, ctypes, copy, sys, itertools
 from openpyxl.cell.text import InlineFont
 from openpyxl.cell.rich_text import TextBlock, CellRichText
 from openpyxl import Workbook
@@ -69,13 +73,6 @@ if not first_distance <= last_distance:
 
 kernel32 = ctypes.windll.kernel32
 kernel32.SetConsoleMode(kernel32.GetStdHandle(-11), 7)
-
-def warning(s = "Warning"):
-	return f"\x1b[38;2;255;255;0m{s}\033[0m"
-def message(s = "Message"):
-	return f"\x1b[38;2;83;141;213m{s}\033[0m"
-def error(s = "Error"):
-	return f"\x1b[38;2;255;0;0m{s}\033[0m"
 
 
 def color_to_openpyxl_color(s : str):
@@ -1111,133 +1108,8 @@ def save_to_xlsx_file(weapons : list[Weapon], stat_names : tuple[str,...], stat_
 	# save to file
 	workbook.save(xlsx_output_file_name)
 	
-	os.system("start " + xlsx_output_file_name)
+	#os.system("start " + xlsx_output_file_name)
 	return
-
-def save_to_html_file(weapons : list[Weapon], stat_names : tuple[str,...]):
-	# html file
-	string = """<!DOCTYPE html><html lang="en"><body>"""
-	string += """<script> function toggledCheckbox(event)
-{
-	if (event.target.checked)
-		document.getElementById("row_" + event.target.id).style.visibility = 'visible';
-	else
-		document.getElementById("row_" + event.target.id).style.visibility = 'collapse';
-}
-function changedStat() {
-	let values = document.getElementById('values');
-	let tbody = values.children[0];
-	let data = document.getElementById('data');
-	let data_tbody = data.children[0];
-	
-	let displayed_stats_tbody = document.getElementById('displayed stat').children[0];
-	
-	let row0 = displayed_stats_tbody.children[0];
-	let dmgPerBullet = row0.children[0].children[0];
-	let dmgPerShot = row0.children[1].children[0];
-	let dmgPerSecond = row0.children[2].children[0];
-	let STDOK = row0.children[3].children[0];
-	let TTDOK = row0.children[4].children[0];
-	
-	let row1 = displayed_stats_tbody.children[1];
-	let hp = row1.children[3].children[0].valueAsNumber;
-	//let hp = 100;
-	
-	for (let i = 0; i < tbody.childElementCount; i++)
-	{
-		let row = tbody.children[i+2];
-		let data_row = data_tbody.children[i];
-		let pellets = parseInt(row.children[47].textContent);
-		let rpm = parseInt(row.children[45].textContent);
-		for (let j = 1; j < """ + f"{len(Weapon.distances) + 1}" + """; j++)
-		{
-			let cell = row.children[j];
-			let data_cell = data_row.children[j-1];
-		
-			
-			if (dmgPerBullet.checked == true)
-				cell.textContent = data_cell.textContent;
-			else if (dmgPerShot.checked == true)
-				cell.textContent = parseInt(data_cell.textContent) * parseInt(pellets);
-			else if (dmgPerSecond.checked == true)
-				cell.textContent = Math.round(parseFloat(data_cell.textContent) * pellets * rpm / 60.);
-			else if (STDOK.checked == true)
-				cell.textContent = Math.ceil(hp / parseInt(data_cell.textContent));
-			else if (TTDOK.checked == true)
-				cell.textContent = Math.round((Math.ceil(hp / parseInt(data_cell.textContent)) - 1) * 60000 / rpm);
-			
-			/*if (event.target.id == 'Damage per bullet')
-				cell.textContent = data_cell.textContent;
-			else if (event.target.id == 'Damage per shot')
-				cell.textContent = parseInt(data_cell.textContent) * parseInt(pellets);
-			else if (event.target.id == 'Damage per second')
-				cell.textContent = Math.round(parseFloat(data_cell.textContent) * pellets * rpm / 60.);
-			else if (event.target.id == 'Shots to down or kill')
-				cell.textContent = Math.ceil(hp / parseInt(data_cell.textContent));
-			else if (event.target.id == 'Time to down or kill')
-				cell.textContent = Math.round((Math.ceil(hp / parseInt(data_cell.textContent)) - 1) * 60000 / rpm);*/
-		}
-	}
-}
-</script>"""
-
-	# weapon filter
-	string += """<table><tr style="vertical-align:top">"""
-	current_type = ""
-	for weapon in weapons:
-		if current_type != weapon.class_ or weapon == weapons[0]:
-			if weapon != weapons[0]:
-				current_type = weapon.class_
-				string += f"</fieldset></td>"
-			string += f"""<td><fieldset><legend>{weapon.class_}{"" if weapon.class_ == "Else" else "s"}:</legend>"""
-			
-		weapon_name = weapon.name
-		string += f"""<input type="checkbox" id="{weapon_name}" value="{weapon_name}" onchange="toggledCheckbox(event)"><label for="{weapon_name}">{weapon_name}</label><br>"""
-
-		if weapon == weapons[-1]:
-			string += "</fieldset></td>"
-		pass
-	string += """</tr></table>"""
-	
-	# displayed stat
-	string += """<fieldset><legend>Stat:</legend><form><table id="displayed stat"><tr>"""
-	for stat in stat_names:
-		string += f"""<td><input type="radio" id="{stat}" name="stat" onchange="changedStat()" {"checked" if stat == stat_names[0] else ""}><label for="{stat}">{stat}</label></td>"""
-	string += f"""<tr><td></td><td></td><td></td><td colspan="2" align="center"><input type="number" id="hp" value="100" onchange="changedStat()"><label for="hp"> hp</label></td></tr>"""
-	string += """</tr></table></form></fieldset>"""
-
-	# values
-	string += """<table id="values">"""
-	string += "<tr>" + ("<td></td>" * 51) + """<th colspan="2">Reload time</th></tr>"""
-	string += "<tr><th>Distance</th>"
-	for distance in Weapon.distances:
-		string += f"""<th>{distance}</th>"""
-	string += """<th>&emsp;</th><th>Type</th><th>&emsp;</th><th>RPM</th><th>Capacity</th><th>Pellets</th><th>&emsp;</th><th>ADS time</th><th>&emsp;</th><td>Tactical</td><td>Full</td></tr>"""
-		
-	for weapon in weapons:
-		bg = f"background-color:#{background_colors[weapon.class_]};"
-		string += f"""<tr id="row_{weapon.name}" style="visibility:collapse;"><td style="{bg}">{weapon.name}</td>"""
-		for i in range(len(Weapon.distances)):
-			string += f"""<td>{weapon.damages[i]}</td>"""
-		string += f"""<td></td><td style="{bg}">{weapon.class_}</td><td></td><td style="{bg}">{weapon.rpm}</td><td style="{bg}">{weapon.capacity[0]}+{weapon.capacity[1]}</td>"""
-		string += f"""<td style="{bg}">{weapon.pellets}</td><td></td><td style="{bg}">{weapon.ads_time}</td><td></td><td>a</td><td>b</td></tr>"""
-		string += "</tr>"
-	string += "</table>"
-
-	string += """<table id="data">"""
-	for weapon in weapons:
-		string += f"""<tr style="display:none">"""
-		for i in range(len(Weapon.distances)):
-			string += f"""<td>{weapon.damages[i]}</td>"""
-		string += "</tr>"
-	string += "</table>"	
-
-
-	string += """</body></html>"""
-
-	with open(html_output_file_name, "w") as file:
-		file.write(string)
-	os.system("start " + html_output_file_name)
 
 def save_to_output_files(weapons : list[Weapon]):
 	stat_names = ("Damage per bullet", "Damage per shot", "Damage per second", "Shots to down or kill - old", "Shots to down or kill", "Time to down or kill")
@@ -1271,51 +1143,3 @@ if failed: raise Exception(f"{error()}: See above warnings.")
 save_to_output_files(weapons)
 input("\nCompleted!")
 
-
-# try to reverse engineer the damage drop-off formula for ARs
-
-# # f(x, a, c) = a - round(x*g(a, c)) = round(a - x*g(a, c))
-# # f(c, a, c) = round(0.6*a)
-
-# def inverse_floor(n : int):
-# 	"""return a, b so that a <= x < b fulfills n = floor(x)"""
-# 	return (n + 0., n + 1.)
-# def inverse_round(n : int):
-# 	"""return a, b so that a <= x < b fulfills n = round(x)"""
-# 	return (n - 0.5, n + 0.5)
-
-
-# def f_(x, a, c):
-# 	return a * (1 - x / c * 0.4)
-# def ffloor(x, a, c) :
-# 	return np.floor(f_(x, a, c))
-# def fround(x, a, c) :
-# 	return np.round(f_(x, a, c))
-# def iffloor(x, a, c) :
-# 	return inverse_floor(ffloor(x, a, c))
-# def ifround(x, a, c) :
-# 	return inverse_round(fround(x, a, c))
-
-# c = 11
-# ai = 24
-# ars = [weapon for weapon in weapons if weapon.class_ == "AR"]
-# datasets = np.array([ar.damages for ar in ars])[:,ai:ai+c]
-# print(datasets.shape)
-
-# for i, dataset in enumerate(datasets):
-# 	plt.plot(Weapon.distances[ai:ai+c], dataset)
-	
-# 	arr1 = np.array(iffloor(np.arange(len(dataset)), dataset[0], c))
-# 	if not np.all((arr1[0] <= dataset) & (dataset <= arr1[1])):
-# 		plt.plot(Weapon.distances[ai:ai+c], arr1[0], color="red", label="floor", ls="--")
-# 		plt.plot(Weapon.distances[ai:ai+c], arr1[1], color="red", ls="--")
-		
-# 	arr2 = np.array(ifround(np.arange(len(dataset)), dataset[0], c))
-# 	if not np.all((arr2[0] <= dataset) & (dataset <= arr2[1])):
-# 		plt.plot(Weapon.distances[ai:ai+c], arr2[0], color="blue", label="round", ls="--")
-# 		plt.plot(Weapon.distances[ai:ai+c], arr2[1], color="blue", ls="--")
-
-# 	plt.grid(True)
-# 	plt.legend()
-# 	plt.title(ars[i].name)
-# 	plt.show()
