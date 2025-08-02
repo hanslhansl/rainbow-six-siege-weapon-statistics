@@ -59,6 +59,8 @@ from openpyxl.styles import PatternFill, Border, Alignment, NamedStyle, Side, Fo
 from openpyxl.formatting.rule import ColorScaleRule
 from openpyxl.utils import get_column_letter
 
+colorama.just_fix_windows_console()
+
 # check if the settings are correct
 if not os.path.isfile(operators_file_name):
 	raise Exception(f"{error()}: '{operators_file_name}' is not a valid file path.")
@@ -70,8 +72,6 @@ if not 0 <= first_distance:
 	raise Exception(f"{error()}: 'first_distance' must be >=0 but is {first_distance}.")
 if not first_distance <= last_distance:
 	raise Exception(f"{error()}: 'last_distance' must be >='first_distance'={first_distance} but is {last_distance}.")
-
-colorama.just_fix_windows_console()
 
 def color_to_openpyxl_color(s : str):
 	r, g, b = int(s[0:2], 16) / 0xFF, int(s[2:4], 16) / 0xFF, int(s[4:6], 16) / 0xFF
@@ -1139,5 +1139,5 @@ if failed: raise Exception(f"{error()}: See above warnings.")
 
 # save to excel file
 save_to_output_files(weapons)
-input("\nCompleted!")
+#input("Completed!")
 
