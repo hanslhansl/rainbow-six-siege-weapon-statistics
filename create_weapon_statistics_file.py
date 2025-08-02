@@ -1081,7 +1081,7 @@ def save_to_xlsx_file(weapons : list[Weapon], stat_names : tuple[str,...], stat_
 		"The color gradient illustrates the TTDOK compared to the lowest TTDOK of the weapon's type against the same armor rating (excluding extended barrel stats).")
 
 	
-	tdok_additional_params = [(f"{int(i%3)+1} armor {"+ Rook " if with_rook else ""}({hp} hp)", hp) for i, (hp, with_rook) in enumerate(zip(Weapon.hp_levels, Weapon.with_rook))]
+	tdok_additional_params = [(f"{int(i%3)+1} armor {'+ Rook ' if with_rook else ''}({hp} hp)", hp) for i, (hp, with_rook) in enumerate(zip(Weapon.hp_levels, Weapon.with_rook))]
 
 	# excel file
 	workbook = Workbook()
