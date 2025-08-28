@@ -388,7 +388,7 @@ class Weapon:
 		elif first_nonzero_index == -1:
 			raise Exception(f"{error()}: Weapon '{self.name}' has no damage values at all.")
 		else:
-			if self.class_ == "SG":	# special treatment for shotguns
+			if self.class_ == "SG" or self.name == "Glaive-12":	# special treatment for shotgunsand glaive-12
 				if first_nonzero_index <= 5:
 					for i in range(first_nonzero_index):
 						damages[i] = damages[first_nonzero_index]

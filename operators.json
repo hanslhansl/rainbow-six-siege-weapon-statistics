@@ -652,5 +652,14 @@
       "P229"
     ],
     "side": "D"
+  },
+  "Denari": {
+    "weapons": [
+      "SCORPION EVO 3 A1",
+      "FMG-9",
+      "Glaive-12",
+      "P226 MK 25"
+    ],
+    "side": "D"
   }
 }
