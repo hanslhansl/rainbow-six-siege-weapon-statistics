@@ -51,7 +51,7 @@ def error(s = "Error"):
 	return f"\x1b[38;2;255;0;0m{s}\033[0m"
 
 #imports
-import os, json, typing, math, ctypes, copy, sys, itertools, colorama
+import os, json, typing, math, ctypes, copy, sys, itertools, colorama, pickle
 from openpyxl.cell.text import InlineFont
 from openpyxl.cell.rich_text import TextBlock, CellRichText
 from openpyxl import Workbook
@@ -679,44 +679,38 @@ def add_worksheet_header(worksheet : typing.Any, stat_name : str, stat_link : st
 	
 	worksheet.column_dimensions[get_column_letter(1)].width = 22
 	
-	worksheet.merge_cells(start_row=row, end_row=row, start_column=2, end_column=1 + cols_inbetween)
-	c = worksheet.cell(row=row, column=2)
-	c.value = f"created by hanslhansl, updated for {patch_version}"
-	c.font = Font(bold=True)
+	def add_header_entry(row, start_column, end_column, value, font = None):
+		worksheet.merge_cells(start_row=row, end_row=row, start_column=start_column, end_column=end_column)
+		c = worksheet.cell(row=row, column=start_column)
+		c.value = value
+		if font is not None:
+			c.font = font
+
+	add_header_entry(row, 2, 1 + cols_inbetween,
+	 f"created by hanslhansl, updated for {patch_version}", Font(bold=True))
 
 	row += 1
-	worksheet.merge_cells(start_row=row, end_row=row, start_column=2, end_column=6)
-	c = worksheet.cell(row=row, column=2)
-	c.value = '=HYPERLINK("https://github.com/hanslhansl/Rainbow-Six-Siege-Weapon-Statistics/", "Detailed explanation")'
-	c.font = Font(color = "FF0000FF")
-	
-	worksheet.merge_cells(start_row=row, end_row=row, start_column=8, end_column=14)
-	c = worksheet.cell(row=row, column=8)
-	c.value = '=HYPERLINK("https://docs.google.com/spreadsheets/d/1QgbGALNZGLlvf6YyPLtywZnvgIHkstCwGl1tvCt875Q", "Spreadsheet on Google Sheets")'
-	c.font = Font(color = "FF0000FF")
-	
-	worksheet.merge_cells(start_row=row, end_row=row, start_column=16, end_column=1 + cols_inbetween)
-	c = worksheet.cell(row=row, column=16)
-	c.value = '=HYPERLINK("https://docs.google.com/spreadsheets/d/e/2PACX-1vQ1KitQsZksdVP9YPDInxK3xE2gtu1mpUxV5_PNyE8sSm-vFINdbiL8vo9RA2CRSIbIUePLVA1GCTWZ/pubhtml", "Spreadsheet on Google Drive")'
-	c.font = Font(color = "FF0000FF")
+	add_header_entry(row, 2, 6,
+	 '=HYPERLINK("https://github.com/hanslhansl/Rainbow-Six-Siege-Weapon-Statistics/", "Detailed explanation")', Font(color = "FF0000FF"))
+
+	add_header_entry(row, 8, 14,
+	 '=HYPERLINK("https://docs.google.com/spreadsheets/d/1QgbGALNZGLlvf6YyPLtywZnvgIHkstCwGl1tvCt875Q", "Spreadsheet on Google Sheets")', Font(color = "FF0000FF"))
+
+	add_header_entry(row, 16, 1 + cols_inbetween,
+	 '=HYPERLINK("https://docs.google.com/spreadsheets/d/e/2PACX-1vQ1KitQsZksdVP9YPDInxK3xE2gtu1mpUxV5_PNyE8sSm-vFINdbiL8vo9RA2CRSIbIUePLVA1GCTWZ/pubhtml", "Spreadsheet on Google Drive")', Font(color = "FF0000FF"))
 
 	row += 2
-	worksheet.merge_cells(start_row=row, end_row=row, start_column=2, end_column=1 + cols_inbetween)
-	c = worksheet.cell(row=row, column=2)
 	if type(stat_link) == str:
-		c.value = f'=HYPERLINK("https://github.com/hanslhansl/Rainbow-Six-Siege-Weapon-Statistics/#{stat_link}", "{stat_name}")'
-		c.font = Font(color = "FF0000FF", bold=True)
+		add_header_entry(row, 2, 1 + cols_inbetween,
+			f'=HYPERLINK("https://github.com/hanslhansl/Rainbow-Six-Siege-Weapon-Statistics/#{stat_link}", "{stat_name}")', Font(color = "FF0000FF", bold=True))
 	else:
-		c.value = stat_name
-		c.font = Font(bold=True)
+		add_header_entry(row, 2, 1 + cols_inbetween, stat_name, Font(bold=True))
 	
 	if type(description) == str:
 		description = (description, )
 	for desc in description:
 		row += 1
-		worksheet.merge_cells(start_row=row, end_row=row, start_column=2, end_column=1 + cols_inbetween)
-		c = worksheet.cell(row=row, column=2)
-		c.value = desc
+		add_header_entry(row, 2, 1 + cols_inbetween, desc)
 	
 	return row
 
@@ -727,119 +721,85 @@ def add_weapon_to_worksheet(worksheet : typing.Any, weapon : Weapon, stat_method
 		c = worksheet.cell(row=row, column=1)
 		c.value = sub_name
 	
-	if additional_param == None:
-		for col in range(2, len(Weapon.distances) + 2):
-			c = worksheet.cell(row=row, column=col)
+	for col in range(2, len(Weapon.distances) + 2):
+		c = worksheet.cell(row=row, column=col)
+		if additional_param == None:
 			c.value, c.style = stat_method(weapon, col - 2)
-		if format_method != None:
-			cond_format = format_method(weapon)
-			if cond_format in cond_formats:
-				cond_formats[cond_format] += f" {get_column_letter(2)}{row}:{get_column_letter(len(Weapon.distances)+2)}{row}"
-			else:
-				cond_formats[cond_format] = f"{get_column_letter(2)}{row}:{get_column_letter(len(Weapon.distances)+2)}{row}"
-		
-	else:
-		for col in range(2, len(Weapon.distances) + 2):
-			c = worksheet.cell(row=row, column=col)
+		else:
 			c.value, c.style = stat_method(weapon, col - 2, additional_param)
-		if format_method != None:
+	if format_method != None:
+		if additional_param == None:
+			cond_format = format_method(weapon)
+		else:
 			cond_format = format_method(weapon, additional_param)
-			if cond_format in cond_formats:
-				cond_formats[cond_format] += f" {get_column_letter(2)}{row}:{get_column_letter(len(Weapon.distances)+2)}{row}"
-			else:
-				cond_formats[cond_format] = f"{get_column_letter(2)}{row}:{get_column_letter(len(Weapon.distances)+2)}{row}"
-		
+
+		if cond_format in cond_formats:
+			cond_formats[cond_format] += f" {get_column_letter(2)}{row}:{get_column_letter(len(Weapon.distances)+2)}{row}"
+		else:
+			cond_formats[cond_format] = f"{get_column_letter(2)}{row}:{get_column_letter(len(Weapon.distances)+2)}{row}"
+
 	return
 
 def add_secondary_weapon_stats_header(worksheet : typing.Any, row : int, col : int):
 	
 	worksheet.freeze_panes = worksheet.cell(row=row+1, column=2)
 
-	c = worksheet.cell(row=row, column=col)
-	c.value = "Distance"
+	def add_secondary_stat_header(row, col, value, alignment, width = None):
+		c = worksheet.cell(row=row, column=col)
+		c.value = value
+		c.alignment = alignment
+		if width:
+			worksheet.column_dimensions[get_column_letter(col)].width = width
+
 	al = copy.copy(Weapon.alignment)
 	al.horizontal = "left"
-	c.alignment = al
+	add_secondary_stat_header(row, col, "Distance", al)
 
 	for col in range(2, len(Weapon.distances) + 2):
-		c = worksheet.cell(row=row, column=col)
-		c.value = Weapon.distances[col - 2]
-		c.alignment = Weapon.alignment
-		worksheet.column_dimensions[get_column_letter(col)].width = 4.8
+		add_secondary_stat_header(row, col, Weapon.distances[col - 2], Weapon.alignment, 4.8)
 		
 	col += 1
 	worksheet.column_dimensions[get_column_letter(col)].width = 3
 
 	col += 1
-	c = worksheet.cell(row=row, column=col)
-	c.value = "Class"
-	c.alignment = Weapon.alignment
-	worksheet.column_dimensions[get_column_letter(col)].width = 10
+	add_secondary_stat_header(row, col, "Class", Weapon.alignment, 10)
 
 	col += 1
 	worksheet.column_dimensions[get_column_letter(col)].width = 3
 	
 	col += 1
-	c = worksheet.cell(row=row, column=col)
-	c.value = "RPM"
-	c.alignment = Weapon.alignment
-	worksheet.column_dimensions[get_column_letter(col)].width = 6
+	add_secondary_stat_header(row, col, "RPM", Weapon.alignment, 6)
 
 	col += 1
-	c = worksheet.cell(row=row, column=col)
-	c.value = "Capacity"
-	c.alignment = Weapon.alignment
-	worksheet.column_dimensions[get_column_letter(col)].width = 10
+	add_secondary_stat_header(row, col, "Capacity", Weapon.alignment, 10)
 	
 	col += 1
-	c = worksheet.cell(row=row, column=col)
-	c.value = "Ammo"
-	c.alignment = Weapon.alignment
-	worksheet.column_dimensions[get_column_letter(col)].width = 8
+	add_secondary_stat_header(row, col, "Ammo", Weapon.alignment, 8)
 
 	col += 1
-	c = worksheet.cell(row=row, column=col)
-	c.value = "Pellets"
-	c.alignment = Weapon.alignment
-	worksheet.column_dimensions[get_column_letter(col)].width = 8
+	add_secondary_stat_header(row, col, "Pellets", Weapon.alignment, 8)
 	
 	col += 1
 	worksheet.column_dimensions[get_column_letter(col)].width = 3
 	
 	col += 1
-	c = worksheet.cell(row=row, column=col)
-	c.value = "ADS"
-	c.alignment = Weapon.alignment
-	worksheet.column_dimensions[get_column_letter(col)].width = 6
+	add_secondary_stat_header(row, col, "ADS", Weapon.alignment, 6)
 
 	col += 1
-	c = worksheet.cell(row=row, column=col)
-	c.value = "+ Laser"
-	c.alignment = Weapon.alignment
-	worksheet.column_dimensions[get_column_letter(col)].width = 9
+	add_secondary_stat_header(row, col, "+ Laser", Weapon.alignment, 9)
 
 	col += 1
 	worksheet.column_dimensions[get_column_letter(col)].width = 3
 
 	col += 1
-
-	c = worksheet.cell(row=row, column=col)
-	c.value = "Full reload"
-	c.alignment = Weapon.alignment
-	worksheet.column_dimensions[get_column_letter(col)].width = 11
+	add_secondary_stat_header(row, col, "Full reload", Weapon.alignment, 11)
 	
 	col += 1
-	c = worksheet.cell(row=row, column=col)
-	c.value = "Tactical"
-	c.alignment = Weapon.alignment
-	worksheet.column_dimensions[get_column_letter(col)].width = 8
+	add_secondary_stat_header(row, col, "Tactical", Weapon.alignment, 8)
 	
 	col += 1
 	worksheet.merge_cells(start_row=row, end_row=row, start_column=col, end_column=col + 1)
-	c = worksheet.cell(row=row, column=col)
-	c.value = "+ Angled grip"
-	c.alignment = Weapon.alignment
-	worksheet.column_dimensions[get_column_letter(col)].width = 7
+	add_secondary_stat_header(row, col, "+ Angled grip", Weapon.alignment, 7)
 
 	col += 1
 	worksheet.column_dimensions[get_column_letter(col)].width = 7
@@ -848,12 +808,9 @@ def add_secondary_weapon_stats_header(worksheet : typing.Any, row : int, col : i
 	worksheet.column_dimensions[get_column_letter(col)].width = 3
 	
 	col += 1
-	c = worksheet.cell(row=row, column=col)
-	c.value = "Operators"
 	al = copy.copy(Weapon.alignment)
 	al.horizontal = "left"
-	c.alignment = al
-	worksheet.column_dimensions[get_column_letter(col)].width = 50
+	add_secondary_stat_header(row, col, "Operators", al, 50)
 
 	return row
 
@@ -1120,27 +1077,38 @@ def save_to_output_files(weapons : list[Weapon]):
 	save_to_xlsx_file(weapons, stat_names, stat_links)
 	return
 
+# https://demo-stockpeers.streamlit.app/?ref=streamlit-io-gallery-favorites&stocks=AAPL%2CMSFT%2CGOOGL%2CNVDA%2CAMZN%2CTSLA%2CADP%2CACN%2CABBV%2CAMT%2CAXP%2CAMGN%2CAMD
 
-# get all weapons from the files
-weapons = get_weapons_list()
+if __name__ == "__main__":
 
-# group weapons by class and by base damage
-weapons_sorted = sorted(weapons, key=lambda obj: (obj.class_, obj.damages[0]))
-grouped = [list(group) for key, group in itertools.groupby(weapons_sorted, key=lambda o: (o.class_, o.damages[0]))]
-# find all weapons with the same base damage but different damage drop-off
-failed = False
-for group in grouped:
-	if len(group) > 1:
-		for i, distance in enumerate(Weapon.distances):
-			if len(set(weapon.damages[i] for weapon in group)) > 1:
-				print(f"{warning()}: These {group[0].class_}s have the {warning('same base damage')} ({group[0].damages[0]}) but {warning('different damages')} at {distance}m:")
-				for weapon in group:
-					print(f"{weapon.name}: {weapon.damages[i]}")
-				failed = True
-if failed: raise Exception(f"{error()}: See above warnings.")
+	# get all weapons from the files
+	weapons = get_weapons_list()
+
+	ser = pickle.dumps(weapons[0])
+	with open("test", "wb") as file:
+		pickle.dump(weapons[0], file)
+	print(len(ser))
+	print(len(str(weapons[0].__dict__)))
+	sys.exit()
+
+	# verify
+	# group weapons by class and by base damage
+	weapons_sorted = sorted(weapons, key=lambda obj: (obj.class_, obj.damages[0]))
+	grouped = [list(group) for key, group in itertools.groupby(weapons_sorted, key=lambda o: (o.class_, o.damages[0]))]
+	# find all weapons with the same base damage but different damage drop-off
+	failed = False
+	for group in grouped:
+		if len(group) > 1:
+			for i, distance in enumerate(Weapon.distances):
+				if len(set(weapon.damages[i] for weapon in group)) > 1:
+					print(f"{warning()}: These {group[0].class_}s have the {warning('same base damage')} ({group[0].damages[0]}) but {warning('different damages')} at {distance}m:")
+					for weapon in group:
+						print(f"{weapon.name}: {weapon.damages[i]}")
+					failed = True
+	if failed: raise Exception(f"{error()}: See above warnings.")
 
 
-# save to excel file
-save_to_output_files(weapons)
-#input("Completed!")
+	# save to excel file
+	save_to_output_files(weapons)
+	#input("Completed!")
 
