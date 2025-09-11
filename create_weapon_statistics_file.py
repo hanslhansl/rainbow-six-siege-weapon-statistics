@@ -338,6 +338,9 @@ class Weapon:
 
 		return
 
+	def __repr__(self):
+		return f"<Weapon: {self.name}>"
+
 	def validate_damages(self, distance_damage_dict : dict[int, int]):
 		# insert missing distances with damage = 0
 		for distance in Weapon.distances:
@@ -1082,16 +1085,9 @@ if __name__ == "__main__":
 	# get all weapons from the files
 	weapons = get_weapons_list()
 
-	ser = pickle.dumps(weapons[0])
-	with open("test", "wb") as file:
-		pickle.dump(weapons[0], file)
-	print(len(ser))
-	print(len(str(weapons[0].__dict__)))
-	sys.exit()
-
 	# verify
 	# group weapons by class and by base damage
-	weapons_sorted = sorted(weapons, key=lambda obj: (obj.class_, obj.damages[0]))
+	weapons_sorted = sorted(weapons.copy(), key=lambda obj: (obj.class_, obj.damages[0]))
 	grouped = [list(group) for key, group in itertools.groupby(weapons_sorted, key=lambda o: (o.class_, o.damages[0]))]
 	# find all weapons with the same base damage but different damage drop-off
 	failed = False

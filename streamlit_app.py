@@ -15,7 +15,13 @@ def calculate_average_damage(selected_weapons : create_weapon_statistics_file.We
 
 # Load data
 weapons = get_weapons_list()
+print(weapons)
 raw_data = pd.DataFrame({w.name : w.damages for w in weapons}).transpose()
+
+# Initialize session state
+if "selected_weapons" not in st.session_state:
+    temp : set[create_weapon_statistics_file.Weapon] = set()
+    st.session_state.selected_weapons = temp
 
 # Streamlit UI
 st.set_page_config(
@@ -34,18 +40,31 @@ top_left_cell = cols[0].container(
 )
 
 with top_left_cell:
+
+    #Button to add subset
+    if st.button("ARs"):
+        # Merge current selection with subset, avoiding duplicates
+        st.session_state.selected_weapons.update(w for w in weapons if w.class_ == "AR")
+        #st.session_state.selected_weapons = st.session_state.selected_weapons + {w for w in weapons if w.class_ == "AR"}
+
     # Suchfeld und Waffenfilter
     search_query = st.text_input("🔍 search weapon")
     filtered_weapons = [w for w in weapons if search_query.lower() in w.name.lower()]
-    selected_weapons = st.multiselect(
-        label="select weapon",
-        options=filtered_weapons,
-        #default=filtered_weapons,
-        format_func=lambda w: w.name
-        )
+    try:
+        selected_weapons = st.multiselect(
+            label="select weapon",
+            options=filtered_weapons,
+            default=list(st.session_state.selected_weapons),
+            format_func=lambda w: w.name
+            )
+    except st.errors.StreamlitAPIException:
+        print("filtered_weapons:", filtered_weapons)
+        print("st.session_state.selected_weapons:", st.session_state.selected_weapons)
+        raise
 
     # Durchschnittsanzeige
     show_average = st.checkbox("show average")
+
 
 right_cell = cols[1].container(
     border=True, height="stretch", vertical_alignment="center"
@@ -75,4 +94,4 @@ with right_cell:
 ## raw data
 """
 
-raw_data
+st.dataframe(raw_data, height=700)
