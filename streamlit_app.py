@@ -1,4 +1,4 @@
-import create_weapon_statistics_file, streamlit as st, matplotlib.pyplot as plt, pandas as pd
+import create_weapon_statistics_file, streamlit as st, matplotlib.pyplot as plt, pandas as pd, altair as alt, numpy as np
 
 # https://demo-stockpeers.streamlit.app/?ref=streamlit-io-gallery-favorites&stocks=AAPL%2CMSFT%2CGOOGL%2CNVDA%2CAMZN%2CTSLA%2CADP%2CACN%2CABBV%2CAMT%2CAXP%2CAMGN%2CAMD
 github_url = "https://github.com/hanslhansl/rainbow-six-siege-weapon-statistics"
@@ -15,7 +15,6 @@ def calculate_average_damage(selected_weapons : create_weapon_statistics_file.We
 
 # Load data
 weapons = get_weapons_list()
-print(weapons)
 raw_data = pd.DataFrame({w.name : w.damages for w in weapons}).transpose()
 
 # Initialize session state
@@ -50,21 +49,15 @@ with top_left_cell:
     # Suchfeld und Waffenfilter
     search_query = st.text_input("🔍 search weapon")
     filtered_weapons = [w for w in weapons if search_query.lower() in w.name.lower()]
-    try:
-        selected_weapons = st.multiselect(
-            label="select weapon",
-            options=filtered_weapons,
-            default=list(st.session_state.selected_weapons),
-            format_func=lambda w: w.name
-            )
-    except st.errors.StreamlitAPIException:
-        print("filtered_weapons:", filtered_weapons)
-        print("st.session_state.selected_weapons:", st.session_state.selected_weapons)
-        raise
+    selected_weapons = st.multiselect(
+        label="select weapon",
+        options=filtered_weapons,
+        #default=list(st.session_state.selected_weapons),
+        format_func=lambda w: w.name
+        )
 
     # Durchschnittsanzeige
     show_average = st.checkbox("show average")
-
 
 right_cell = cols[1].container(
     border=True, height="stretch", vertical_alignment="center"
@@ -73,19 +66,42 @@ right_cell = cols[1].container(
 with right_cell:
 # Plot erstellen
     if selected_weapons:
-        fig, ax = plt.subplots()
-        for weapon in selected_weapons:
-            ax.plot(create_weapon_statistics_file.Weapon.distances, weapon.damages, label=weapon.name)
-        
-        if show_average:
-            avg_damage = calculate_average_damage(selected_weapons)
-            ax.plot(create_weapon_statistics_file.Weapon.distances, avg_damage, label="Average", linestyle='--', color='black')
+        if False: # plt
+            fig, ax = plt.subplots()
+            for weapon in selected_weapons:
+                ax.plot(create_weapon_statistics_file.Weapon.distances, weapon.damages, label=weapon.name)
+            
+            if show_average:
+                avg_damage = calculate_average_damage(selected_weapons)
+                ax.plot(create_weapon_statistics_file.Weapon.distances, avg_damage, label="Average", linestyle='--', color='black')
 
-        ax.set_xlabel("distance (meter)")
-        ax.set_ylabel("damage per bullet")
-        ax.set_title("damage over distance")
-        ax.legend()
-        st.pyplot(fig)
+            ax.set_xlabel("distance (meter)")
+            ax.set_ylabel("damage per bullet")
+            ax.set_title("damage over distance")
+            ax.legend()
+            st.pyplot(fig)
+        else: # altair
+            data = pd.DataFrame.from_dict({w.name : w.damages for w in selected_weapons}, orient="index", columns=create_weapon_statistics_file.Weapon.distances)
+            print(data)
+            #data = pd.DataFrame(np.random.default_rng(0).standard_normal((60, 3)), columns=("a", "b", "c"))
+            #print(data)
+            st.altair_chart(
+                alt.Chart(
+                    #normalized.reset_index().melt(
+                    #    id_vars=["distance"], var_name="weapon", value_name="damage"
+                    #)
+                    data.reset_index().melt(
+                        id_vars=["distance"], var_name="weapon", value_name="damage"
+                    )
+                )
+                .mark_line()
+                .encode(
+                    alt.X("distance"),
+                    alt.Y("damage").scale(zero=False),
+                    alt.Color("weapon:N"),
+                )
+                .properties(height=400)
+            )
     else:
         st.info("selet at least one weapon")
 
