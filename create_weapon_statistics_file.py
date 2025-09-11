@@ -35,6 +35,7 @@ background_colors = {"AR":"5083EA", "SMG":"B6668E", "MP":"76A5AE", "LMG":"8771BD
 ###################################################
 
 # install exception catcher
+from tkinter import W
 import sys, traceback
 
 def show_exception_and_exit(exc_type, exc_value, tb):
@@ -137,10 +138,9 @@ class Weapon:
 	
 	fills = {type_ : PatternFill(fgColor=background_colors[type_], fill_type = "solid") for type_ in classes}
 	
-	stylesABF = (lambda t=classes, a=alignment, b=borders, f=fills: {type_ : NamedStyle(name=type_ + " ABF", alignment=a, border=b[type_], fill=f[type_]) for type_ in t})()
 	stylesBF = (lambda t=classes, b=borders, f=fills: {type_ : NamedStyle(name=type_ + " BF", border=b[type_], fill=f[type_]) for type_ in t})()
-	stylesAB = (lambda t=classes, a=alignment, b=borders: {type_ : NamedStyle(name=type_ + " AB", alignment=a, border=b[type_]) for type_ in t})()
-	stylesA = NamedStyle(name="A", alignment=alignment)
+	stylesB = (lambda t=classes, b=borders: {type_ : NamedStyle(name=type_ + " B", border=b[type_]) for type_ in t})()
+	styleNormal = "Normal"
 
 	default_rpm = 0
 	default_ads = 0.
@@ -226,10 +226,10 @@ class Weapon:
 				raise Exception(f"{error()}: Weapon '{self.name}' doesn't have exactly 2 magazine capacity values.")
 			if type(self.json_content["capacity"][0]) != int or type(self.json_content["capacity"][1]) != int:
 				raise Exception(f"{error()}: Weapon '{self.name}' has magazine capacities that don't deserialize to integers.")
-			self.capacity = (self.json_content["capacity"][0], self.json_content["capacity"][1])
+			self._capacity = (self.json_content["capacity"][0], self.json_content["capacity"][1])
 		else:
 			print(f"{warning('Warning:')} Weapon '{warning(self.name)}' is missing the {warning('magazine capacity')}. Using default value ({self.default_capacity}) instead.")
-			self.capacity = self.default_capacity
+			self._capacity = self.default_capacity
 
 		# get extra ammo
 		if "extra_ammo" in self.json_content:
@@ -249,41 +249,6 @@ class Weapon:
 			raise Exception(f"{error()}: Weapon '{self.name}' has damage values that don't deserialize to integers.")
 		distance_damage_dict = {int(distance) : int(damage) for distance, damage in self.json_content["damages"].items()}
 		self.damages = self.validate_damages(distance_damage_dict)
-
-		# get weapon extended barrel
-		potential_eb = copy.copy(self)
-		self.is_extended_barrel = False	# whether this is an extended barrel version
-		if "extended_barrel" in self.json_content:
-			if type(self.json_content["extended_barrel"]) == bool:	# use default damage multiplier for extended barrel
-				self.has_extended_barrel = self.json_content["extended_barrel"]
-				if self.has_extended_barrel == True:
-					print(f"{warning('Warning:')} Using {warning('approximated')} extended barrel stats for weapon '{warning(self.name)}'.")
-					potential_eb.damages = tuple(math.ceil(dmg * self.extended_barrel_damage_multiplier) for dmg in self.damages)
-
-			elif type(self.json_content["extended_barrel"]) == dict:	# use custom damages for extended barrel
-				if not all(isinstance(damage, int) for damage in self.json_content["extended_barrel"].values()):
-					raise Exception(f"{error()}: Weapon '{self.name}' has damage values that don't deserialize to integers.")
-				#print(f"{message('Message:')} Using {message('exact')} extended barrel stats for weapon '{message(self.name)}'.")
-				self.has_extended_barrel = True
-				potential_eb.damages = self.validate_damages({int(distance) : int(damage) for distance, damage in self.json_content["extended_barrel"].items()})
-			else:
-				raise Exception(f"{error()}: Weapon '{self.name}' has an extended barrel value that doesn't deserialize to a bool or a dict.")
-		else:
-			print(f"{warning('Warning:')} Weapon '{warning(self.name)}' is missing an {warning('extended barrel')} value. Using default value ({self.default_has_extended_barrel}) instead.")
-			self.has_extended_barrel = Weapon.default_has_extended_barrel
-				
-		if self.has_extended_barrel == True:
-			potential_eb.json_content = None
-			potential_eb.name = Weapon.extended_barrel_weapon_name
-
-			potential_eb.has_extended_barrel = False
-			potential_eb.extended_barrel_weapon = None
-			potential_eb.is_extended_barrel = True
-			potential_eb.extended_barrel_parent = self
-		
-			potential_eb.DmgPerShotColorScaleRule = None
-				
-			self.extended_barrel_weapon = potential_eb
 
 		# get laser
 		if "laser" in self.json_content:
@@ -334,6 +299,45 @@ class Weapon:
 				Weapon.lowest_highest_ttdok[hp][self.class_] = min(TTDOK), max(TTDOK)
 			else:
 				Weapon.lowest_highest_ttdok[hp][self.class_] = min(Weapon.lowest_highest_ttdok[hp][self.class_][0], min(TTDOK)), max(Weapon.lowest_highest_ttdok[hp][self.class_][1], max(TTDOK))
+
+		self.styleBF = self.stylesBF[self.class_]
+		self.styleB = self.stylesB[self.class_]
+
+
+		# get extended barrel weapon, needs to be last bc of copy()
+		potential_eb = copy.copy(self)
+		self.is_extended_barrel = False	# whether this is an extended barrel version
+		if "extended_barrel" in self.json_content:
+			if type(self.json_content["extended_barrel"]) == bool:	# use default damage multiplier for extended barrel
+				self.has_extended_barrel = self.json_content["extended_barrel"]
+				if self.has_extended_barrel == True:
+					print(f"{warning('Warning:')} Using {warning('approximated')} extended barrel stats for weapon '{warning(self.name)}'.")
+					potential_eb.damages = tuple(math.ceil(dmg * self.extended_barrel_damage_multiplier) for dmg in self.damages)
+
+			elif type(self.json_content["extended_barrel"]) == dict:	# use custom damages for extended barrel
+				if not all(isinstance(damage, int) for damage in self.json_content["extended_barrel"].values()):
+					raise Exception(f"{error()}: Weapon '{self.name}' has damage values that don't deserialize to integers.")
+				#print(f"{message('Message:')} Using {message('exact')} extended barrel stats for weapon '{message(self.name)}'.")
+				self.has_extended_barrel = True
+				potential_eb.damages = self.validate_damages({int(distance) : int(damage) for distance, damage in self.json_content["extended_barrel"].items()})
+			else:
+				raise Exception(f"{error()}: Weapon '{self.name}' has an extended barrel value that doesn't deserialize to a bool or a dict.")
+		else:
+			print(f"{warning('Warning:')} Weapon '{warning(self.name)}' is missing an {warning('extended barrel')} value. Using default value ({self.default_has_extended_barrel}) instead.")
+			self.has_extended_barrel = Weapon.default_has_extended_barrel
+				
+		if self.has_extended_barrel == True:
+			potential_eb.json_content = None
+			potential_eb.name = Weapon.extended_barrel_weapon_name
+
+			potential_eb.has_extended_barrel = False
+			potential_eb.extended_barrel_weapon = None
+			potential_eb.is_extended_barrel = True
+			potential_eb.extended_barrel_parent = self
+		
+			potential_eb.DmgPerShotColorScaleRule = None
+				
+			self.extended_barrel_weapon = potential_eb
 
 		return
 
@@ -418,7 +422,7 @@ class Weapon:
 		if self.has_laser == True:
 			return self.ads_time / self.laser_ads_speed_multiplier
 		else:
-			raise Exception(f"{error()}: Weapon '{self.name}' doesn't have a laser.")
+			return None
 	@property
 	def reload_times_with_angled_grip(self):
 		if self.has_grip == True:
@@ -430,7 +434,7 @@ class Weapon:
 				rt1 /= self.angled_grip_reload_speed_multiplier
 			return rt0, rt1
 		else:
-			raise Exception(f"{error()}: Weapon '{self.name}' doesn't have a grip.")
+			return None
 	def damage_per_shot(self, index : int):
 		return self.damages[index] * self.pellets
 	def dps(self, index : int):
@@ -441,67 +445,39 @@ class Weapon:
 		return (self.stdok(index, hp) - 1) / self.rpms
 	def how_useful_is_extended_barrel(self, hp : int):
 		return self.extended_barrel_parent.stdok(0, hp) - self.stdok(0, hp), self.extended_barrel_parent.ttdok(0, hp) - self.ttdok(0, hp)
+	@property
+	def capacity(self):
+		return str(self._capacity[0]) + "+" + str(self._capacity[1])
 
 	# properties with excel styles
-	def getName(self):
+	def getNameStyle(self):
 		if self.name == self.extended_barrel_weapon_name:
-			return self.name, "Normal"
+			return self.styleNormal
 		else:
-			return self.name, self.getStyleBF()
-	def getClass(self):
-		return self.class_, self.getStyleABF()
-	def getRPM(self):
-		return self.rpm, self.getStyleABF()
-	def getRPS(self):
-		return self.rps, self.getStyleABF()
-	def getRPMS(self):
-		return self.rpms, self.getStyleABF()
+			return self.styleBF
 	def getDamage(self, index : int):
 		return self.damages[index], self.getDamageStyle(index)
 	def getDamagePerShot(self, index : int):
-		return self.damage_per_shot(index), self.getStyleAB()
+		return self.damage_per_shot(index), self.styleB
 	def getDPS(self, index : int):
-		return int(self.dps(index) + 0.5), self.getStyleAB()
+		return int(self.dps(index) + 0.5), self.styleB
 	def getSTDOK(self, index : int, hp : int):
 		return self.stdok(index, hp), self.getSTDOKStyle(index, hp)
 	def getTTDOK(self, index : int, hp : int):
-		return int(self.ttdok(index, hp) + 0.5), self.getStyleAB()
-	def getCapacity(self):
-		return str(self.capacity[0]) + "+" + str(self.capacity[1]), self.getStyleABF()
-	def getExtraAmmo(self):
-		return self.extra_ammo, self.getStyleABF()
-	def getReloadTimes(self):
-		return str(self.reload_times[0]), str(self.reload_times[1]), self.getStyleABF()
-	def getReloadTimesWithAngledGrip(self):
-		if self.has_grip == False:
-			return "", "", self.getStyleA()
-		else:
-			return str(self.reload_times_with_angled_grip[0]), str(self.reload_times_with_angled_grip[1]), self.getStyleABF()
-	def getPellets(self):
-		if self.pellets == 1:
-			return "", self.getStyleA()
-		else:
-			return self.pellets, self.getStyleABF()
-	def getADSTime(self):
-		return str(self.ads_time), self.getStyleABF()
-	def getADSTimeWithLaser(self):
-		if self.has_laser == False:
-			return "", self.getStyleA()
-		else:
-			return str(round(self.ads_time_with_laser, 3)), self.getStyleABF()
+		return int(self.ttdok(index, hp) + 0.5), self.styleB
 	def getDamageToBaseDamagePercentage(self, index : int):
 		val = round(self.damages[index] / max(self.damages), 2)
 		if val == 1:
-			return 1, self.getStyleAB()
+			return 1, self.styleB
 		else:
-			return val, self.getStyleAB()
-			return str(val)[1:], self.getStyleAB()
+			return val, self.styleB
+			return str(val)[1:], self.styleB
 	def getHowUsefulIsExtendedBarrel(self, hp : int):
 		usefulness = self.how_useful_is_extended_barrel(hp)
 		if usefulness[0] == 0:
-			return 0, 0, self.getStyleA()
+			return 0, 0, self.styleNormal
 		else:
-			return usefulness[0], int(usefulness[1] + 0.5), self.getStyleABF()
+			return usefulness[0], int(usefulness[1] + 0.5), self.styleBF
 	def getOperators(self):
 		elements = [op.rich_text_name for op in self.operators]
 		n = 1
@@ -514,26 +490,17 @@ class Weapon:
 	# excel styles
 	def getDamageStyle(self, index : int):
 		if is_index_in_intervals(index, self.getDamageDropoffBorders()) is None:
-			return self.getStyleABF()
+			return self.styleBF
 		else:
-			return self.getStyleA()
+			return self.styleNormal
 	def getSTDOKStyle(self, index : int, hp : int):
 		# if this is the extended barrel version of a weapon
 		if self.is_extended_barrel:
 			# if the stdok of the extended barrel version is different from the stdok of the normal version
 			if self.stdok(index, hp) != self.extended_barrel_parent.stdok(index, hp):
-				return self.getStyleABF()
+				return self.styleBF
 			
-		return self.getStyleA()
-		
-	def getStyleABF(self):
-		return self.stylesABF[self.class_]
-	def getStyleAB(self):
-		return self.stylesAB[self.class_]
-	def getStyleBF(self):
-		return self.stylesBF[self.class_]
-	def getStyleA(self):
-		return self.stylesA
+		return self.styleNormal
 	
 	def getDmgPerShotColorScaleRule(self):
 		if self.DmgPerShotColorScaleRule == None:
@@ -570,8 +537,6 @@ class Weapon:
 
 	# other methods
 	def getDamageDropoffBorders(self):
-		
-
 		intervals = get_non_stagnant_intervals(self.damages)
 		if self.class_ == "SG":
 			if len(intervals) != 2:
@@ -585,6 +550,14 @@ class Weapon:
 			return self.extended_barrel_weapon
 		else:
 			raise Exception(f"{error()}: Weapon '{self.name}' doesn't have an extended barrel version.")
+
+	# pandas styling
+	def pdNameColor(self):
+		if self.name == self.extended_barrel_weapon_name:
+			return ""
+		else:
+			return background_colors[self.class_]
+
 
 class Operator:
 	attacker_color = color_to_openpyxl_color("198FEB")
@@ -651,7 +624,7 @@ def get_operators_list(weapons : list[Weapon], file_name : str) -> None:
 		
 	return
 
-def get_weapons_list() -> list[Weapon]:
+def get_weapons_dict() -> dict[str, Weapon]:
 	attachment_categories = deserialize_json(attachment_overview_file_name)
 	Weapon.extended_barrel_damage_multiplier = 1.0 + attachment_categories["Barrels"]["Extended barrel"]["damage bonus"]
 	Weapon.laser_ads_speed_multiplier = 1.0 + attachment_categories["Under Barrel"]["Laser"]["ads speed bonus"]
@@ -674,7 +647,7 @@ def get_weapons_list() -> list[Weapon]:
 	
 	weapons = sorted(weapons, key=lambda weapon: (weapon_classes.index(weapon.class_), weapon.name), reverse=False)
 
-	return weapons
+	return {w.name : w for w in weapons}
 
 
 def add_worksheet_header(worksheet : typing.Any, stat_name : str, stat_link : str | None, description : str | tuple[str,...], row : int, cols_inbetween : int):
@@ -729,6 +702,7 @@ def add_weapon_to_worksheet(worksheet : typing.Any, weapon : Weapon, stat_method
 			c.value, c.style = stat_method(weapon, col - 2)
 		else:
 			c.value, c.style = stat_method(weapon, col - 2, additional_param)
+		c.alignment = Weapon.alignment
 	if format_method != None:
 		if additional_param == None:
 			cond_format = format_method(weapon)
@@ -817,48 +791,23 @@ def add_secondary_weapon_stats_header(worksheet : typing.Any, row : int, col : i
 	return row
 
 def add_secondary_weapon_stats(worksheet : typing.Any, weapon : Weapon, row : int, col : int):
-	c = worksheet.cell(row=row, column=col)
-	c.value, c.style = weapon.getClass()
-		
-	col += 2
-	c = worksheet.cell(row=row, column=col)
-	c.value, c.style = weapon.getRPM()
-		
-	col += 1
-	c = worksheet.cell(row=row, column=col)
-	c.value, c.style = weapon.getCapacity()
+	values = [weapon.class_, weapon.rpm, weapon.capacity, weapon.extra_ammo, weapon.pellets, weapon.ads_time, weapon.ads_time_with_laser,
+		  #Weapon.getReload, Weapon.getReloadTimesWithAngledGrip
+		  ]
+	skips = [2, 1, 1, 1, 2, 1, 7]
 
-	col += 1
-	c = worksheet.cell(row=row, column=col)
-	c.value, c.style = weapon.getExtraAmmo()
-
-	col += 1
-	c = worksheet.cell(row=row, column=col)
-	c.value, c.style = weapon.getPellets()
+	for value, skip in zip(values, skips):
+		c = worksheet.cell(row=row, column=col)
 		
-	col += 2
-	c = worksheet.cell(row=row, column=col)
-	c.value, c.style = weapon.getADSTime()
-	
-	col += 1
-	c = worksheet.cell(row=row, column=col)
-	c.value, c.style = weapon.getADSTimeWithLaser()
+		if value != None:
+			if type(value) == float:
+				value = str(round(value, 3))
+			c.value = value
+			c.style = weapon.styleBF
 
-	col += 2
-	# c1 = worksheet.cell(row=row, column=col)
-	col += 1
-	# c2 = worksheet.cell(row=row, column=col)
-	# c1.value, c2.value, c1.style = weapon.getReloadTimes()
-	# c2.style = c1.style
-	
-	col += 1
-	# c1 = worksheet.cell(row=row, column=col)
-	col += 1
-	# c2 = worksheet.cell(row=row, column=col)
-	# c1.value, c2.value, c1.style = weapon.getReloadTimesWithAngledGrip()
-	# c2.style = c1.style
-	
-	col += 2
+		c.alignment = Weapon.alignment
+		col += skip
+
 	c1 = worksheet.cell(row=row, column=col)
 	c1.value = weapon.getOperators()
 
@@ -881,7 +830,8 @@ def add_stats_worksheet(workbook : typing.Any, weapons : list[Weapon], worksheet
 		weapon = weapons[i]
 
 		c = worksheet.cell(row=row, column=1)
-		c.value, c.style = weapon.getName()
+		c.value = weapon.name
+		c.style = weapon.getNameStyle()
 
 		add_secondary_weapon_stats(worksheet, weapon, row, len(Weapon.distances) + 3)
 
@@ -922,7 +872,6 @@ def add_stats_worksheet(workbook : typing.Any, weapons : list[Weapon], worksheet
 		worksheet.conditional_formatting.add(rng, cond_format)
 	
 	return
-
 
 def add_extended_barrel_overview(worksheet : typing.Any, weapons : list[Weapon], row : int, col : int, with_secondary_weapon_stats : bool):
 	col_names = ("1 (100)", "2 (110)", "3 (125)", "1R (120)", "2R (130)", "3R (145)")
@@ -966,7 +915,8 @@ def add_extended_barrel_overview(worksheet : typing.Any, weapons : list[Weapon],
 		col = original_col
 		
 		c = worksheet.cell(row=row, column=col)
-		c.value, c.style = weapon.getName()
+		c.value = weapon.name
+		c.style = weapon.getNameStyle()
 
 		if with_secondary_weapon_stats:
 			add_secondary_weapon_stats(worksheet, weapon, row, col+15)
@@ -1084,7 +1034,7 @@ if __name__ == "__main__":
 	sys.excepthook = show_exception_and_exit
 
 	# get all weapons from the files
-	weapons = get_weapons_list()
+	weapons = list(get_weapons_dict().values())
 
 	# verify
 	# group weapons by class and by base damage
