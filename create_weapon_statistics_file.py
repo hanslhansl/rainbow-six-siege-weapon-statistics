@@ -673,7 +673,7 @@ def get_weapons_list() -> list[Weapon]:
 	# get all operator weapons
 	get_operators_list(weapons, operators_file_name)
 	
-	weapons = sorted(weapons, key=lambda weapon: weapon_classes.index(weapon.class_), reverse=False)
+	weapons = sorted(weapons, key=lambda weapon: (weapon_classes.index(weapon.class_), weapon.name), reverse=False)
 
 	return weapons
 
