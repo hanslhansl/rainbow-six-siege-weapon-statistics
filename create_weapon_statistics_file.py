@@ -1077,8 +1077,6 @@ def save_to_output_files(weapons : list[Weapon]):
 	save_to_xlsx_file(weapons, stat_names, stat_links)
 	return
 
-# https://demo-stockpeers.streamlit.app/?ref=streamlit-io-gallery-favorites&stocks=AAPL%2CMSFT%2CGOOGL%2CNVDA%2CAMZN%2CTSLA%2CADP%2CACN%2CABBV%2CAMT%2CAXP%2CAMGN%2CAMD
-
 if __name__ == "__main__":
 
 	# get all weapons from the files
