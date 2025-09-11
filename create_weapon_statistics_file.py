@@ -41,7 +41,6 @@ def show_exception_and_exit(exc_type, exc_value, tb):
 	traceback.print_exception(exc_type, exc_value, tb)
 	input("\nAbort")
 	sys.exit(-1)
-sys.excepthook = show_exception_and_exit
 
 def warning(s = "Warning"):
 	return f"\x1b[38;2;255;255;0m{s}\033[0m"
@@ -1081,6 +1080,8 @@ def save_to_output_files(weapons : list[Weapon]):
 	return
 
 if __name__ == "__main__":
+	# set exception hook
+	sys.excepthook = show_exception_and_exit
 
 	# get all weapons from the files
 	weapons = get_weapons_list()
