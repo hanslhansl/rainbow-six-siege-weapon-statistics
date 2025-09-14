@@ -58,6 +58,18 @@ operators_file_name += ".json"
 attachment_overview_file_name += ".json"
 xlsx_output_file_name += ".xlsx"
 
+github_link = "https://github.com/hanslhansl/Rainbow-Six-Siege-Weapon-Statistics/"
+google_sheets_link = "https://docs.google.com/spreadsheets/d/1QgbGALNZGLlvf6YyPLtywZnvgIHkstCwGl1tvCt875Q"
+google_drive_link = "https://docs.google.com/spreadsheets/d/e/2PACX-1vQ1KitQsZksdVP9YPDInxK3xE2gtu1mpUxV5_PNyE8sSm-vFINdbiL8vo9RA2CRSIbIUePLVA1GCTWZ/pubhtml"
+
+format_explanations = (
+		"the colored areas represent steady damage, the white areas represent decreasing damage",
+		"the color gradient illustrates the damage compared to the weapon's base damage",
+		"the color gradient illustrates the dps compared to the highest dps of the weapon's type (excluding extended barrel stats)",
+		"the colored areas show where the extended barrel attachment actually affects the stdok",
+		"the color gradient illustrates the ttdok compared to the lowest ttdok of the weapon's type against the same armor rating (excluding extended barrel stats)"
+		)
+
 # check if the settings are correct
 if not os.path.isfile(operators_file_name):
 	raise Exception(f"{error()}: '{operators_file_name}' is not a valid file path.")
@@ -154,9 +166,6 @@ class Weapon:
 	extended_barrel_damage_multiplier = 0.0
 	laser_ads_speed_multiplier = 0.0;
 	angled_grip_reload_speed_multiplier = 0.0;
-	
-	with_rook = (False, False, False, True, True, True)
-	hp_levels = (100, 110, 125, 120, 130, 145)
 
 	lowest_highest_base_dps : dict[str, tuple[int, int]] = {}	# class : (lowest dps, highest dps)
 	lowest_highest_base_ttdok : dict[int, dict[str, tuple[int, int]]] = {}	# hp : {class : (lowest ttdok, highest ttdok)}
@@ -533,10 +542,9 @@ class Weapon:
 
 	# other excel styles
 	def ex_name_style(self):
-		if self.name == self.extended_barrel_weapon_name:
+		if self.is_extended_barrel:
 			return self.ex_style_normal
-		else:
-			return self.ex_style_bf
+		return self.ex_style_bf
 	def ex_operators_rich_text(self):
 		elements = [op.rich_text_name for op in self.operators]
 		n = 1
@@ -551,12 +559,15 @@ class Weapon:
 		return self.ex_fill
 	
 	# pandas styling
-	def pd_name_color(self):
-		if not self.is_extended_barrel:
-			return ""
-		else:
+	def pd_damage_drop_off_color(self, index : int, *_):
+		if self.is_in_damage_drop_off(index):
 			return self.background_color
+		return ""
 
+	def pd_name_color(self):
+		if self.is_extended_barrel:
+			return ""
+		return self.background_color
 
 class Operator:
 	attacker_color = color_to_openpyxl_color("198FEB")
@@ -598,6 +609,42 @@ class Operator:
 		self.rich_text_name = TextBlock(InlineFont(color=Operator.defender_color if self.side else Operator.attacker_color), self.name)
 
 		return
+
+class StatsChooser:
+	names = ("damage per bullet", "damage per shot", "damage per second", "shots to down or kill", "time to down or kill")
+	short_names = ("damage per bullet", "damage per shot", "dps", "stdok", "ttdok")
+	_links = ("damage-per-bullet", "damage-per-shot", "damage-per-second---dps", "shots-to-down-or-kill---stdok", "time-to-down-or-kill---ttdok")
+	links = tuple(f"https://github.com/hanslhansl/Rainbow-Six-Siege-Weapon-Statistics/#{link}" for link in _links)
+
+	stat_methods = (Weapon.damage, Weapon.damage_per_shot, Weapon.dps, Weapon.stdok, Weapon.ttdok)
+
+	tdok_hp_levels = (100, 110, 125, 120, 130, 145)
+	tdok_with_rook = (False, False, False, True, True, True)
+	stat_method_descriptions = tuple(f"{int(i%3)+1} armor {'+ Rook ' if with_rook else ''}({hp} hp)"
+									for i, (hp, with_rook) in enumerate(zip(tdok_hp_levels, tdok_with_rook)))
+	
+	def __init__(self, index : int):
+		self.index = index
+
+		stat_method = self.stat_methods[self.index]
+		if self.index in (3, 4):
+			self.stat_method = tuple(lambda w, i, hp=hp: stat_method(w, i, hp) for hp in self.tdok_hp_levels)
+		else:
+			self.stat_method = (stat_method, )
+
+		return
+
+	@property
+	def name(self):
+		return self.names[self.index]
+	@property
+	def short_name(self):
+		return self.short_names[self.index]
+	@property
+	def link(self):
+		return self.links[self.index]
+
+
 
 
 def deserialize_json(file_name : str):
@@ -664,19 +711,17 @@ def add_worksheet_header(worksheet : typing.Any, stat_name : str, stat_link : st
 	 f"created by hanslhansl, updated for {patch_version}", Font(bold=True))
 
 	row += 1
-	add_header_entry(row, 2, 6,
-	 '=HYPERLINK("https://github.com/hanslhansl/Rainbow-Six-Siege-Weapon-Statistics/", "detailed explanation")', Font(color = "FF0000FF"))
+	add_header_entry(row, 2, 6, f'=HYPERLINK("{github_link}", "detailed explanation")', Font(color = "FF0000FF"))
 
-	add_header_entry(row, 8, 14,
-	 '=HYPERLINK("https://docs.google.com/spreadsheets/d/1QgbGALNZGLlvf6YyPLtywZnvgIHkstCwGl1tvCt875Q", "spreadsheet on google sheets")', Font(color = "FF0000FF"))
+	add_header_entry(row, 8, 14, f'=HYPERLINK("{google_sheets_link}", "spreadsheet on google sheets")', Font(color = "FF0000FF"))
 
 	add_header_entry(row, 16, 1 + cols_inbetween,
-	 '=HYPERLINK("https://docs.google.com/spreadsheets/d/e/2PACX-1vQ1KitQsZksdVP9YPDInxK3xE2gtu1mpUxV5_PNyE8sSm-vFINdbiL8vo9RA2CRSIbIUePLVA1GCTWZ/pubhtml", "spreadsheet on google drive")', Font(color = "FF0000FF"))
+				  f'=HYPERLINK("{google_drive_link}", "spreadsheet on google drive")', Font(color = "FF0000FF"))
 
 	row += 2
 	if type(stat_link) == str:
 		add_header_entry(row, 2, 1 + cols_inbetween,
-			f'=HYPERLINK("https://github.com/hanslhansl/Rainbow-Six-Siege-Weapon-Statistics/#{stat_link}", "{stat_name}")', Font(color = "FF0000FF", bold=True))
+			f'=HYPERLINK("{github_link}#{stat_link}", "{stat_name}")', Font(color = "FF0000FF", bold=True))
 	else:
 		add_header_entry(row, 2, 1 + cols_inbetween, stat_name, Font(bold=True))
 	
@@ -946,17 +991,6 @@ def add_attachment_overview(workbook : typing.Any, weapons : list[Weapon]):
 def save_to_xlsx_file(weapons : list[Weapon], stat_names : tuple[str,...], stat_links : tuple[str,...]):
 	""" https://openpyxl.readthedocs.io/en/stable/ """
 
-	sheet_names = ("damage per bullet", "damage per shot", "dps", "stdok", "ttdok")
-	explanations = (
-		"the colored areas represent steady damage, the white areas represent decreasing damage",
-		"the color gradient illustrates the damage compared to the weapon's base damage",
-		"the color gradient illustrates the dps compared to the highest dps of the weapon's type (excluding extended barrel stats)",
-		"the colored areas show where the extended barrel attachment actually affects the stdok",
-		"the color gradient illustrates the ttdok compared to the lowest ttdok of the weapon's type against the same armor rating (excluding extended barrel stats)")
-
-	
-	tdok_additional_params = [(f"{int(i%3)+1} armor {'+ Rook ' if with_rook else ''}({hp} hp)", hp) for i, (hp, with_rook) in enumerate(zip(Weapon.hp_levels, Weapon.with_rook))]
-
 	# excel file
 	workbook = Workbook()
 
@@ -986,11 +1020,8 @@ def save_to_xlsx_file(weapons : list[Weapon], stat_names : tuple[str,...], stat_
 	return
 
 def save_to_output_files(weapons : list[Weapon]):
-	stat_names = ("damage per bullet", "damage per shot", "damage per second", "shots to down or kill", "time to down or kill")
-	stat_links = ("damage-per-bullet", "damage-per-shot", "damage-per-second---dps", "shots-to-down-or-kill---stdok", "time-to-down-or-kill---ttdok")
-	
 	#save_to_html_file(weapons, stat_names)
-	save_to_xlsx_file(weapons, stat_names, stat_links)
+	save_to_xlsx_file(weapons)
 	return
 
 if __name__ == "__main__":
