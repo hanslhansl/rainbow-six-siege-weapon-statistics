@@ -52,7 +52,7 @@ def error(s = "Error"):
 	return f"\x1b[38;2;255;0;0m{s}\033[0m"
 
 colorama.just_fix_windows_console()
-patch_version = sys.argv[1] if len(sys.argv) > 1 else "Y_S_"
+patch_version = sys.argv[1] if len(sys.argv) > 1 else "y_s_"
 
 operators_file_name += ".json"
 attachment_overview_file_name += ".json"
@@ -665,13 +665,13 @@ def add_worksheet_header(worksheet : typing.Any, stat_name : str, stat_link : st
 
 	row += 1
 	add_header_entry(row, 2, 6,
-	 '=HYPERLINK("https://github.com/hanslhansl/Rainbow-Six-Siege-Weapon-Statistics/", "Detailed explanation")', Font(color = "FF0000FF"))
+	 '=HYPERLINK("https://github.com/hanslhansl/Rainbow-Six-Siege-Weapon-Statistics/", "detailed explanation")', Font(color = "FF0000FF"))
 
 	add_header_entry(row, 8, 14,
-	 '=HYPERLINK("https://docs.google.com/spreadsheets/d/1QgbGALNZGLlvf6YyPLtywZnvgIHkstCwGl1tvCt875Q", "Spreadsheet on Google Sheets")', Font(color = "FF0000FF"))
+	 '=HYPERLINK("https://docs.google.com/spreadsheets/d/1QgbGALNZGLlvf6YyPLtywZnvgIHkstCwGl1tvCt875Q", "spreadsheet on google sheets")', Font(color = "FF0000FF"))
 
 	add_header_entry(row, 16, 1 + cols_inbetween,
-	 '=HYPERLINK("https://docs.google.com/spreadsheets/d/e/2PACX-1vQ1KitQsZksdVP9YPDInxK3xE2gtu1mpUxV5_PNyE8sSm-vFINdbiL8vo9RA2CRSIbIUePLVA1GCTWZ/pubhtml", "Spreadsheet on Google Drive")', Font(color = "FF0000FF"))
+	 '=HYPERLINK("https://docs.google.com/spreadsheets/d/e/2PACX-1vQ1KitQsZksdVP9YPDInxK3xE2gtu1mpUxV5_PNyE8sSm-vFINdbiL8vo9RA2CRSIbIUePLVA1GCTWZ/pubhtml", "spreadsheet on google drive")', Font(color = "FF0000FF"))
 
 	row += 2
 	if type(stat_link) == str:
@@ -708,22 +708,22 @@ def add_secondary_weapon_stats_header(worksheet : typing.Any, row : int, col : i
 	empty = (None, 3)
 	values_widths = (
 		empty,
-		("Class", 10),
+		("class", 10),
 		empty,
-		("RPM", 6),
-		("Capacity", 10),
-		("Ammo", 8),
-		("Pellets", 8),
+		("rpm", 6),
+		("capacity", 10),
+		("ammo", 8),
+		("pellets", 8),
 		empty,
-		("ADS", 6),
-		("+ Laser", 9),
+		("ads", 6),
+		("+ laser", 9),
 		empty,
-		("Full reload", 11),
-		("Tactical", 8),
-		("+ Angled grip", 7),
+		("full reload", 11),
+		("tactical", 8),
+		("+ angled grip", 7),
 		(None, 7),
 		empty,
-		("Operators", 50)
+		("operators", 50)
 	)
 
 	for value, width in values_widths:
@@ -773,7 +773,7 @@ def add_stats_worksheet(workbook : typing.Any, weapons : list[Weapon], worksheet
 	col = 1
 
 	c = worksheet.cell(row=row, column=col)
-	c.value = "Weapon"
+	c.value = "weapon"
 	worksheet.column_dimensions[get_column_letter(col)].width = 22
 	col += 1
 
@@ -836,20 +836,20 @@ def add_extended_barrel_overview(worksheet : typing.Any, weapons : list[Weapon],
 
 	worksheet.merge_cells(start_row=row, end_row=row, start_column=col+1, end_column=+len(col_names))
 	c = worksheet.cell(row=row, column=col+1)
-	c.value = "STDOK"
+	c.value = "stdok"
 	c.alignment = center_alignment
 
 	worksheet.column_dimensions[get_column_letter(col+len(col_names)+1)].width = 5
 	
 	worksheet.merge_cells(start_row=row, end_row=row, start_column=col+len(col_names)+2, end_column=col+len(col_names)*2+1)
 	c = worksheet.cell(row=row, column=col+8)
-	c.value = "TTDOK"
+	c.value = "ttdok"
 	c.alignment = center_alignment
 	
 	row += 1
 	
 	c = worksheet.cell(row=row, column=col)
-	c.value = "Weapon"
+	c.value = "weapon"
 	worksheet.column_dimensions[get_column_letter(col)].width = 22
 
 	for col_name in col_names:
@@ -946,14 +946,13 @@ def add_attachment_overview(workbook : typing.Any, weapons : list[Weapon]):
 def save_to_xlsx_file(weapons : list[Weapon], stat_names : tuple[str,...], stat_links : tuple[str,...]):
 	""" https://openpyxl.readthedocs.io/en/stable/ """
 
-	sheet_names = ("Damage per bullet", "Damage per shot", "DPS", "STDOK - old", "STDOK", "TTDOK")
+	sheet_names = ("damage per bullet", "damage per shot", "dps", "stdok", "ttdok")
 	explanations = (
-		"The colored areas represent steady damage, the white areas represent decreasing damage.",
-		"The color gradient illustrates the damage compared to the weapon's base damage.",
-		"The color gradient illustrates the DPS compared to the highest DPS of the weapon's type (excluding extended barrel stats).",
-		"The colored areas represent steady STDOK, the white areas represent increasing STDOK.",
-		"The colored areas show where the extended barrel attachment actually affects the STDOK.",
-		"The color gradient illustrates the TTDOK compared to the lowest TTDOK of the weapon's type against the same armor rating (excluding extended barrel stats).")
+		"the colored areas represent steady damage, the white areas represent decreasing damage",
+		"the color gradient illustrates the damage compared to the weapon's base damage",
+		"the color gradient illustrates the dps compared to the highest dps of the weapon's type (excluding extended barrel stats)",
+		"the colored areas show where the extended barrel attachment actually affects the stdok",
+		"the color gradient illustrates the ttdok compared to the lowest ttdok of the weapon's type against the same armor rating (excluding extended barrel stats)")
 
 	
 	tdok_additional_params = [(f"{int(i%3)+1} armor {'+ Rook ' if with_rook else ''}({hp} hp)", hp) for i, (hp, with_rook) in enumerate(zip(Weapon.hp_levels, Weapon.with_rook))]
@@ -972,10 +971,10 @@ def save_to_xlsx_file(weapons : list[Weapon], stat_names : tuple[str,...], stat_
 	add_stats_worksheet(workbook, weapons, sheet_names[2], stat_names[2], stat_links[2], explanations[2],
 					 Weapon.dps, Weapon.ex_dps_to_base_dps_class_gradient_fill)
 
-	add_stats_worksheet(workbook, weapons, sheet_names[4], stat_names[4], stat_links[4], explanations[4],
+	add_stats_worksheet(workbook, weapons, sheet_names[3], stat_names[3], stat_links[3], explanations[3],
 					 Weapon.stdok, Weapon.ex_eb_stdok_improvement_fill, tdok_additional_params)
 
-	add_stats_worksheet(workbook, weapons, sheet_names[5], stat_names[5], stat_links[5], explanations[5],
+	add_stats_worksheet(workbook, weapons, sheet_names[4], stat_names[4], stat_links[4], explanations[4],
 					 Weapon.ttdok, Weapon.ex_ttdok_to_base_ttdok_hp_class_gradient_fill, tdok_additional_params)
 	
 	add_attachment_overview(workbook, weapons)
@@ -987,8 +986,8 @@ def save_to_xlsx_file(weapons : list[Weapon], stat_names : tuple[str,...], stat_
 	return
 
 def save_to_output_files(weapons : list[Weapon]):
-	stat_names = ("Damage per bullet", "Damage per shot", "Damage per second", "Shots to down or kill - old", "Shots to down or kill", "Time to down or kill")
-	stat_links = ("damage-per-bullet", "damage-per-shot", "damage-per-second---dps", "shots-to-down-or-kill---stdok", "shots-to-down-or-kill---stdok", "time-to-down-or-kill---ttdok")
+	stat_names = ("damage per bullet", "damage per shot", "damage per second", "shots to down or kill", "time to down or kill")
+	stat_links = ("damage-per-bullet", "damage-per-shot", "damage-per-second---dps", "shots-to-down-or-kill---stdok", "time-to-down-or-kill---ttdok")
 	
 	#save_to_html_file(weapons, stat_names)
 	save_to_xlsx_file(weapons, stat_names, stat_links)
