@@ -101,6 +101,7 @@ class RGBA:
 
 	def to_css(self):
 		return f"#{self.r:02X}{self.g:02X}{self.b:02X}{int(self.a*0xFF):02X}"
+		return f"rgba({self.r}, {self.g}, {self.b}, {self.a})"
 
 	def with_alpha(self, a : float):
 		return RGBA(self.r, self.g, self.b, a)
