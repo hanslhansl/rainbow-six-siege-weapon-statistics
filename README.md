@@ -1,5 +1,5 @@
 #  Rainbow Six Siege Weapon Statistics
-Provides detailed statistics for all weapons in Tom Clancy's Rainbow Six Siege. This includes the weapon's damage at distances up to 40 meters, fire rate, damage per second, shots to down or kill, ADS time, etc. After every game patch a spreadsheet of the important stats is [released](https://github.com/hanslhansl/rainbow-six-siege-weapon-statistics/releases). The most recent version can also be found on [Google Sheets](https://docs.google.com/spreadsheets/d/1QgbGALNZGLlvf6YyPLtywZnvgIHkstCwGl1tvCt875Q) and as a stand-alone website on [Google Drive](https://docs.google.com/spreadsheets/d/e/2PACX-1vQ1KitQsZksdVP9YPDInxK3xE2gtu1mpUxV5_PNyE8sSm-vFINdbiL8vo9RA2CRSIbIUePLVA1GCTWZ/pubhtml).
+Provides detailed statistics for all weapons in Tom Clancy's Rainbow Six Siege. This includes the weapon's damage at distances up to 40 meters, fire rate, damage per second, shots to down or kill, ADS time, etc. After every game patch a spreadsheet of the important stats is [released](https://github.com/hanslhansl/rainbow-six-siege-weapon-statistics/releases). The most recent version can also be found on [Google Sheets](https://docs.google.com/spreadsheets/d/1QgbGALNZGLlvf6YyPLtywZnvgIHkstCwGl1tvCt875Q)/[Google Drive](https://docs.google.com/spreadsheets/d/e/2PACX-1vQ1KitQsZksdVP9YPDInxK3xE2gtu1mpUxV5_PNyE8sSm-vFINdbiL8vo9RA2CRSIbIUePLVA1GCTWZ/pubhtml).
 # About how the data is collected
 Generally speaking I am trying to collect as much of the data myself and by hand because Ubisoft has proven to be an unreliable source for statistics. At the same time I am trying to cut corners where possible.
 ## Time measuring
@@ -24,8 +24,10 @@ As [already mentioned](#time-measuring) my time measurements can vary up to 16.7
 At some point I will measure all fully automatic weapon's fire rates as well. Just to be sure. soon (tm).
 ## Damage per second - DPS
 The damage per second is calculated as $DPS = DmgPerShot * RPS = DmgPerShot * RPM / 60$. No measuring necessary.
+## Bullets to down or kill - BTDOK
+For a target with $x$ hp the BTDOK is calculated as $\lceil {x \over Damage} \rceil$. No measuring necessary.
 ## Shots to down or kill - STDOK
-For a target with $x$ hp the STDOK is calculated as $\lceil {x \over Damage} \rceil$. No measuring necessary.
+For a target with $x$ hp the STDOK is calculated as $\lceil {x \over Damage per shot} \rceil$. No measuring necessary.
 ## Time to down or kill - TTDOK
 For a target with $x$ hp the TTDOK in milliseconds is calculated as ${STDOK - 1 \over rpms}$. No measuring necessary.
 ## Magazine capacity

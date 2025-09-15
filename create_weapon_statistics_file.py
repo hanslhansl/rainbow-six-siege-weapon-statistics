@@ -497,6 +497,8 @@ class Weapon:
 		return self.damages[index] * self.pellets
 	def dps(self, index : int, *_):
 		return int(self.damages[index] * self.pellets * self.rps)
+	def btdok(self, index : int, hp : int):
+		return math.ceil(hp / self.damages[index])
 	def stdok(self, index : int, hp : int):
 		return math.ceil(hp / self.damages[index] / self.pellets)
 	def ttdok(self, index : int, hp : int):
