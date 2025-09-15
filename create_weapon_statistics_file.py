@@ -32,7 +32,7 @@ weapon_colors = {"AR":"5083EA", "SMG":"B6668E", "MP":"76A5AE", "LMG":"8771BD", "
 ###################################################
 
 #imports
-import os, json, typing, math, ctypes, copy, sys, itertools, colorama, sys, colorsys
+import os, json, typing, math, ctypes, copy, sys, itertools, colorama, sys, colorsys, pandas as pd
 from openpyxl.cell.text import InlineFont
 from openpyxl.cell.rich_text import TextBlock, CellRichText
 from openpyxl import Workbook
@@ -73,6 +73,13 @@ if not 0 <= first_distance:
 if not first_distance <= last_distance:
 	raise Exception(f"{error()}: 'last_distance' must be >='first_distance'={first_distance} but is {last_distance}.")
 
+def deserialize_json(file_name : str):
+	with open(file_name, "r", encoding='utf-8') as file:
+		try:
+			content = json.load(file)
+		except json.JSONDecodeError:
+			raise Exception(f"{error()}: The json deserialization of file '{file_name}' failed.")
+	return content
 
 class RGBA:
 	def __init__(self, r : int, g : int, b : int, a : float):
@@ -118,7 +125,6 @@ class RGBA:
 		
 		return RGBA(int(r_new*255), int(g_new*255), int(b_new*255), 1.)
 
-
 def normalize(min_val, max_val, value):
     # Clamp value within range
     value = max(min_val, min(max_val, value))
@@ -153,10 +159,104 @@ border_style = "thin"
 center_alignment = Alignment("center", wrapText=True)
 left_alignment = Alignment("left", wrapText=True)
 
+attachment_overview_json = deserialize_json(attachment_overview_file_name)
+
+class Weapons:
+	def __init__(self):
+		attachment_categories = deserialize_json(attachment_overview_file_name)
+		Weapon.extended_barrel_damage_multiplier = 1.0 + attachment_categories["Barrels"]["Extended barrel"]["damage bonus"]
+		Weapon.laser_ads_speed_multiplier = 1.0 + attachment_categories["Under Barrel"]["Laser"]["ads speed bonus"]
+
+		weapons : list[Weapon] = []
+		for file_name in os.listdir(weapon_data_dir):
+			file_path = os.path.join(weapon_data_dir, file_name)
+
+			name, extension = os.path.splitext(file_name);		
+			if not extension == ".json":
+				continue
+			if name.startswith("_"):
+				print(f"{message('Message: Excluding')} weapon '{message(file_name)}' because of _.")
+				continue
+		
+			w = Weapon(deserialize_json(file_path))
+			weapons.append(w)
+
+			"""# adjust Weapon.lowest_highest_base_dps
+			DPS = tuple(int(self.dps(index=i) + 0.5) for i in range(len(Weapon.distances)))
+			if self.class_ not in Weapon.lowest_highest_base_dps:
+				Weapon.lowest_highest_base_dps[self.class_] = min(DPS), max(DPS)
+			else:
+				Weapon.lowest_highest_base_dps[self.class_] = (
+					min(Weapon.lowest_highest_base_dps[self.class_][0], min(DPS)),
+					max(Weapon.lowest_highest_base_dps[self.class_][1], max(DPS))
+					)
+
+			# adjust Weapon.lowest_highest_base_ttdok
+			for hp in tdok_hp_levels:
+				if hp not in Weapon.lowest_highest_base_ttdok:
+					Weapon.lowest_highest_base_ttdok[hp] = {}
+				
+				TTDOK = tuple([int(self.ttdok(index=i, hp=hp) + 0.5) for i in range(len(Weapon.distances))])
+				if self.class_ not in Weapon.lowest_highest_base_ttdok[hp]:
+					Weapon.lowest_highest_base_ttdok[hp][self.class_] = min(TTDOK), max(TTDOK)
+				else:
+					Weapon.lowest_highest_base_ttdok[hp][self.class_] = (
+						min(Weapon.lowest_highest_base_ttdok[hp][self.class_][0], min(TTDOK)),
+						max(Weapon.lowest_highest_base_ttdok[hp][self.class_][1], max(TTDOK))
+						)"""
+
+		
+		# get all operator weapons
+		get_operators_list(weapons, operators_file_name)
+
+		# add eb weapons
+		weapons += (w.extended_barrel_weapon for w in weapons if w.extended_barrel_weapon)
+	
+		weapons_sorted = sorted(weapons, key=lambda w: (Weapon.classes.index(w.class_), w.name))
+		self.weapons = {w.name : w for w in weapons_sorted}
+
+		self._damages = pd.DataFrame({name : w.damages for name, w in self.weapons.items()})
+		for w in self.weapons.values():
+			del w.damages
+
+		return
+
+	def filter_df(self, df : pd.DataFrame, filter_func : typing.Callable[["Weapon"], bool]):
+		return df[[name for name in df.columns if filter_func(self.weapons[name])]]
+	def apply(self, df : pd.DataFrame, callback : typing.Callable[["Weapon", int, typing.Any], typing.Any]):
+		df2 = pd.DataFrame(index=df.index, columns=df.columns)
+		for row_index, row in df.iterrows():
+			for col_name, value in row.items():
+				df2.at[row_index, col_name] = callback(self.weapons[col_name], row_index, value)
+		return df2
+	def style_apply(self, df : pd.DataFrame, callback : typing.Callable[["Weapon", int, int | float], str]):
+		df_styles = pd.DataFrame('', index=df.index, columns=df.columns)
+		for row_index, row in df.iterrows():
+			for col_name, value in row.items():
+				df_styles.at[row_index, col_name] = callback(self.weapons[col_name], row_index, value)
+		return df.style.apply(lambda _: df_styles, axis=None)
+
+	def damages(self):
+		return self.damages
+	def damages_per_shot(self):
+		pellets = {name : w.pellets for name, w in self.weapons.items()}
+		return self._damages.mul(pd.Series(pellets), axis=1)
+	def dps(self):
+		pellets = {name : w.pellets * w.rps for name, w in self.weapons.items()}
+		return self._damages.mul(pd.Series(pellets), axis=1)
+
 class Weapon:
 	colors = {class_: RGBA.from_rgb_hex(color) for class_, color in weapon_colors.items()}
 	classes = tuple(colors)
 	distances = list(range(first_distance, last_distance+1))
+
+	# excel stuff
+	ex_borders = {class_ : Border(
+				left=  Side(border_style=border_style, color=color.to_border_color().to_rgb_hex()),
+				right= Side(border_style=border_style, color=color.to_border_color().to_rgb_hex()),
+				top=   Side(border_style=border_style, color=color.to_border_color().to_rgb_hex()),
+				bottom=Side(border_style=border_style, color=color.to_border_color().to_rgb_hex())
+				) for class_, color in colors.items()}
 
 	default_rpm = 0
 	default_ads = 0.
@@ -168,24 +268,15 @@ class Weapon:
 	default_has_grip = False
 	default_has_laser = False
 
-	extended_barrel_weapon_name = "+ extended barrel"
+	extended_barrel_postfix = "+ extended barrel"
 	extended_barrel_damage_multiplier = 0.0
 	laser_ads_speed_multiplier = 0.0
 	angled_grip_reload_speed_multiplier = 0.0
 
-	lowest_highest_base_dps : dict[str, tuple[int, int]] = {}				# class : (lowest dps, highest dps)
-	lowest_highest_base_ttdok : dict[int, dict[str, tuple[int, int]]] = {}	# hp : {class : (lowest ttdok, highest ttdok)}
+	# lowest_highest_base_dps : dict[str, tuple[int, int]] = {}				# class : (lowest dps, highest dps)
+	# lowest_highest_base_ttdok : dict[int, dict[str, tuple[int, int]]] = {}	# hp : {class : (lowest ttdok, highest ttdok)}
 	
 	empty_color = RGBA(0,0,0,0)
-
-	# excel stuff
-	ex_borders = {class_ : Border(
-				left=  Side(border_style=border_style, color=color.to_border_color().to_rgb_hex()),
-				right= Side(border_style=border_style, color=color.to_border_color().to_rgb_hex()),
-				top=   Side(border_style=border_style, color=color.to_border_color().to_rgb_hex()),
-				bottom=Side(border_style=border_style, color=color.to_border_color().to_rgb_hex())
-				) for class_, color in colors.items()}
-	
 
 	def __init__(self, json_content_):
 		self.json_content =  json_content_
@@ -268,7 +359,8 @@ class Weapon:
 		if not all(isinstance(damage, int) for damage in self.json_content["damages"].values()):
 			raise Exception(f"{error()}: Weapon '{self.name}' has damage values that don't deserialize to integers.")
 		distance_damage_dict = {int(distance) : int(damage) for distance, damage in self.json_content["damages"].items()}
-		self.damages = self.validate_damages(distance_damage_dict)
+		#self.damages = self.validate_damages(distance_damage_dict)
+		setattr(self, "damages", self.validate_damages(distance_damage_dict))
 
 		# get laser
 		if "laser" in self.json_content:
@@ -300,39 +392,14 @@ class Weapon:
 		# else:
 		# 	print(f"{warning('Warning:')} Weapon '{warning(self.name)}' is missing the {warning('reload times')}. Using default value ({self.default_reload_times}) instead.")
 		# 	self.reload_times = self.default_reload_times
-				
-
-		# adjust Weapon.lowest_highest_base_dps
-		DPS = tuple(int(self.dps(index=i) + 0.5) for i in range(len(Weapon.distances)))
-		if self.class_ not in Weapon.lowest_highest_base_dps:
-			Weapon.lowest_highest_base_dps[self.class_] = min(DPS), max(DPS)
-		else:
-			Weapon.lowest_highest_base_dps[self.class_] = (
-				min(Weapon.lowest_highest_base_dps[self.class_][0], min(DPS)),
-				max(Weapon.lowest_highest_base_dps[self.class_][1], max(DPS))
-				)
-
-		# adjust Weapon.lowest_highest_base_ttdok
-		for hp in tdok_hp_levels:
-			if hp not in Weapon.lowest_highest_base_ttdok:
-				Weapon.lowest_highest_base_ttdok[hp] = {}
-				
-			TTDOK = tuple([int(self.ttdok(index=i, hp=hp) + 0.5) for i in range(len(Weapon.distances))])
-			if self.class_ not in Weapon.lowest_highest_base_ttdok[hp]:
-				Weapon.lowest_highest_base_ttdok[hp][self.class_] = min(TTDOK), max(TTDOK)
-			else:
-				Weapon.lowest_highest_base_ttdok[hp][self.class_] = (
-					min(Weapon.lowest_highest_base_ttdok[hp][self.class_][0], min(TTDOK)),
-					max(Weapon.lowest_highest_base_ttdok[hp][self.class_][1], max(TTDOK))
-					)
 
 		# get extended barrel weapon, needs to be last bc of copy()
 		potential_eb = copy.copy(self)
 		self.is_extended_barrel = False	# whether this is an extended barrel version
 		if "extended_barrel" in self.json_content:
 			if type(self.json_content["extended_barrel"]) == bool:	# use default damage multiplier for extended barrel
-				self.has_extended_barrel = self.json_content["extended_barrel"]
-				if self.has_extended_barrel == True:
+				has_extended_barrel = self.json_content["extended_barrel"]
+				if has_extended_barrel == True:
 					print(f"{warning('Warning:')} Using {warning('approximated')} extended barrel stats for weapon '{warning(self.name)}'.")
 					potential_eb.damages = tuple(math.ceil(dmg * self.extended_barrel_damage_multiplier) for dmg in self.damages)
 
@@ -340,24 +407,26 @@ class Weapon:
 				if not all(isinstance(damage, int) for damage in self.json_content["extended_barrel"].values()):
 					raise Exception(f"{error()}: Weapon '{self.name}' has damage values that don't deserialize to integers.")
 				#print(f"{message('Message:')} Using {message('exact')} extended barrel stats for weapon '{message(self.name)}'.")
-				self.has_extended_barrel = True
+				has_extended_barrel = True
 				potential_eb.damages = self.validate_damages({int(distance) : int(damage) for distance, damage in self.json_content["extended_barrel"].items()})
 			else:
 				raise Exception(f"{error()}: Weapon '{self.name}' has an extended barrel value that doesn't deserialize to a bool or a dict.")
 		else:
 			print(f"{warning('Warning:')} Weapon '{warning(self.name)}' is missing an {warning('extended barrel')} value. Using default value ({self.default_has_extended_barrel}) instead.")
-			self.has_extended_barrel = Weapon.default_has_extended_barrel
-				
-		if self.has_extended_barrel == True:
+			has_extended_barrel = Weapon.default_has_extended_barrel
+			
+		self.extended_barrel_parent : Weapon | None = None
+		if has_extended_barrel == True:
 			potential_eb.json_content = None
-			potential_eb.name = Weapon.extended_barrel_weapon_name
+			potential_eb.name = self.name + " " + Weapon.extended_barrel_postfix
 
-			potential_eb.has_extended_barrel = False
 			potential_eb.extended_barrel_weapon = None
 			potential_eb.is_extended_barrel = True
 			potential_eb.extended_barrel_parent = self
 		
 			self.extended_barrel_weapon = potential_eb
+		else:
+			self.extended_barrel_weapon = None
 
 		return
 
@@ -432,6 +501,11 @@ class Weapon:
 
 	# derived properties
 	@property
+	def display_name(self):
+		if self.is_extended_barrel:
+			return self.extended_barrel_postfix
+		return self.name
+	@property
 	def rps(self):
 		return self.rpm / 60.
 	@property
@@ -441,8 +515,7 @@ class Weapon:
 	def ads_time_with_laser(self):
 		if self.has_laser == True:
 			return self.ads_time / self.laser_ads_speed_multiplier
-		else:
-			return None
+		return None
 	@property
 	def reload_times_with_angled_grip(self):
 		if self.has_grip == True:
@@ -453,8 +526,7 @@ class Weapon:
 			if rt1 != 0:
 				rt1 /= self.angled_grip_reload_speed_multiplier
 			return rt0, rt1
-		else:
-			return None
+		return None
 	def how_useful_is_extended_barrel(self, hp : int):
 		a = self.extended_barrel_parent.stdok(0, hp) - self.stdok(0, hp)
 		b = round(self.extended_barrel_parent.ttdok(0, hp) - self.ttdok(0, hp))
@@ -482,18 +554,18 @@ class Weapon:
 		return (intervals[0][0], intervals[-1][-1]),
 
 	# primary stats
-	def damage(self, index : int, *_):
-		return self.damages[index]
-	def damage_per_shot(self, index : int, *_):
-		return self.damages[index] * self.pellets
-	def dps(self, index : int, *_):
-		return int(self.damages[index] * self.pellets * self.rps)
-	def btdok(self, index : int, hp : int):
-		return math.ceil(hp / self.damages[index])
-	def stdok(self, index : int, hp : int):
-		return math.ceil(hp / self.damages[index] / self.pellets)
-	def ttdok(self, index : int, hp : int):
-		return (self.stdok(index, hp) - 1) / self.rpms
+	# def damage(self, index : int, *_):
+	# 	return self.damages[index]
+	# def damage_per_shot(self, index : int, *_):
+	# 	return self.damages[index] * self.pellets
+	# def dps(self, index : int, *_):
+	# 	return int(self.damages[index] * self.pellets * self.rps)
+	# def btdok(self, index : int, hp : int):
+	# 	return math.ceil(hp / self.damages[index])
+	# def stdok(self, index : int, hp : int):
+	# 	return math.ceil(hp / self.damages[index] / self.pellets)
+	# def ttdok(self, index : int, hp : int):
+	# 	return (self.stdok(index, hp) - 1) / self.rpms
 
 	# style helper methods
 	def is_in_damage_drop_off(self, index : int):
@@ -607,6 +679,39 @@ class Operator:
 
 		return
 
+def get_operators_list(weapons : list[Weapon], file_name : str) -> None:
+	json_content = deserialize_json(file_name)
+
+	if type(json_content) != dict:
+		raise Exception(f"{error()}: File '{file_name}' doesn't deserialize to a dict of operators and weapons lists.")
+
+	if not all(isinstance(operator_name, str) for operator_name in json_content):
+		raise Exception(f"{error()}: The operator names in file '{file_name}' don't deserialize to strings.")
+	if not all(isinstance(op, dict) for op in json_content.values()):
+		raise Exception(f"{error()}: The operators in file '{file_name}' don't deserialize to dicts.")
+
+	operators = [Operator(js, op_name, weapons) for (op_name, js) in json_content.items()]
+		
+	return
+
+ws = Weapons()
+
+print(ws.filter_df(ws.dps(), lambda w: w.class_ == "SG"))
+
+
+s = ws.style_apply(ws.dps(), lambda *_: f"background-color: green")
+
+
+html = s.to_html()  # render() erzeugt HTML-Code
+with open("styled_df.html", "w") as f:
+    f.write(html)
+
+
+
+sys.exit()
+
+
+
 @dataclass
 class Stat:
 	name : str
@@ -642,28 +747,7 @@ stat_illustrations = (
 	Weapon.ttdok_to_base_ttdok_hp_class_gradient_color
 	)
 
-def deserialize_json(file_name : str):
-	with open(file_name, "r", encoding='utf-8') as file:
-		try:
-			content = json.load(file)
-		except json.JSONDecodeError:
-			raise Exception(f"{error()}: The json deserialization of file '{file_name}' failed.")
-	return content
 
-def get_operators_list(weapons : list[Weapon], file_name : str) -> None:
-	json_content = deserialize_json(file_name)
-
-	if type(json_content) != dict:
-		raise Exception(f"{error()}: File '{file_name}' doesn't deserialize to a dict of operators and weapons lists.")
-
-	if not all(isinstance(operator_name, str) for operator_name in json_content):
-		raise Exception(f"{error()}: The operator names in file '{file_name}' don't deserialize to strings.")
-	if not all(isinstance(op, dict) for op in json_content.values()):
-		raise Exception(f"{error()}: The operators in file '{file_name}' don't deserialize to dicts.")
-
-	operators = [Operator(js, op_name, weapons) for (op_name, js) in json_content.items()]
-		
-	return
 
 def get_weapons_dict() -> dict[str, Weapon]:
 	attachment_categories = deserialize_json(attachment_overview_file_name)
