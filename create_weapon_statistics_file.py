@@ -58,14 +58,6 @@ github_link = "https://github.com/hanslhansl/Rainbow-Six-Siege-Weapon-Statistics
 google_sheets_link = "https://docs.google.com/spreadsheets/d/1QgbGALNZGLlvf6YyPLtywZnvgIHkstCwGl1tvCt875Q"
 google_drive_link = "https://docs.google.com/spreadsheets/d/e/2PACX-1vQ1KitQsZksdVP9YPDInxK3xE2gtu1mpUxV5_PNyE8sSm-vFINdbiL8vo9RA2CRSIbIUePLVA1GCTWZ/pubhtml"
 
-stat_illustration_explanations = (
-		"the colored areas represent steady damage, the white areas represent decreasing damage",
-		"the color gradient illustrates the damage compared to the weapon's base damage",
-		"the color gradient illustrates the dps compared to the highest dps of the weapon's type (excluding extended barrel stats)",
-		"the colored areas show where the extended barrel attachment actually affects the stdok",
-		"the color gradient illustrates the ttdok compared to the lowest ttdok of the weapon's type against the same armor rating (excluding extended barrel stats)"
-		)
-
 tdok_hp_levels = (100, 110, 125, 120, 130, 145)
 tdok_with_rook = (False, False, False, True, True, True)
 tdok_levels_descriptions = tuple(f"{int(i%3)+1} armor {'+ Rook ' if with_rook else ''}({hp} hp)"
@@ -108,7 +100,7 @@ class RGBA:
 		return f"{r:02X}{g:02X}{b:02X}"
 
 	def to_css(self):
-		return f"rgba({self.r}, {self.g}, {self.b}, {self.a})"
+		return f"#{self.r:02X}{self.g:02X}{self.b:02X}{int(self.a*0xFF):02X}"
 
 	def with_alpha(self, a : float):
 		return RGBA(self.r, self.g, self.b, a)
@@ -180,7 +172,7 @@ class Weapon:
 	laser_ads_speed_multiplier = 0.0
 	angled_grip_reload_speed_multiplier = 0.0
 
-	lowest_highest_base_dps : dict[str, tuple[int, int]] = {}	# class : (lowest dps, highest dps)
+	lowest_highest_base_dps : dict[str, tuple[int, int]] = {}				# class : (lowest dps, highest dps)
 	lowest_highest_base_ttdok : dict[int, dict[str, tuple[int, int]]] = {}	# hp : {class : (lowest ttdok, highest ttdok)}
 	
 	empty_color = RGBA(0,0,0,0)
@@ -364,8 +356,6 @@ class Weapon:
 			potential_eb.is_extended_barrel = True
 			potential_eb.extended_barrel_parent = self
 		
-			potential_eb.DmgPerShotColorScaleRule = None
-				
 			self.extended_barrel_weapon = potential_eb
 
 		return
@@ -511,7 +501,11 @@ class Weapon:
 		return self.damages[index] / self.damages[0]
 		#return normalize(min(self.damages), max(self.damages), self.damages[index])
 	def base_dps_class_interval(self):
-		return self.lowest_highest_base_dps[self.class_]
+		try:
+			return self.lowest_highest_base_dps[self.class_]
+		except:
+			print(self.lowest_highest_base_dps)
+			raise
 	def dps_to_base_dps_class_ratio(self, index : int):
 		min_dps, max_dps = self.base_dps_class_interval()
 		return normalize(min_dps, max_dps, self.dps(index))
@@ -523,16 +517,28 @@ class Weapon:
 
 	# primary stat colors
 	def damage_drop_off_color(self, index : int, *_):
+		"""the colored areas represent steady damage, the white areas represent decreasing damage"""
 		if self.is_in_damage_drop_off(index):
 			return self.color
 		return self.empty_color
 	def damage_to_base_damage_gradient_color(self, index : int, *_):
+		"""the color gradient illustrates the damage compared to the weapon's base damage"""
 		a = self.damage_to_base_damage_ratio(index)
 		return self.color.with_alpha(a)
 	def dps_to_base_dps_class_gradient_color(self, index : int, *_):
+		"""the color gradient illustrates the dps compared to the highest dps of the weapon's type (excluding extended barrel stats)"""
 		a = self.dps_to_base_dps_class_ratio(index)
 		return self.color.with_alpha(a)
+	def eb_btdok_improvement_color(self, index : int, hp : int, *_):
+		"""the colored areas show where the extended barrel attachment actually affects the btdok"""
+		# if this is the extended barrel version of a weapon
+		if self.is_extended_barrel:
+			# if the btdok of the extended barrel version is different from the btdok of the normal version
+			if self.btdok(index, hp) != self.extended_barrel_parent.btdok(index, hp):
+				return self.color
+		return self.empty_color
 	def eb_stdok_improvement_color(self, index : int, hp : int, *_):
+		"""the colored areas show where the extended barrel attachment actually affects the stdok"""
 		# if this is the extended barrel version of a weapon
 		if self.is_extended_barrel:
 			# if the stdok of the extended barrel version is different from the stdok of the normal version
@@ -540,6 +546,7 @@ class Weapon:
 				return self.color
 		return self.empty_color
 	def ttdok_to_base_ttdok_hp_class_gradient_color(self, index : int, hp : int, *_):
+		"""the color gradient illustrates the ttdok compared to the lowest ttdok of the weapon's type against the same armor rating (excluding extended barrel stats)"""
 		a = self.ttdok_to_base_ttdok_hp_class_ratio(index, hp)
 		return self.color.with_alpha(a)
 
@@ -611,21 +618,28 @@ class Stat:
 		self.link = f"https://github.com/hanslhansl/Rainbow-Six-Siege-Weapon-Statistics/#{self._link}"
 
 		if self._is_tdok:
+			self.additional_parameter_name = "hp"
 			self.additional_parameters = tuple(zip(tdok_hp_levels, tdok_levels_descriptions))
 		else:
+			self.additional_parameter_name = None
 			self.additional_parameters = (None, None),
 
 stats = (
 	Stat("damage per bullet", "damage per bullet", "damage-per-bullet", Weapon.damage, False),
 	Stat("damage per shot", "damage per shot", "damage-per-shot", Weapon.damage_per_shot, False),
 	Stat("damage per second", "dps", "damage-per-second---dps", Weapon.dps, False),
-	#Stat("bullets to down or kill", "btdok", "bullets-to-down-or-kill---btdok", Weapon.btdok, True),
+	Stat("bullets to down or kill", "btdok", "bullets-to-down-or-kill---btdok", Weapon.btdok, True),
 	Stat("shots to down or kill", "stdok", "shots-to-down-or-kill---stdok", Weapon.stdok, True),
 	Stat("time to down or kill", "ttdok", "time-to-down-or-kill---ttdok", Weapon.ttdok, True)
 )
-stat_illustrations = tuple(zip((Weapon.damage_drop_off_color, Weapon.damage_to_base_damage_gradient_color,
-								Weapon.dps_to_base_dps_class_gradient_color, Weapon.eb_stdok_improvement_color,
-								Weapon.ttdok_to_base_ttdok_hp_class_gradient_color), stat_illustration_explanations))
+stat_illustrations = (
+	Weapon.damage_drop_off_color,
+	Weapon.damage_to_base_damage_gradient_color,
+	Weapon.dps_to_base_dps_class_gradient_color,
+	Weapon.eb_btdok_improvement_color,
+	Weapon.eb_stdok_improvement_color,
+	Weapon.ttdok_to_base_ttdok_hp_class_gradient_color
+	)
 
 def deserialize_json(file_name : str):
 	with open(file_name, "r", encoding='utf-8') as file:
@@ -689,24 +703,25 @@ def add_worksheet_header(worksheet : typing.Any, stat : Stat | str, description 
 
 	add_header_entry(row, 2, 1 + cols_inbetween,
 	 f"created by hanslhansl, updated for {patch_version}", Font(bold=True))
-
 	row += 1
+
 	add_header_entry(row, 2, 6, f'=HYPERLINK("{github_link}", "detailed explanation")', Font(color = "FF0000FF"))
 
 	add_header_entry(row, 8, 14, f'=HYPERLINK("{google_sheets_link}", "spreadsheet on google sheets")', Font(color = "FF0000FF"))
 
 	add_header_entry(row, 16, 1 + cols_inbetween,
 				  f'=HYPERLINK("{google_drive_link}", "spreadsheet on google drive")', Font(color = "FF0000FF"))
-
 	row += 2
+
 	if type(stat) == str:
 		add_header_entry(row, 2, 1 + cols_inbetween, stat, Font(color = "FF0000FF", bold=True))
 	else:
 		add_header_entry(row, 2, 1 + cols_inbetween, f'=HYPERLINK("{github_link}#{stat.link}", "{stat.name}")', Font(color = "FF0000FF", bold=True))
-	
 	row += 1
+
 	add_header_entry(row, 2, 1 + cols_inbetween, description)
-	
+	row += 1
+
 	return row
 
 def add_weapon_to_worksheet(worksheet : typing.Any, weapon : Weapon, stat_method : typing.Any, color_method : typing.Any,
@@ -808,7 +823,7 @@ def add_stats_worksheet(workbook : typing.Any, weapons : list[Weapon], stat : St
 	worksheet.freeze_panes = worksheet.cell(row=row+1, column=2)
 	row += 2
 
-	row = add_worksheet_header(worksheet, stat, illustration[1], row, len(Weapon.distances))
+	row = add_worksheet_header(worksheet, stat, illustration.__doc__, row, len(Weapon.distances))
 	row += 2
 
 	for i, weapon in enumerate(weapons):
@@ -835,14 +850,14 @@ def add_stats_worksheet(workbook : typing.Any, weapons : list[Weapon], stat : St
 
 		for param, sub_name in stat.additional_parameters:
 			bound_stat_method = lambda w, i: stat.stat_method(w, i, param)
-			bound_color_method = lambda w, i: illustration[0](w, i, param)
+			bound_color_method = lambda w, i: illustration(w, i, param)
 				
 			add_weapon_to_worksheet(worksheet, weapon, bound_stat_method, bound_color_method, sub_name, row)
 				
 			if (weapon.has_extended_barrel):
 				add_weapon_to_worksheet(
 					worksheet, weapon.extended_barrel_weapon, bound_stat_method, bound_color_method,
-					weapon.name, row+inline_skip
+					weapon.extended_barrel_weapon.name, row+inline_skip
 					)
 				
 			row += skip
@@ -925,8 +940,8 @@ def add_attachment_overview(workbook : typing.Any, weapons : list[Weapon]):
 		raise Exception(f"{error()}: File '{attachment_overview_file_name}' doesn't deserialize to a dictionary.")
 	attachment_categories : dict[str, typing.Any] = json_content
 
-	worksheet = workbook.create_sheet("Attachments")
-	row = add_worksheet_header(worksheet, "Attachment overview", "A short overview over all available attachments.", 1, 19)
+	worksheet = workbook.create_sheet("attachments")
+	row = add_worksheet_header(worksheet, "attachment overview", "a short overview over all available attachments.", 1, 19)
 	#worksheet.freeze_panes = worksheet.cell(row=row, column=2)
 
 	for attachment_category, attachment_dict in attachment_categories.items():
@@ -972,8 +987,9 @@ def save_to_xlsx_file(weapons : list[Weapon]):
 
 	workbook.remove(workbook.active)
 	
-	for stat, illustration in zip(stats, stat_illustrations):
-		add_stats_worksheet(workbook, weapons, stat, illustration)
+	for i, (stat, illustration) in enumerate(zip(stats, stat_illustrations)):
+		if i in (0, 1, 2, 4, 5):
+			add_stats_worksheet(workbook, weapons, stat, illustration)
 
 	add_attachment_overview(workbook, weapons)
 

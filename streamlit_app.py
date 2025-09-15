@@ -1,4 +1,4 @@
-import create_weapon_statistics_file, streamlit as st, matplotlib.pyplot as plt, pandas as pd, altair as alt, numpy as np, sys
+import create_weapon_statistics_file as cwsf, streamlit as st, matplotlib.pyplot as plt, pandas as pd, altair as alt, numpy as np, sys
 import pandas.core.series
 # https://demo-stockpeers.streamlit.app/?ref=streamlit-io-gallery-favorites&stocks=AAPL%2CMSFT%2CGOOGL%2CNVDA%2CAMZN%2CTSLA%2CADP%2CACN%2CABBV%2CAMT%2CAXP%2CAMGN%2CAMD
 github_url = "https://github.com/hanslhansl/rainbow-six-siege-weapon-statistics"
@@ -6,11 +6,12 @@ github_url = "https://github.com/hanslhansl/rainbow-six-siege-weapon-statistics"
 
 @st.cache_data
 def get_weapons_dict():
-    return create_weapon_statistics_file.get_weapons_dict()
+    return cwsf.get_weapons_dict()
+
 
 # Load data
 weapons = get_weapons_dict()
-raw_data = pd.DataFrame({w.name : w.damages for w in weapons.values()}).transpose()
+#raw_data = pd.DataFrame({w.name : w.damages for w in weapons.values()}).transpose()
 
 # Streamlit UI
 st.set_page_config(
@@ -26,11 +27,17 @@ st.markdown("interactive visualisation of damage data over different distances")
 ### choose stat
 """
 with st.container(border=True):
-    choice = st.selectbox("Choose one:", ["Option A", "Option B", "Option C", "Option D", "Option E"])
-    st.write("You selected:", choice)
-
-    choice = st.radio("Pick one:", ["Option A", "Option B", "Option C", "Option D", "Option E"])
-    st.write("You picked:", choice)
+    selected_stat = st.selectbox(
+        "choose a stat:",
+        cwsf.stats,
+        format_func=lambda stat: stat.name if stat.name == stat.short_name else f"{stat.short_name} - {stat.name}"
+        )
+    
+    selected_illustration = st.selectbox(
+        "choose a coloring scheme:",
+        cwsf.stat_illustrations,
+        format_func=lambda x: x.__doc__
+        )
 
 
 """
@@ -42,9 +49,9 @@ with st.container(border=True):
     # Create rows of buttons
     with cols[0]:
         cols_per_row = 4
-        for i in range(0, len(create_weapon_statistics_file.weapon_classes), cols_per_row):
+        for i in range(0, len(cwsf.Weapon.classes), cols_per_row):
             inner_cols = st.columns(cols_per_row)
-            for j, label in enumerate(create_weapon_statistics_file.weapon_classes[i:i+cols_per_row]):
+            for j, label in enumerate(cwsf.Weapon.classes[i:i+cols_per_row]):
                 with inner_cols[j]:
                     if st.button(label):
                         print(f"{label} clicked")
@@ -52,23 +59,24 @@ with st.container(border=True):
     # Suchfeld und Waffenfilter
     with cols[1]:
         search_query = st.text_input("filter weapons")
-        filtered_weapons = [w for w in weapons.values() if search_query.lower() in w.name.lower()]
+        filtered_weapons = {name : weapon for name, weapon in weapons.items() if search_query.lower() in name.lower()}
         selected_weapons = st.multiselect(
             label="select weapon(s)",
-            options=filtered_weapons,
+            options=filtered_weapons.items(),
             #default=list(st.session_state.selected_weapons),
-            format_func=lambda w: w.name
+            format_func=lambda tup: tup[0]
             )
 
-data = {w.name : w.damages for w in selected_weapons}
+if len(selected_weapons):
+    selected_weapons = dict(selected_weapons)
+else:
+    selected_weapons = weapons
 
 """
 ### plot
 """
-right_cell = st.container(border=True)
-with right_cell:
-    if len(data):
-        # Convert data to DataFrame
+with st.container(border=True):
+    if False:#len(selected_weapons):
         df = pd.DataFrame(data)
 
         # insert average
@@ -103,34 +111,30 @@ with right_cell:
 ### raw data
 """
 
-df = raw_data.reset_index().rename(columns={"index": "weapon"})
-def color_survived(val):
-    color = 'green' if val else 'red'
-    return f'background-color: {color}'
 def column_styler(s : pandas.core.series.Series):
-    weapon_string = s["weapon"]
-    weapon = weapons[weapon_string]
+    weapon = weapons[s["weapon"]]
     
     ret = []
     for index, value in s.items():
         if index == "weapon":
-            ret.append(f"background-color: #{weapon.pd_name_color()}")
+            ret.append(f"background-color: {weapon.name_color.to_css()}")
         else:
-            ret.append(f"background-color: #{weapon.pd_damage_drop_off_color(index)}")
+            ret.append(f"background-color: {selected_illustration(weapon, index).to_css()}")
 
     return ret
 
-
 df = (
-    df.style
-    #.map(color_survived, subset=[2])
-    #.map(color_survived, subset=["weapons"])
-    .apply(column_styler, axis=1)
-#df=df.style.highlight_max(color="lightgreen", axis=0)
-)
+    pd.DataFrame({name : tuple(selected_stat.stat_method(weapon, i) for i in range(len(cwsf.Weapon.distances))) for name, weapon in selected_weapons.items()})
+    .transpose()
+    .reset_index()
+    .rename(columns={"index": "weapon"})
+    .style.apply(column_styler, axis=1)
+    )
 
-if 0:
-    config = {i+2 : st.column_config.Column(width=1) for i in range(0, len(create_weapon_statistics_file.Weapon.distances))}
+#df.to_excel("out.xlsx")
+
+if False:
+    config = {i+2 : st.column_config.Column(width=1) for i in range(0, len(cwsf.Weapon.distances))}
     config[1] = st.column_config.Column(pinned=True, width=200)
 
     st.dataframe(
