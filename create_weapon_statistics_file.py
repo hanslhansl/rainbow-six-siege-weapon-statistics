@@ -21,11 +21,8 @@ first_distance = 0
 # the distance the weapon damage stats end at (usually 40 because the of the Shooting Range limit)
 last_distance = 40 
 
-# weapon types
-weapon_classes = ("AR", "SMG", "MP", "LMG", "DMR", "SR", "SG", "Slug SG", "Handgun", "Revolver", "Hand Canon")
-
 # weapon type background colors
-background_colors = {"AR":"5083EA", "SMG":"B6668E", "MP":"76A5AE", "LMG":"8771BD", "DMR":"7CB563", "SR":"DE2A00",
+weapon_colors = {"AR":"5083EA", "SMG":"B6668E", "MP":"76A5AE", "LMG":"8771BD", "DMR":"7CB563", "SR":"DE2A00",
 					 "SG":"FFBC01", "Slug SG":"A64E06", "Handgun":"A3A3A3", "Revolver":"F48020", "Hand Canon":"948A54"}
 
 
@@ -35,14 +32,13 @@ background_colors = {"AR":"5083EA", "SMG":"B6668E", "MP":"76A5AE", "LMG":"8771BD
 ###################################################
 
 #imports
-from turtle import left
-import os, json, typing, math, ctypes, copy, sys, itertools, colorama, pickle, sys
+import os, json, typing, math, ctypes, copy, sys, itertools, colorama, sys, colorsys
 from openpyxl.cell.text import InlineFont
 from openpyxl.cell.rich_text import TextBlock, CellRichText
 from openpyxl import Workbook
 from openpyxl.styles import PatternFill, Border, Alignment, NamedStyle, Side, Font
-from openpyxl.formatting.rule import ColorScaleRule, FormulaRule, CellIsRule
 from openpyxl.utils import get_column_letter
+from dataclasses import dataclass
 
 def warning(s = "Warning"):
 	return f"\x1b[38;2;255;255;0m{s}\033[0m"
@@ -62,13 +58,18 @@ github_link = "https://github.com/hanslhansl/Rainbow-Six-Siege-Weapon-Statistics
 google_sheets_link = "https://docs.google.com/spreadsheets/d/1QgbGALNZGLlvf6YyPLtywZnvgIHkstCwGl1tvCt875Q"
 google_drive_link = "https://docs.google.com/spreadsheets/d/e/2PACX-1vQ1KitQsZksdVP9YPDInxK3xE2gtu1mpUxV5_PNyE8sSm-vFINdbiL8vo9RA2CRSIbIUePLVA1GCTWZ/pubhtml"
 
-format_explanations = (
+stat_illustration_explanations = (
 		"the colored areas represent steady damage, the white areas represent decreasing damage",
 		"the color gradient illustrates the damage compared to the weapon's base damage",
 		"the color gradient illustrates the dps compared to the highest dps of the weapon's type (excluding extended barrel stats)",
 		"the colored areas show where the extended barrel attachment actually affects the stdok",
 		"the color gradient illustrates the ttdok compared to the lowest ttdok of the weapon's type against the same armor rating (excluding extended barrel stats)"
 		)
+
+tdok_hp_levels = (100, 110, 125, 120, 130, 145)
+tdok_with_rook = (False, False, False, True, True, True)
+tdok_levels_descriptions = tuple(f"{int(i%3)+1} armor {'+ Rook ' if with_rook else ''}({hp} hp)"
+								 for i, (hp, with_rook) in enumerate(zip(tdok_hp_levels, tdok_with_rook)))
 
 # check if the settings are correct
 if not os.path.isfile(operators_file_name):
@@ -80,39 +81,50 @@ if not 0 <= first_distance:
 if not first_distance <= last_distance:
 	raise Exception(f"{error()}: 'last_distance' must be >='first_distance'={first_distance} but is {last_distance}.")
 
-def color_to_openpyxl_color(s : str):
-	r, g, b = int(s[0:2], 16) / 0xFF, int(s[2:4], 16) / 0xFF, int(s[4:6], 16) / 0xFF
-	
-	r = pow(r, 2.2)
-	g = pow(g, 2.2)
-	b = pow(b, 2.2)
 
-	mult = 0.65
+class RGBA:
+	def __init__(self, r : int, g : int, b : int, a : float):
+		self.r = r
+		self.g = g
+		self.b = b
+		self.a = a
 
-	r = r * mult
-	g = g * mult
-	b = b * mult
+	@classmethod
+	def from_rgb_hex(cls, hex_str : str):
+		hex_str = hex_str.lstrip('#')
+		if len(hex_str) != 6:
+			raise ValueError("Hex string must be 6 characters long.")
+		r = int(hex_str[0:2], 16)
+		g = int(hex_str[2:4], 16)
+		b = int(hex_str[4:6], 16)
+		a = 1.0
 
-	r = pow(r, 1/2.2)
-	g = pow(g, 1/2.2)
-	b = pow(b, 1/2.2)
+		return cls(r, g, b, a)
+		
+	def to_rgb_hex(self):
+		r = int(self.r + (255 - self.r) * (1 - self.a))
+		g = int(self.g + (255 - self.g) * (1 - self.a))
+		b = int(self.b + (255 - self.b) * (1 - self.a))
+		return f"{r:02X}{g:02X}{b:02X}"
 
-	r = int(r * 0xFF)
-	g = int(g * 0xFF)
-	b = int(b * 0xFF)
+	def to_css(self):
+		return f"rgba({self.r}, {self.g}, {self.b}, {self.a})"
 
-	ret = hex(r)[2:].zfill(2) + hex(g)[2:].zfill(2) + hex(b)[2:].zfill(2)
-	return ret
+	def with_alpha(self, a : float):
+		return RGBA(self.r, self.g, self.b, a)
 
-def hex_to_rgb(hex_color):
-    hex_color = hex_color.lstrip('#')
-    return tuple(int(hex_color[i:i+2], 16) for i in (0, 2, 4))
-def lighten_color(hex_color, ratio):
-    r, g, b = hex_to_rgb(hex_color)
-    r = int(r + (255 - r) * (1 - ratio))
-    g = int(g + (255 - g) * (1 - ratio))
-    b = int(b + (255 - b) * (1 - ratio))
-    return f"{r:02X}{g:02X}{b:02X}"
+	def to_ex_fill(self):
+		rgb = self.to_rgb_hex()
+		return PatternFill(start_color=rgb, end_color=rgb, fill_type="solid")
+
+	def to_border_color(self, factor=0.8):
+		# RGB to HLS
+		h, l, s = colorsys.rgb_to_hls(self.r/255, self.g/255, self.b/255)
+		l = max(0, min(1, l * factor))  # Helligkeit anpassen
+		r_new, g_new, b_new = colorsys.hls_to_rgb(h, l, s)
+		
+		return RGBA(int(r_new*255), int(g_new*255), int(b_new*255), 1.)
+
 
 def normalize(min_val, max_val, value):
     # Clamp value within range
@@ -149,7 +161,8 @@ center_alignment = Alignment("center", wrapText=True)
 left_alignment = Alignment("left", wrapText=True)
 
 class Weapon:
-	classes = weapon_classes
+	colors = {class_: RGBA.from_rgb_hex(color) for class_, color in weapon_colors.items()}
+	classes = tuple(colors)
 	distances = list(range(first_distance, last_distance+1))
 
 	default_rpm = 0
@@ -164,33 +177,27 @@ class Weapon:
 
 	extended_barrel_weapon_name = "+ extended barrel"
 	extended_barrel_damage_multiplier = 0.0
-	laser_ads_speed_multiplier = 0.0;
-	angled_grip_reload_speed_multiplier = 0.0;
+	laser_ads_speed_multiplier = 0.0
+	angled_grip_reload_speed_multiplier = 0.0
 
 	lowest_highest_base_dps : dict[str, tuple[int, int]] = {}	# class : (lowest dps, highest dps)
 	lowest_highest_base_ttdok : dict[int, dict[str, tuple[int, int]]] = {}	# hp : {class : (lowest ttdok, highest ttdok)}
 	
+	empty_color = RGBA(0,0,0,0)
+
 	# excel stuff
-
 	ex_borders = {class_ : Border(
-				left=  Side(border_style=border_style, color=color_to_openpyxl_color(background_colors[class_])),
-				right= Side(border_style=border_style, color=color_to_openpyxl_color(background_colors[class_])),
-				top=   Side(border_style=border_style, color=color_to_openpyxl_color(background_colors[class_])),
-				bottom=Side(border_style=border_style, color=color_to_openpyxl_color(background_colors[class_]))
-				) for class_ in classes}
+				left=  Side(border_style=border_style, color=color.to_border_color().to_rgb_hex()),
+				right= Side(border_style=border_style, color=color.to_border_color().to_rgb_hex()),
+				top=   Side(border_style=border_style, color=color.to_border_color().to_rgb_hex()),
+				bottom=Side(border_style=border_style, color=color.to_border_color().to_rgb_hex())
+				) for class_, color in colors.items()}
 	
-	ex_empty_fill = PatternFill()
-	ex_fills = {class_ : PatternFill(start_color=background_colors[class_], end_color=background_colors[class_], fill_type="solid") for class_ in classes}
-
-	ex_styles_bf = (lambda c=classes, b=ex_borders, f=ex_fills: {class_ : NamedStyle(name=class_+" BF", border=b[class_], fill=f[class_]) for class_ in c})()
-	ex_style_normal = "Normal"
 
 	def __init__(self, json_content_):
 		self.json_content =  json_content_
 
 		self.operators : list[Operator] = []
-		self.DamageRule = None
-		self.DmgPerShotColorScaleRule = None
 
 		if type(self.json_content) != dict:
 			raise Exception(f"{error()}: Weapon '{self.name}' doesn't deserialize to a dict.")
@@ -313,7 +320,7 @@ class Weapon:
 				)
 
 		# adjust Weapon.lowest_highest_base_ttdok
-		for hp in self.hp_levels:
+		for hp in tdok_hp_levels:
 			if hp not in Weapon.lowest_highest_base_ttdok:
 				Weapon.lowest_highest_base_ttdok[hp] = {}
 				
@@ -458,13 +465,22 @@ class Weapon:
 		else:
 			return None
 	def how_useful_is_extended_barrel(self, hp : int):
-		return self.extended_barrel_parent.stdok(0, hp) - self.stdok(0, hp), round(self.extended_barrel_parent.ttdok(0, hp) - self.ttdok(0, hp))
+		a = self.extended_barrel_parent.stdok(0, hp) - self.stdok(0, hp)
+		b = round(self.extended_barrel_parent.ttdok(0, hp) - self.ttdok(0, hp))
+		if a == 0:
+			return a, b, self.empty_color
+		return a, b, self.color
 	@property
 	def capacity(self):
 		return str(self._capacity[0]) + "+" + str(self._capacity[1])
 	@property
-	def background_color(self):
-		return background_colors[self.class_]
+	def color(self):
+		return self.colors[self.class_]
+	@property
+	def name_color(self):
+		if self.is_extended_barrel:
+			return self.empty_color
+		return self.color
 	@property
 	def damage_drop_off_intervals(self):
 		intervals = get_non_stagnant_intervals(self.damages)
@@ -503,48 +519,34 @@ class Weapon:
 		min_ttdok, max_ttdok = self.base_ttdok_hp_class_interval(hp)
 		return 1 - normalize(min_ttdok, max_ttdok, self.ttdok(index, hp))
 
-	# excel properties
-	@property
-	def ex_fill(self):
-		return self.ex_fills[self.class_]
-	@property
-	def ex_style_bf(self):
-		return self.ex_styles_bf[self.class_]
-	@property
-	def ex_border(self):
-		return self.ex_borders[self.class_]
-
-	# primary stats excel fills
-	def ex_damage_drop_off_fill(self, index : int, *_):
+	# primary stat colors
+	def damage_drop_off_color(self, index : int, *_):
 		if self.is_in_damage_drop_off(index):
-			return self.ex_fill
-		return self.ex_empty_fill
-	def ex_damage_to_base_damage_gradient_fill(self, index : int, *_):
-		ratio = self.damage_to_base_damage_ratio(index)
-		rgb = lighten_color(self.background_color, ratio)
-		return PatternFill(start_color=rgb, end_color=rgb, fill_type="solid")
-	def ex_dps_to_base_dps_class_gradient_fill(self, index : int, *_):
-		ratio = self.dps_to_base_dps_class_ratio(index)
-		rgb = lighten_color(self.background_color, ratio)
-		return PatternFill(start_color=rgb, end_color=rgb, fill_type="solid")
-	def ex_eb_stdok_improvement_fill(self, index : int, hp : int, *_):
+			return self.color
+		return self.empty_color
+	def damage_to_base_damage_gradient_color(self, index : int, *_):
+		a = self.damage_to_base_damage_ratio(index)
+		return self.color.with_alpha(a)
+	def dps_to_base_dps_class_gradient_color(self, index : int, *_):
+		a = self.dps_to_base_dps_class_ratio(index)
+		return self.color.with_alpha(a)
+	def eb_stdok_improvement_color(self, index : int, hp : int, *_):
 		# if this is the extended barrel version of a weapon
 		if self.is_extended_barrel:
 			# if the stdok of the extended barrel version is different from the stdok of the normal version
 			if self.stdok(index, hp) != self.extended_barrel_parent.stdok(index, hp):
-				return self.ex_fill
+				return self.color
+		return self.empty_color
+	def ttdok_to_base_ttdok_hp_class_gradient_color(self, index : int, hp : int, *_):
+		a = self.ttdok_to_base_ttdok_hp_class_ratio(index, hp)
+		return self.color.with_alpha(a)
 
-		return self.ex_empty_fill
-	def ex_ttdok_to_base_ttdok_hp_class_gradient_fill(self, index : int, hp : int, *_):
-		ratio = self.ttdok_to_base_ttdok_hp_class_ratio(index, hp)
-		rgb = lighten_color(self.background_color, ratio)
-		return PatternFill(start_color=rgb, end_color=rgb, fill_type="solid")
+	# excel properties
+	@property
+	def ex_border(self):
+		return self.ex_borders[self.class_]
 
 	# other excel styles
-	def ex_name_style(self):
-		if self.is_extended_barrel:
-			return self.ex_style_normal
-		return self.ex_style_bf
 	def ex_operators_rich_text(self):
 		elements = [op.rich_text_name for op in self.operators]
 		n = 1
@@ -553,25 +555,10 @@ class Weapon:
 			elements.insert(i, ', ')
 			i += (n+1)
 		return CellRichText(*elements)
-	def ex_how_useful_is_extended_barrel_fill(self, hp : int):
-		if self.how_useful_is_extended_barrel(hp)[0] == 0:
-			return self.ex_empty_fill
-		return self.ex_fill
 	
-	# pandas styling
-	def pd_damage_drop_off_color(self, index : int, *_):
-		if self.is_in_damage_drop_off(index):
-			return self.background_color
-		return ""
-
-	def pd_name_color(self):
-		if self.is_extended_barrel:
-			return ""
-		return self.background_color
-
 class Operator:
-	attacker_color = color_to_openpyxl_color("198FEB")
-	defender_color = color_to_openpyxl_color("FB3636")
+	attacker_color = "198FEB"
+	defender_color = "FB3636"
 
 	def __init__(self, json_content_, name : str, weapons : list[Weapon]):
 		self.json_content =  json_content_
@@ -610,42 +597,33 @@ class Operator:
 
 		return
 
-class StatsChooser:
-	names = ("damage per bullet", "damage per shot", "damage per second", "shots to down or kill", "time to down or kill")
-	short_names = ("damage per bullet", "damage per shot", "dps", "stdok", "ttdok")
-	_links = ("damage-per-bullet", "damage-per-shot", "damage-per-second---dps", "shots-to-down-or-kill---stdok", "time-to-down-or-kill---ttdok")
-	links = tuple(f"https://github.com/hanslhansl/Rainbow-Six-Siege-Weapon-Statistics/#{link}" for link in _links)
+@dataclass
+class Stat:
+	name : str
+	short_name : str
+	_link : str
+	stat_method : typing.Callable[[Weapon, int, typing.Any], float | int]
+	_is_tdok : bool
 
-	stat_methods = (Weapon.damage, Weapon.damage_per_shot, Weapon.dps, Weapon.stdok, Weapon.ttdok)
+	def __post_init__(self):
+		self.link = f"https://github.com/hanslhansl/Rainbow-Six-Siege-Weapon-Statistics/#{self._link}"
 
-	tdok_hp_levels = (100, 110, 125, 120, 130, 145)
-	tdok_with_rook = (False, False, False, True, True, True)
-	stat_method_descriptions = tuple(f"{int(i%3)+1} armor {'+ Rook ' if with_rook else ''}({hp} hp)"
-									for i, (hp, with_rook) in enumerate(zip(tdok_hp_levels, tdok_with_rook)))
-	
-	def __init__(self, index : int):
-		self.index = index
-
-		stat_method = self.stat_methods[self.index]
-		if self.index in (3, 4):
-			self.stat_method = tuple(lambda w, i, hp=hp: stat_method(w, i, hp) for hp in self.tdok_hp_levels)
+		if self._is_tdok:
+			self.additional_parameters = tuple(zip(tdok_hp_levels, tdok_levels_descriptions))
 		else:
-			self.stat_method = (stat_method, )
+			self.additional_parameters = (None, None),
 
-		return
-
-	@property
-	def name(self):
-		return self.names[self.index]
-	@property
-	def short_name(self):
-		return self.short_names[self.index]
-	@property
-	def link(self):
-		return self.links[self.index]
-
-
-
+stats = (
+	Stat("damage per bullet", "damage per bullet", "damage-per-bullet", Weapon.damage, False),
+	Stat("damage per shot", "damage per shot", "damage-per-shot", Weapon.damage_per_shot, False),
+	Stat("damage per second", "dps", "damage-per-second---dps", Weapon.dps, False),
+	#Stat("bullets to down or kill", "btdok", "bullets-to-down-or-kill---btdok", Weapon.btdok, True),
+	Stat("shots to down or kill", "stdok", "shots-to-down-or-kill---stdok", Weapon.stdok, True),
+	Stat("time to down or kill", "ttdok", "time-to-down-or-kill---ttdok", Weapon.ttdok, True)
+)
+stat_illustrations = tuple(zip((Weapon.damage_drop_off_color, Weapon.damage_to_base_damage_gradient_color,
+								Weapon.dps_to_base_dps_class_gradient_color, Weapon.eb_stdok_improvement_color,
+								Weapon.ttdok_to_base_ttdok_hp_class_gradient_color), stat_illustration_explanations))
 
 def deserialize_json(file_name : str):
 	with open(file_name, "r", encoding='utf-8') as file:
@@ -691,12 +669,12 @@ def get_weapons_dict() -> dict[str, Weapon]:
 	# get all operator weapons
 	get_operators_list(weapons, operators_file_name)
 	
-	weapons = sorted(weapons, key=lambda weapon: (weapon_classes.index(weapon.class_), weapon.name), reverse=False)
+	weapons = sorted(weapons, key=lambda weapon: (weapon.classes.index(weapon.class_), weapon.name), reverse=False)
 
 	return {w.name : w for w in weapons}
 
 
-def add_worksheet_header(worksheet : typing.Any, stat_name : str, stat_link : str | None, description : str | tuple[str,...], row : int, cols_inbetween : int):
+def add_worksheet_header(worksheet : typing.Any, stat : Stat | str, description : str, row : int, cols_inbetween : int):
 	
 	worksheet.column_dimensions[get_column_letter(1)].width = 22
 	
@@ -719,21 +697,17 @@ def add_worksheet_header(worksheet : typing.Any, stat_name : str, stat_link : st
 				  f'=HYPERLINK("{google_drive_link}", "spreadsheet on google drive")', Font(color = "FF0000FF"))
 
 	row += 2
-	if type(stat_link) == str:
-		add_header_entry(row, 2, 1 + cols_inbetween,
-			f'=HYPERLINK("{github_link}#{stat_link}", "{stat_name}")', Font(color = "FF0000FF", bold=True))
+	if type(stat) == str:
+		add_header_entry(row, 2, 1 + cols_inbetween, stat, Font(color = "FF0000FF", bold=True))
 	else:
-		add_header_entry(row, 2, 1 + cols_inbetween, stat_name, Font(bold=True))
+		add_header_entry(row, 2, 1 + cols_inbetween, f'=HYPERLINK("{github_link}#{stat.link}", "{stat.name}")', Font(color = "FF0000FF", bold=True))
 	
-	if type(description) == str:
-		description = (description, )
-	for desc in description:
-		row += 1
-		add_header_entry(row, 2, 1 + cols_inbetween, desc)
+	row += 1
+	add_header_entry(row, 2, 1 + cols_inbetween, description)
 	
 	return row
 
-def add_weapon_to_worksheet(worksheet : typing.Any, weapon : Weapon, stat_method : typing.Any, fill_method : typing.Any,
+def add_weapon_to_worksheet(worksheet : typing.Any, weapon : Weapon, stat_method : typing.Any, color_method : typing.Any,
 							sub_name : None | str, row : int):
 	if sub_name != None:
 		c = worksheet.cell(row=row, column=1)
@@ -742,7 +716,7 @@ def add_weapon_to_worksheet(worksheet : typing.Any, weapon : Weapon, stat_method
 	for col in range(2, len(Weapon.distances) + 2):
 		c = worksheet.cell(row=row, column=col)
 		c.value = stat_method(weapon, col - 2)
-		c.fill = fill_method(weapon, col - 2)
+		c.fill = color_method(weapon, col - 2).to_ex_fill()
 		c.alignment = center_alignment
 		c.border = weapon.ex_border
 
@@ -799,7 +773,8 @@ def add_secondary_weapon_stats(worksheet : typing.Any, weapon : Weapon, row : in
 			if type(value) == float:
 				value = str(round(value, 3))
 			c.value = value
-			c.style = weapon.ex_style_bf
+			c.fill = weapon.color.to_ex_fill()
+			c.border = weapon.ex_border
 			c.alignment = center_alignment
 			weapon.ex_border
 		col += skip
@@ -809,11 +784,9 @@ def add_secondary_weapon_stats(worksheet : typing.Any, weapon : Weapon, row : in
 
 	return
 
-def add_stats_worksheet(workbook : typing.Any, weapons : list[Weapon], worksheet_name : str, stat_name : str, stat_link : str,
-						description : str, stat_method : typing.Any, fill_method : typing.Any,
-						additional_params : tuple[tuple[str, typing.Any],...] = ((None, None), )):
+def add_stats_worksheet(workbook : typing.Any, weapons : list[Weapon], stat : Stat, illustration):
 
-	worksheet = workbook.create_sheet(worksheet_name)
+	worksheet = workbook.create_sheet(stat.short_name)
 	row = 1
 	col = 1
 
@@ -833,18 +806,19 @@ def add_stats_worksheet(workbook : typing.Any, weapons : list[Weapon], worksheet
 	worksheet.freeze_panes = worksheet.cell(row=row+1, column=2)
 	row += 2
 
-	row = add_worksheet_header(worksheet, stat_name, stat_link, description, row, len(Weapon.distances))
+	row = add_worksheet_header(worksheet, stat, illustration[1], row, len(Weapon.distances))
 	row += 2
 
 	for i, weapon in enumerate(weapons):
 
 		c = worksheet.cell(row=row, column=1)
 		c.value = weapon.name
-		c.style = weapon.ex_name_style()
+		c.fill = weapon.name_color.to_ex_fill()
+		c.border = weapon.ex_border
 
 		add_secondary_weapon_stats(worksheet, weapon, row, len(Weapon.distances) + 3)
 
-		if len(additional_params) != 1:
+		if len(stat.additional_parameters) != 1:
 			worksheet.merge_cells(start_row=row, end_row=row, start_column=2, end_column=1 + len(Weapon.distances))
 			row += 1
 
@@ -854,19 +828,19 @@ def add_stats_worksheet(workbook : typing.Any, weapons : list[Weapon], worksheet
 			final_skip = 0
 		else: # eb afterwards: 100hp, 110hp, 125hp, 120hp, 130hp, 145hp, eb, eb, eb, eb, eb, eb
 			skip = 1
-			inline_skip = len(additional_params)
-			final_skip = len(additional_params)
+			inline_skip = len(stat.additional_parameters)
+			final_skip = len(stat.additional_parameters)
 
-		for sub_name, additional_param in additional_params:
-			bound_stat_method = lambda w, i, arg=additional_param: stat_method(w, i, arg)
-			bound_fill_method = lambda w, i, arg=additional_param: fill_method(w, i, arg)
+		for param, sub_name in stat.additional_parameters:
+			bound_stat_method = lambda w, i: stat.stat_method(w, i, param)
+			bound_color_method = lambda w, i: illustration[0](w, i, param)
 				
-			add_weapon_to_worksheet(worksheet, weapon, bound_stat_method, bound_fill_method, sub_name, row)
+			add_weapon_to_worksheet(worksheet, weapon, bound_stat_method, bound_color_method, sub_name, row)
 				
 			if (weapon.has_extended_barrel):
 				add_weapon_to_worksheet(
-					worksheet, weapon.extended_barrel_weapon, bound_stat_method, bound_fill_method,
-					Weapon.extended_barrel_weapon_name, row+inline_skip
+					worksheet, weapon.extended_barrel_weapon, bound_stat_method, bound_color_method,
+					weapon.name, row+inline_skip
 					)
 				
 			row += skip
@@ -923,18 +897,18 @@ def add_extended_barrel_overview(worksheet : typing.Any, weapons : list[Weapon],
 		
 		c = worksheet.cell(row=row, column=col)
 		c.value = weapon.name
-		c.style = weapon.ex_name_style()
+		c.fill = weapon.name_color.to_ex_fill()
+		c.border = weapon.ex_border
 
 		if with_secondary_weapon_stats:
 			add_secondary_weapon_stats(worksheet, weapon, row, col+15)
 
-		for hp in Weapon.hp_levels:
+		for hp in tdok_hp_levels:
 			col += 1
 			c1 = worksheet.cell(row=row, column=col)
 			c2 = worksheet.cell(row=row, column=col + len(col_names) + 1)
-			c1.value, c2.value = weapon.extended_barrel_weapon.how_useful_is_extended_barrel(hp)
-			fill = weapon.extended_barrel_weapon.ex_how_useful_is_extended_barrel_fill(hp)
-			c1.fill = c2.fill = fill
+			c1.value, c2.value, color = weapon.extended_barrel_weapon.how_useful_is_extended_barrel(hp)
+			c1.fill = c2.fill = color.to_ex_fill()
 			c1.alignment = c2.alignment = center_alignment
 			c1.border = c2.border = weapon.ex_border
 			
@@ -950,7 +924,7 @@ def add_attachment_overview(workbook : typing.Any, weapons : list[Weapon]):
 	attachment_categories : dict[str, typing.Any] = json_content
 
 	worksheet = workbook.create_sheet("Attachments")
-	row = add_worksheet_header(worksheet, "Attachment overview", None, "A short overview over all available attachments.", 1, 19)
+	row = add_worksheet_header(worksheet, "Attachment overview", "A short overview over all available attachments.", 1, 19)
 	#worksheet.freeze_panes = worksheet.cell(row=row, column=2)
 
 	for attachment_category, attachment_dict in attachment_categories.items():
@@ -988,29 +962,17 @@ def add_attachment_overview(workbook : typing.Any, weapons : list[Weapon]):
 		row += 1
 
 
-def save_to_xlsx_file(weapons : list[Weapon], stat_names : tuple[str,...], stat_links : tuple[str,...]):
+def save_to_xlsx_file(weapons : list[Weapon]):
 	""" https://openpyxl.readthedocs.io/en/stable/ """
 
 	# excel file
 	workbook = Workbook()
 
 	workbook.remove(workbook.active)
-		
-	add_stats_worksheet(workbook, weapons, sheet_names[0], stat_names[0], stat_links[0], explanations[0],
-					 Weapon.damage, Weapon.ex_damage_drop_off_fill)
-
-	add_stats_worksheet(workbook, weapons, sheet_names[1], stat_names[1], stat_links[1], explanations[1], 
-					 Weapon.damage_per_shot, Weapon.ex_damage_to_base_damage_gradient_fill)
-
-	add_stats_worksheet(workbook, weapons, sheet_names[2], stat_names[2], stat_links[2], explanations[2],
-					 Weapon.dps, Weapon.ex_dps_to_base_dps_class_gradient_fill)
-
-	add_stats_worksheet(workbook, weapons, sheet_names[3], stat_names[3], stat_links[3], explanations[3],
-					 Weapon.stdok, Weapon.ex_eb_stdok_improvement_fill, tdok_additional_params)
-
-	add_stats_worksheet(workbook, weapons, sheet_names[4], stat_names[4], stat_links[4], explanations[4],
-					 Weapon.ttdok, Weapon.ex_ttdok_to_base_ttdok_hp_class_gradient_fill, tdok_additional_params)
 	
+	for stat, illustration in zip(stats, stat_illustrations):
+		add_stats_worksheet(workbook, weapons, stat, illustration)
+
 	add_attachment_overview(workbook, weapons)
 
 	# save to file
