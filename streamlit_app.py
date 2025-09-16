@@ -1,16 +1,16 @@
 import create_weapon_statistics_file as cwsf, streamlit as st, matplotlib.pyplot as plt, pandas as pd, altair as alt, numpy as np, sys
 import pandas.core.series
 # https://demo-stockpeers.streamlit.app/?ref=streamlit-io-gallery-favorites&stocks=AAPL%2CMSFT%2CGOOGL%2CNVDA%2CAMZN%2CTSLA%2CADP%2CACN%2CABBV%2CAMT%2CAXP%2CAMGN%2CAMD
-github_url = "https://github.com/hanslhansl/rainbow-six-siege-weapon-statistics"
-
 
 @st.cache_data
 def get_weapons_dict():
     return cwsf.get_weapons_dict()
-
+@st.cache_data
+def get_weapons():
+    return cwsf.Weapons()
 
 # Load data
-weapons = get_weapons_dict()
+weapons = get_weapons()
 #raw_data = pd.DataFrame({w.name : w.damages for w in weapons.values()}).transpose()
 
 # Streamlit UI
@@ -21,7 +21,7 @@ st.set_page_config(
 )
 st.markdown("## rainbow six siege weapon statistics")
 st.markdown("interactive visualisation of damage data over different distances")
-#st.markdown(f"find the [project on github]({github_url})")
+#st.markdown(f"find the [project on github]({cwsf.github_url})")
 
 """
 ### choose stat
@@ -59,18 +59,17 @@ with st.container(border=True):
     # Suchfeld und Waffenfilter
     with cols[1]:
         search_query = st.text_input("filter weapons")
-        filtered_weapons = {name : weapon for name, weapon in weapons.items() if search_query.lower() in name.lower()}
+        filtered_weapons = [name for name in weapons.weapons if search_query.lower() in name.lower()]
         selected_weapons = st.multiselect(
             label="select weapon(s)",
-            options=filtered_weapons.items(),
+            options=filtered_weapons,
             #default=list(st.session_state.selected_weapons),
-            format_func=lambda tup: tup[0]
             )
 
 if len(selected_weapons):
-    selected_weapons = dict(selected_weapons)
+    selected_weapons = selected_weapons
 else:
-    selected_weapons = weapons
+    selected_weapons = list(weapons.weapons)
 
 """
 ### plot
@@ -124,11 +123,11 @@ def column_styler(s : pandas.core.series.Series):
     return ret
 
 df = (
-    pd.DataFrame({name : tuple(selected_stat.stat_method(weapon, i) for i in range(len(cwsf.Weapon.distances))) for name, weapon in selected_weapons.items()})
+    weapons.damages()[selected_weapons]
     .transpose()
     .reset_index()
     .rename(columns={"index": "weapon"})
-    .style.apply(column_styler, axis=1)
+    #.style.apply(column_styler, axis=1)
     )
 
 #df.to_excel("out.xlsx")

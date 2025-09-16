@@ -222,14 +222,24 @@ class Weapons:
 		return
 
 	def filter_df(self, df : pd.DataFrame, filter_func : typing.Callable[["Weapon"], bool]):
-		return df[[name for name in df.columns if filter_func(self.weapons[name])]]
+		return df[(name for name in df.columns if filter_func(self.weapons[name]))]
 	def apply(self, df : pd.DataFrame, callback : typing.Callable[["Weapon", int, typing.Any], typing.Any]):
 		df2 = pd.DataFrame(index=df.index, columns=df.columns)
 		for row_index, row in df.iterrows():
 			for col_name, value in row.items():
 				df2.at[row_index, col_name] = callback(self.weapons[col_name], row_index, value)
 		return df2
-	def style_apply(self, df : pd.DataFrame, callback : typing.Callable[["Weapon", int, int | float], str]):
+	def apply_style(self, df : pd.DataFrame, callback : typing.Callable[["Weapon", int, int | float], str]):
+
+		def cb(x):
+			w = self.weapons[x.name]
+			return (callback(w, i, v) for i, v in x.items())
+
+		#print(df)
+		return df.style.apply(cb, axis=0)
+		print("after")
+		sys.exit()
+
 		df_styles = pd.DataFrame('', index=df.index, columns=df.columns)
 		for row_index, row in df.iterrows():
 			for col_name, value in row.items():
@@ -237,7 +247,7 @@ class Weapons:
 		return df.style.apply(lambda _: df_styles, axis=None)
 
 	def damages(self):
-		return self.damages
+		return self._damages
 	def damages_per_shot(self):
 		pellets = {name : w.pellets for name, w in self.weapons.items()}
 		return self._damages.mul(pd.Series(pellets), axis=1)
@@ -696,15 +706,17 @@ def get_operators_list(weapons : list[Weapon], file_name : str) -> None:
 
 ws = Weapons()
 
-print(ws.filter_df(ws.dps(), lambda w: w.class_ == "SG"))
+#print(ws.filter_df(ws.dps(), lambda w: w.class_ == "SG"))
 
-
-s = ws.style_apply(ws.dps(), lambda *_: f"background-color: green")
+#print(ws.dps())
+print("yes")
+#s = ws.apply_style(ws.dps(), lambda *_: f"background-color: green")
+s = ws.apply_style(ws.dps(), lambda *args: print(args))
 
 
 html = s.to_html()  # render() erzeugt HTML-Code
-with open("styled_df.html", "w") as f:
-    f.write(html)
+"""with open("styled_df.html", "w") as f:
+    f.write(html)"""
 
 
 
