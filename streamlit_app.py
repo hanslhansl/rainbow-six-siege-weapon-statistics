@@ -2,9 +2,7 @@ import create_weapon_statistics_file as cwsf, streamlit as st, matplotlib.pyplot
 import pandas.core.series
 # https://demo-stockpeers.streamlit.app/?ref=streamlit-io-gallery-favorites&stocks=AAPL%2CMSFT%2CGOOGL%2CNVDA%2CAMZN%2CTSLA%2CADP%2CACN%2CABBV%2CAMT%2CAXP%2CAMGN%2CAMD
 
-@st.cache_data
-def get_weapons_dict():
-    return cwsf.get_weapons_dict()
+
 @st.cache_data
 def get_weapons():
     return cwsf.Weapons()
@@ -36,8 +34,10 @@ with st.container(border=True):
     selected_illustration = st.selectbox(
         "choose a coloring scheme:",
         cwsf.stat_illustrations,
-        format_func=lambda x: x.__doc__
+        format_func=lambda x: x.__name__.replace("_", " ")
         )
+    
+    consider_eb_for_illustration = st.checkbox("consider extended barrel stats for coloring scheme")
 
 
 """
@@ -109,38 +109,25 @@ with st.container(border=True):
 """
 ### raw data
 """
+st.write(selected_illustration.__doc__)
 
-def column_styler(s : pandas.core.series.Series):
-    weapon = weapons[s["weapon"]]
-    
-    ret = []
-    for index, value in s.items():
-        if index == "weapon":
-            ret.append(f"background-color: {weapon.name_color.to_css()}")
-        else:
-            ret.append(f"background-color: {selected_illustration(weapon, index).to_css()}")
+df = selected_stat.stat_method(weapons).loc[selected_weapons]
+df.index.rename("weapons", inplace=True)
 
-    return ret
+df = selected_illustration(weapons, df, consider_eb_for_illustration)
 
-df = (
-    weapons.damages()[selected_weapons]
-    .transpose()
-    .reset_index()
-    .rename(columns={"index": "weapon"})
-    #.style.apply(column_styler, axis=1)
-    )
 
-#df.to_excel("out.xlsx")
 
 if False:
-    config = {i+2 : st.column_config.Column(width=1) for i in range(0, len(cwsf.Weapon.distances))}
-    config[1] = st.column_config.Column(pinned=True, width=200)
+    config = {col : st.column_config.Column(width=1) for col in df.columns}
+    config["weapons"] = st.column_config.Column()
+    #config[1] = st.column_config.Column(pinned=True, width=200)
 
     st.dataframe(
         df,
         height=700,
-        column_config=config,
-        hide_index=True
+        #column_config=config,
+        hide_index=False
     )
 else:
     st.table(df)

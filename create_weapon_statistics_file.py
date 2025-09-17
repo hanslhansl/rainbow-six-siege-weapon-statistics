@@ -215,45 +215,65 @@ class Weapons:
 		weapons_sorted = sorted(weapons, key=lambda w: (Weapon.classes.index(w.class_), w.name))
 		self.weapons = {w.name : w for w in weapons_sorted}
 
-		self._damages = pd.DataFrame({name : w.damages for name, w in self.weapons.items()})
-		for w in self.weapons.values():
+		self._damages = pd.DataFrame({name : w.damages for name, w in self.weapons.items()}).transpose()
+		for name, w in self.weapons.items():
 			del w.damages
 
 		return
 
-	def filter_df(self, df : pd.DataFrame, filter_func : typing.Callable[["Weapon"], bool]):
-		return df[(name for name in df.columns if filter_func(self.weapons[name]))]
-	def apply(self, df : pd.DataFrame, callback : typing.Callable[["Weapon", int, typing.Any], typing.Any]):
-		df2 = pd.DataFrame(index=df.index, columns=df.columns)
-		for row_index, row in df.iterrows():
-			for col_name, value in row.items():
-				df2.at[row_index, col_name] = callback(self.weapons[col_name], row_index, value)
-		return df2
-	def apply_style(self, df : pd.DataFrame, callback : typing.Callable[["Weapon", int, int | float], str]):
-
+	def filter(self, df : pd.DataFrame, filter_func : typing.Callable[["Weapon"], bool]):
+		return df[df.apply(lambda row: filter_func(self.weapons[row.name]), axis=1)]
+	def apply(self, df : pd.DataFrame, callback : typing.Callable[["Weapon", int], typing.Any]):
 		def cb(x):
 			w = self.weapons[x.name]
-			return (callback(w, i, v) for i, v in x.items())
+			return pd.Series(callback(w, i) for i, v in x.items())
+		return df.apply(cb, axis=1)
+	def apply_style(self, df : pd.DataFrame, callback : typing.Callable[["Weapon", int], str]):
+		def cb(x):
+			w = self.weapons[x.name]
+			return pd.Series(callback(w, i) for i in x.keys())
+		return df.style.apply(cb, axis=1)
+	def apply_background_color(self, df : pd.DataFrame, callback : typing.Callable[["Weapon", int], RGBA]):
+		return self.apply_style(df, lambda *args: f"background-color: {callback(*args).to_css()}")
 
-		#print(df)
-		return df.style.apply(cb, axis=0)
-		print("after")
-		sys.exit()
+	# stats helper
+	def damage_drop_off_intervals(self, w : "Weapon"):
+		intervals = get_non_stagnant_intervals(tuple(self._damages.loc[w.name]))
+		if w.class_ == "SG":
+			if len(intervals) != 2:
+				raise Exception(f"{error()}: A {w.class_} should have exactly 2 damage dropoff intervals but weapon '{w.name}' has {len(intervals)}.")
+			return intervals
+		return (intervals[0][0], intervals[-1][-1]),
+	def is_in_damage_drop_off(self, w : "Weapon", index : int):
+		return is_index_in_intervals(index, self.damage_drop_off_intervals(w)) is None
 
-		df_styles = pd.DataFrame('', index=df.index, columns=df.columns)
-		for row_index, row in df.iterrows():
-			for col_name, value in row.items():
-				df_styles.at[row_index, col_name] = callback(self.weapons[col_name], row_index, value)
-		return df.style.apply(lambda _: df_styles, axis=None)
-
+	# primary stats
 	def damages(self):
 		return self._damages
 	def damages_per_shot(self):
 		pellets = {name : w.pellets for name, w in self.weapons.items()}
-		return self._damages.mul(pd.Series(pellets), axis=1)
+		return self._damages.mul(pellets, axis=0)
 	def dps(self):
-		pellets = {name : w.pellets * w.rps for name, w in self.weapons.items()}
-		return self._damages.mul(pd.Series(pellets), axis=1)
+		bullets_per_second = {name : w.pellets * w.rps for name, w in self.weapons.items()}
+		return self._damages.mul(bullets_per_second, axis=0)
+
+	# illustrations
+	def damage_drop_off_coloring(self, df : pd.DataFrame, consider_eb : bool):
+		"""the colored areas represent steady damage, the colorless areas represent decreasing damage"""
+		return self.apply_background_color(df, lambda w, i: w.color if
+									 self.is_in_damage_drop_off(w if not (w.is_extended_barrel and consider_eb) else w.extended_barrel_parent, i) else w.empty_color)
+	def stat_to_base_stat_gradient_coloring(self, df : pd.DataFrame, consider_eb : bool):
+		"""the color gradient illustrates the stat compared to the weapon's base stat (i.e. at 0 m)"""
+		return self.apply_background_color(df, lambda w, i: w.color.with_alpha(df.loc[w.name][i] / df.loc[w.name][0]))
+	def stat_to_class_stat_gradient_coloring(self, df : pd.DataFrame, consider_eb : bool):
+		"""the color gradient illustrates the stat compared to the weapon class' highest stat at the same distance"""
+		class_max = {class_ : group_df.max(axis=0) for class_, group_df in df.groupby(lambda name: self.weapons[name].class_)}
+		return self.apply_background_color(df, lambda w, i: w.color.with_alpha(df.loc[w.name][i] / class_max[w.class_][i]))
+	def stat_to_class_base_stat_gradient_coloring(self, df : pd.DataFrame, consider_eb : bool):
+		"""the color gradient illustrates the stat compared to the weapon's class' highest base stat (i.e. at 0 m)"""
+		class_base_max = {class_ : group_df.to_numpy().max() for class_, group_df in df.groupby(lambda name: self.weapons[name].class_)}
+		return self.apply_background_color(df, lambda w, i: w.color.with_alpha(df.loc[w.name][i] / class_base_max[w.class_]))
+
 
 class Weapon:
 	colors = {class_: RGBA.from_rgb_hex(color) for class_, color in weapon_colors.items()}
@@ -278,7 +298,7 @@ class Weapon:
 	default_has_grip = False
 	default_has_laser = False
 
-	extended_barrel_postfix = "+ extended barrel"
+	extended_barrel_postfix = "+ eb"
 	extended_barrel_damage_multiplier = 0.0
 	laser_ads_speed_multiplier = 0.0
 	angled_grip_reload_speed_multiplier = 0.0
@@ -537,12 +557,6 @@ class Weapon:
 				rt1 /= self.angled_grip_reload_speed_multiplier
 			return rt0, rt1
 		return None
-	def how_useful_is_extended_barrel(self, hp : int):
-		a = self.extended_barrel_parent.stdok(0, hp) - self.stdok(0, hp)
-		b = round(self.extended_barrel_parent.ttdok(0, hp) - self.ttdok(0, hp))
-		if a == 0:
-			return a, b, self.empty_color
-		return a, b, self.color
 	@property
 	def capacity(self):
 		return str(self._capacity[0]) + "+" + str(self._capacity[1])
@@ -554,7 +568,8 @@ class Weapon:
 		if self.is_extended_barrel:
 			return self.empty_color
 		return self.color
-	@property
+	
+	
 	def damage_drop_off_intervals(self):
 		intervals = get_non_stagnant_intervals(self.damages)
 		if self.class_ == "SG":
@@ -562,6 +577,12 @@ class Weapon:
 				raise Exception(f"{error()}: A {self.class_} should have exactly 2 damage dropoff intervals but weapon '{self.name}' has {len(intervals)}.")
 			return intervals
 		return (intervals[0][0], intervals[-1][-1]),
+	def how_useful_is_extended_barrel(self, hp : int):
+		a = self.extended_barrel_parent.stdok(0, hp) - self.stdok(0, hp)
+		b = round(self.extended_barrel_parent.ttdok(0, hp) - self.ttdok(0, hp))
+		if a == 0:
+			return a, b, self.empty_color
+		return a, b, self.color
 
 	# primary stats
 	# def damage(self, index : int, *_):
@@ -704,32 +725,17 @@ def get_operators_list(weapons : list[Weapon], file_name : str) -> None:
 		
 	return
 
-ws = Weapons()
-
-#print(ws.filter_df(ws.dps(), lambda w: w.class_ == "SG"))
-
-#print(ws.dps())
-print("yes")
-#s = ws.apply_style(ws.dps(), lambda *_: f"background-color: green")
-s = ws.apply_style(ws.dps(), lambda *args: print(args))
-
-
-html = s.to_html()  # render() erzeugt HTML-Code
-"""with open("styled_df.html", "w") as f:
-    f.write(html)"""
-
-
-
-sys.exit()
-
-
+#ws = Weapons()
+#s = ws.apply_background_color(ws.damages(), ws.damage_dropoff_color())
+#s.to_html('styled_dataframe.html', escape=False)
+#sys.exit()
 
 @dataclass
 class Stat:
 	name : str
 	short_name : str
 	_link : str
-	stat_method : typing.Callable[[Weapon, int, typing.Any], float | int]
+	stat_method : typing.Callable[[Weapons], pd.DataFrame]
 	_is_tdok : bool
 
 	def __post_init__(self):
@@ -743,20 +749,24 @@ class Stat:
 			self.additional_parameters = (None, None),
 
 stats = (
-	Stat("damage per bullet", "damage per bullet", "damage-per-bullet", Weapon.damage, False),
-	Stat("damage per shot", "damage per shot", "damage-per-shot", Weapon.damage_per_shot, False),
-	Stat("damage per second", "dps", "damage-per-second---dps", Weapon.dps, False),
-	Stat("bullets to down or kill", "btdok", "bullets-to-down-or-kill---btdok", Weapon.btdok, True),
-	Stat("shots to down or kill", "stdok", "shots-to-down-or-kill---stdok", Weapon.stdok, True),
-	Stat("time to down or kill", "ttdok", "time-to-down-or-kill---ttdok", Weapon.ttdok, True)
+	Stat("damage per bullet", "damage per bullet", "damage-per-bullet", Weapons.damages, False),
+	Stat("damage per shot", "damage per shot", "damage-per-shot", Weapons.damages_per_shot, False),
+	Stat("damage per second", "dps", "damage-per-second---dps", Weapons.dps, False),
+	#Stat("bullets to down or kill", "btdok", "bullets-to-down-or-kill---btdok", Weapon.btdok, True),
+	#Stat("shots to down or kill", "stdok", "shots-to-down-or-kill---stdok", Weapon.stdok, True),
+	#Stat("time to down or kill", "ttdok", "time-to-down-or-kill---ttdok", Weapon.ttdok, True)
 )
 stat_illustrations = (
-	Weapon.damage_drop_off_color,
-	Weapon.damage_to_base_damage_gradient_color,
-	Weapon.dps_to_base_dps_class_gradient_color,
-	Weapon.eb_btdok_improvement_color,
-	Weapon.eb_stdok_improvement_color,
-	Weapon.ttdok_to_base_ttdok_hp_class_gradient_color
+	Weapons.damage_drop_off_coloring,
+	Weapons.stat_to_base_stat_gradient_coloring,
+	Weapons.stat_to_class_stat_gradient_coloring,
+	Weapons.stat_to_class_base_stat_gradient_coloring,
+	#Weapons.eb_btdok_improvement_color,
+	#Weapons.eb_stdok_improvement_color,
+	
+	)
+tdok_stat_illustrations = (
+	#Weapon.ttdok_to_base_ttdok_hp_class_gradient_color,
 	)
 
 
