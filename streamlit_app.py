@@ -116,7 +116,7 @@ df.index.rename("weapons", inplace=True)
 
 df = selected_illustration(weapons, df, consider_eb_for_illustration)
 
-
+#https://discuss.streamlit.io/t/select-all-on-a-streamlit-multiselect/9799
 
 if False:
     config = {col : st.column_config.Column(width=1) for col in df.columns}
