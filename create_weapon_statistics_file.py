@@ -32,7 +32,7 @@ weapon_colors = {"AR":"5083EA", "SMG":"B6668E", "MP":"76A5AE", "LMG":"8771BD", "
 ###################################################
 
 #imports
-import os, json, typing, math, ctypes, copy, sys, itertools, colorama, sys, colorsys, pandas as pd
+import os, json, typing, math, ctypes, copy, sys, itertools, colorama, sys, colorsys, pandas as pd, numpy as np
 from openpyxl.cell.text import InlineFont
 from openpyxl.cell.rich_text import TextBlock, CellRichText
 from openpyxl import Workbook
@@ -155,6 +155,11 @@ def is_index_in_intervals(index : int, intervals : tuple[tuple[int, int],...]):
 			return start, end
 	return None
 
+def safe_division(a : float, b : float):
+	if a == b:
+		return 1.
+	return a / b
+
 border_style = "thin"
 center_alignment = Alignment("center", wrapText=True)
 left_alignment = Alignment("left", wrapText=True)
@@ -248,14 +253,20 @@ class Weapons:
 		return is_index_in_intervals(index, self.damage_drop_off_intervals(w)) is None
 
 	# primary stats
-	def damages(self):
+	def damages(self, _):
 		return self._damages
-	def damages_per_shot(self):
+	def damages_per_shot(self, _):
 		pellets = {name : w.pellets for name, w in self.weapons.items()}
 		return self._damages.mul(pellets, axis=0)
-	def dps(self):
+	def dps(self, _):
 		bullets_per_second = {name : w.pellets * w.rps for name, w in self.weapons.items()}
 		return self._damages.mul(bullets_per_second, axis=0)
+	def stdok(self, hp : int):
+		pellets = {name : w.pellets for name, w in self.weapons.items()}
+		return np.ceil((hp / self._damages).div(pellets, axis=0))
+	def ttdok(self, hp : int):
+		rpms = {name : w.rpms for name, w in self.weapons.items()}
+		return (self.stdok(hp) - 1).div(rpms, axis=0)
 
 	# illustrations
 	def damage_drop_off_coloring(self, df : pd.DataFrame, consider_eb : bool):
@@ -264,16 +275,21 @@ class Weapons:
 									 self.is_in_damage_drop_off(w if not (w.is_extended_barrel and consider_eb) else w.extended_barrel_parent, i) else w.empty_color)
 	def stat_to_base_stat_gradient_coloring(self, df : pd.DataFrame, consider_eb : bool):
 		"""the color gradient illustrates the stat compared to the weapon's base stat (i.e. at 0 m)"""
-		return self.apply_background_color(df, lambda w, i: w.color.with_alpha(df.loc[w.name][i] / df.loc[w.name][0]))
+		return self.apply_background_color(df, lambda w, i: w.color.with_alpha(safe_division(df.loc[w.name][i], df.loc[w.name].max())))
 	def stat_to_class_stat_gradient_coloring(self, df : pd.DataFrame, consider_eb : bool):
 		"""the color gradient illustrates the stat compared to the weapon class' highest stat at the same distance"""
 		class_max = {class_ : group_df.max(axis=0) for class_, group_df in df.groupby(lambda name: self.weapons[name].class_)}
-		return self.apply_background_color(df, lambda w, i: w.color.with_alpha(df.loc[w.name][i] / class_max[w.class_][i]))
+		return self.apply_background_color(df, lambda w, i: w.color.with_alpha(safe_division(df.loc[w.name][i], class_max[w.class_][i])))
 	def stat_to_class_base_stat_gradient_coloring(self, df : pd.DataFrame, consider_eb : bool):
 		"""the color gradient illustrates the stat compared to the weapon's class' highest base stat (i.e. at 0 m)"""
 		class_base_max = {class_ : group_df.to_numpy().max() for class_, group_df in df.groupby(lambda name: self.weapons[name].class_)}
-		return self.apply_background_color(df, lambda w, i: w.color.with_alpha(df.loc[w.name][i] / class_base_max[w.class_]))
-
+		return self.apply_background_color(df, lambda w, i: w.color.with_alpha(safe_division(df.loc[w.name][i], class_base_max[w.class_])))
+	def extended_barrel_is_improvement_coloring(self, df : pd.DataFrame, consider_eb : bool):
+		"""the colored areas show where the extended barrel attachment actually affects the stat"""
+		return self.apply_background_color(df, lambda w, i:
+									 w.color if
+									 w.is_extended_barrel and consider_eb and df.loc[w.name][i] != df.loc[w.extended_barrel_parent.name][i]
+									 else w.empty_color)
 
 class Weapon:
 	colors = {class_: RGBA.from_rgb_hex(color) for class_, color in weapon_colors.items()}
@@ -735,38 +751,39 @@ class Stat:
 	name : str
 	short_name : str
 	_link : str
-	stat_method : typing.Callable[[Weapons], pd.DataFrame]
-	_is_tdok : bool
+	stat_method : typing.Callable[[Weapons, typing.Any], pd.DataFrame]
+	is_tdok : bool
 
 	def __post_init__(self):
 		self.link = f"https://github.com/hanslhansl/Rainbow-Six-Siege-Weapon-Statistics/#{self._link}"
 
-		if self._is_tdok:
+		if self.is_tdok:
 			self.additional_parameter_name = "hp"
-			self.additional_parameters = tuple(zip(tdok_hp_levels, tdok_levels_descriptions))
+			self.additional_parameters = tdok_hp_levels
+			self.additional_parameters_descriptions = tdok_levels_descriptions
 		else:
 			self.additional_parameter_name = None
-			self.additional_parameters = (None, None),
+			self.additional_parameters = None
 
 stats = (
 	Stat("damage per bullet", "damage per bullet", "damage-per-bullet", Weapons.damages, False),
 	Stat("damage per shot", "damage per shot", "damage-per-shot", Weapons.damages_per_shot, False),
 	Stat("damage per second", "dps", "damage-per-second---dps", Weapons.dps, False),
 	#Stat("bullets to down or kill", "btdok", "bullets-to-down-or-kill---btdok", Weapon.btdok, True),
-	#Stat("shots to down or kill", "stdok", "shots-to-down-or-kill---stdok", Weapon.stdok, True),
-	#Stat("time to down or kill", "ttdok", "time-to-down-or-kill---ttdok", Weapon.ttdok, True)
+	Stat("shots to down or kill", "stdok", "shots-to-down-or-kill---stdok", Weapons.stdok, True),
+	Stat("time to down or kill", "ttdok", "time-to-down-or-kill---ttdok", Weapons.ttdok, True)
 )
 stat_illustrations = (
 	Weapons.damage_drop_off_coloring,
 	Weapons.stat_to_base_stat_gradient_coloring,
 	Weapons.stat_to_class_stat_gradient_coloring,
 	Weapons.stat_to_class_base_stat_gradient_coloring,
-	#Weapons.eb_btdok_improvement_color,
-	#Weapons.eb_stdok_improvement_color,
+	Weapons.extended_barrel_is_improvement_coloring,
 	
 	)
 tdok_stat_illustrations = (
 	#Weapon.ttdok_to_base_ttdok_hp_class_gradient_color,
+	#Weapons.extended_barrel_tdok_improvement_color,
 	)
 
 

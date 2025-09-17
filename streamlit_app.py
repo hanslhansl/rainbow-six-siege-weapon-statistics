@@ -33,12 +33,20 @@ with st.container(border=True):
     
     selected_illustration = st.selectbox(
         "choose a coloring scheme:",
-        cwsf.stat_illustrations,
+        cwsf.stat_illustrations + (cwsf.tdok_stat_illustrations if selected_stat.is_tdok else ()),
         format_func=lambda x: x.__name__.replace("_", " ")
         )
     
-    consider_eb_for_illustration = st.checkbox("consider extended barrel stats for coloring scheme")
 
+    consider_eb_for_illustration = st.checkbox("consider extended barrel stats for coloring scheme", True)
+
+    additional_parameter = st.pills(
+        label=f"choose {selected_stat.additional_parameter_name} level",
+        options=selected_stat.additional_parameters,
+        default=selected_stat.additional_parameters[0],
+        format_func=lambda x: selected_stat.additional_parameters_descriptions[selected_stat.additional_parameters.index(x)],
+        label_visibility="collapsed"
+        ) if selected_stat.additional_parameters else None
 
 """
 ### choose weapons
@@ -71,9 +79,9 @@ if len(selected_weapons):
 else:
     selected_weapons = list(weapons.weapons)
 
-"""
+_ = """
 ### plot
-"""
+
 with st.container(border=True):
     if False:#len(selected_weapons):
         df = pd.DataFrame(data)
@@ -104,6 +112,7 @@ with st.container(border=True):
         )
     else:
         st.info("select some weapons to plot")
+"""
 
 
 """
@@ -111,7 +120,7 @@ with st.container(border=True):
 """
 st.write(selected_illustration.__doc__)
 
-df = selected_stat.stat_method(weapons).loc[selected_weapons]
+df = selected_stat.stat_method(weapons, additional_parameter).round().astype(int).loc[selected_weapons]
 df.index.rename("weapons", inplace=True)
 
 df = selected_illustration(weapons, df, consider_eb_for_illustration)
