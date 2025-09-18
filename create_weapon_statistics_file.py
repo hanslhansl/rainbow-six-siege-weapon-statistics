@@ -34,7 +34,7 @@ weapon_colors = {"AR":"#5083EA",
 				 "Revolver":"#F48020",
 				 "Hand Canon":"#948A54"}
 
-weapon_colors = {"AR":"#1f77b4",
+weapon_colors_ = {"AR":"#1f77b4",
 				 "SMG":"#e377c2",
 				 "MP":"#1abc9c",
 				 "LMG":"#9467bd",
