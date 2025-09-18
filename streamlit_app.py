@@ -121,7 +121,6 @@ with st.container(border=True):
 st.write(selected_illustration.__doc__)
 
 df = selected_stat.stat_method(weapons, additional_parameter).loc[selected_weapons]
-df.index.rename("weapons", inplace=True)
 
 cell_hover = {  # for row hover use <tr> instead of <td>
     'selector': 'tr:hover',
