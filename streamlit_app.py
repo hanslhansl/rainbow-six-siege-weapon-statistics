@@ -33,7 +33,7 @@ with st.container(border=True):
     
     selected_illustration = st.selectbox(
         "choose a coloring scheme:",
-        cwsf.stat_illustrations + (cwsf.tdok_stat_illustrations if selected_stat.is_tdok else ()),
+        cwsf.stat_illustrations,
         format_func=lambda x: x.__name__.replace("_", " ")
         )
     
@@ -120,23 +120,28 @@ with st.container(border=True):
 """
 st.write(selected_illustration.__doc__)
 
-df = selected_stat.stat_method(weapons, additional_parameter).round().astype(int).loc[selected_weapons]
+df = selected_stat.stat_method(weapons, additional_parameter).loc[selected_weapons]
 df.index.rename("weapons", inplace=True)
 
-df = selected_illustration(weapons, df, consider_eb_for_illustration)
+styler = selected_illustration(weapons, df, consider_eb_for_illustration)
+
+float_cols = df.select_dtypes(include='float').columns
+styler = styler.format({col: lambda x: f"{x:.1f}".rstrip('0').rstrip('.') for col in float_cols}).hide(axis="index")
+
 
 #https://discuss.streamlit.io/t/select-all-on-a-streamlit-multiselect/9799
 
 if False:
     config = {col : st.column_config.Column(width=1) for col in df.columns}
-    config["weapons"] = st.column_config.Column()
+    #config["weapons"] = st.column_config.Column()
     #config[1] = st.column_config.Column(pinned=True, width=200)
 
     st.dataframe(
-        df,
+        styler,
         height=700,
-        #column_config=config,
+        column_config=config,
         hide_index=False
     )
 else:
-    st.table(df)
+    with st.container():
+        st.table(styler)
