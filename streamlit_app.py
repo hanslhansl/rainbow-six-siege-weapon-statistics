@@ -37,8 +37,12 @@ with st.container(border=True):
         format_func=lambda x: x.__name__.replace("_", " ")
         )
     
+    extended_barrel_difference = st.checkbox("calculate the difference between the weapon with and without extended barrel", False)
 
-    consider_eb_for_illustration = st.checkbox("consider extended barrel stats for coloring scheme", True)
+    consider_eb_for_illustration = st.checkbox(
+        label="consider extended barrel stats for the coloring",
+        value=True,
+        disabled=extended_barrel_difference)
 
     additional_parameter = st.pills(
         label=f"choose {selected_stat.additional_parameter_name} level",
@@ -122,6 +126,16 @@ st.write(selected_illustration.__doc__)
 
 df = selected_stat.stat_method(weapons, additional_parameter).loc[selected_weapons]
 
+if extended_barrel_difference:
+    has_or_is_eb = weapons.filter(df, lambda w: w.is_extended_barrel or w.extended_barrel_weapon != None)
+    has_eb = weapons.filter(has_or_is_eb, lambda w: w.extended_barrel_weapon != None)
+
+    df = pd.DataFrame(
+        np.abs(weapons.apply(has_or_is_eb, lambda w, i: has_or_is_eb[i][w.name] - has_or_is_eb[i][(w if w.is_extended_barrel else w.extended_barrel_weapon).name])),
+        index=has_or_is_eb.index,
+        columns=has_or_is_eb.columns)
+
+
 cell_hover = {  # for row hover use <tr> instead of <td>
     'selector': 'tr:hover',
     'props': [('background-color', '#ffffb3')]
@@ -137,8 +151,11 @@ headers = {
 styler = selected_illustration(weapons, df, consider_eb_for_illustration)#.set_table_styles([cell_hover, index_names, headers])
 
 float_cols = df.select_dtypes(include='float').columns
-styler = styler.format({col: lambda x: f"{x:.1f}".rstrip('0').rstrip('.') for col in float_cols}).hide(axis="index")
+styler = styler.format({col: lambda x: f"{x:.1f}".rstrip('0').rstrip('.') for col in float_cols})
 
+if extended_barrel_difference:
+    #styler = has_eb.style.use(styler.export())
+    pass
 
 #https://discuss.streamlit.io/t/select-all-on-a-streamlit-multiselect/9799
 

@@ -261,7 +261,7 @@ class Weapons:
 	def apply_style(self, df : pd.DataFrame, callback : typing.Callable[["Weapon", int], str]):
 		def cb(x):
 			w = self.weapons[x.name]
-			return pd.Series(callback(w, i) for i in x.keys())
+			return pd.Series(callback(w, i) for i in df.columns)
 		return df.style.apply(cb, axis=1)
 	def apply_background_color(self, df : pd.DataFrame, callback : typing.Callable[["Weapon", int], RGBA]):
 		convert_color = RGBA.to_rgb_hex if __name__ == "__main__" else RGBA.to_css
@@ -272,54 +272,82 @@ class Weapons:
 		return is_index_in_intervals(index, w.damage_drop_off_intervals) is None
 
 	# primary stats
-	def damages(self, _ = None):
+	def damage_per_bullet(self, _ = None):
 		return self._damages
-	def damages_per_shot(self, _ = None):
+	def damage_per_shot(self, _ = None):
 		pellets = {name : w.pellets for name, w in self.weapons.items()}
 		return self._damages.mul(pellets, axis=0)
 	def dps(self, _ = None):
+		"""damage per second"""
 		bullets_per_second = {name : w.pellets * w.rps for name, w in self.weapons.items()}
 		return self._damages.mul(bullets_per_second, axis=0).round()
+	
 	def btdok(self, hp : int):
-		raise NotImplementedError
+		"""bullets to down or kill"""
+		return np.ceil(hp / self._damages)
 	def stdok(self, hp : int):
+		"""shots to down or kill"""
 		pellets = {name : w.pellets for name, w in self.weapons.items()}
-		return np.ceil((hp / self._damages).div(pellets, axis=0)).round()
+		return np.ceil((hp / self._damages).div(pellets, axis=0))
 	def ttdok(self, hp : int):
+		"""time to down or kill"""
 		rpms = {name : w.rpms for name, w in self.weapons.items()}
 		return (self.stdok(hp) - 1).div(rpms, axis=0).round()
+	
+	def theoretical_btdok(self, hp : int):
+		""""""
+		return hp / self._damages
 	def theoretical_stdok(self, hp : int):
+		""""""
 		pellets = {name : w.pellets for name, w in self.weapons.items()}
 		return (hp / self._damages).div(pellets, axis=0)
 	def theoretical_ttdok(self, hp : int):
+		""""""
 		pellets_rpms = {name : w.pellets * w.rpms for name, w in self.weapons.items()}
 		return (hp / self._damages).div(pellets_rpms, axis=0)
+
+	def btk(self, hp : int):
+		"""bullets to kill"""
+		return self.btdok(hp + 20)
+	def stk(self, hp : int):
+		"""shots to kill"""
+		return self.stdok(hp + 20)
+	def ttk(self, hp : int):
+		"""time to kill"""
+		return self.ttdok(hp + 20)
+	
+	def how_useful_is_extended_barrel(self, hp : int):
+		a = self.extended_barrel_parent.stdok(0, hp) - self.stdok(0, hp)
+		b = round(self.extended_barrel_parent.ttdok(0, hp) - self.ttdok(0, hp))
+		if a == 0:
+			return a, b, self.empty_color
+		return a, b, self.color
 
 	# illustrations helper
 	def eb_or_parent_weapon(self, w : "Weapon", consider_eb : bool):
 		return w if w.is_extended_barrel <= consider_eb else w.extended_barrel_parent
 
 	# illustrations
-	def damage_drop_off_coloring(self, df : pd.DataFrame, consider_eb : bool):
+	def damage_drop_off_coloring(self, target : pd.DataFrame, consider_eb : bool, source : pd.DataFrame = None):
 		"""the colored areas represent steady damage, the colorless areas represent decreasing damage"""
-		return self.apply_background_color(df, lambda w, i: w.color if
+		return self.apply_background_color(target, lambda w, i: w.color if
 									 self.is_in_damage_drop_off(self.eb_or_parent_weapon(w, consider_eb), i) else w.empty_color)
-	def stat_to_base_stat_gradient_coloring(self, df : pd.DataFrame, consider_eb : bool):
+	def stat_to_base_stat_gradient_coloring(self, target : pd.DataFrame, consider_eb : bool, source : pd.DataFrame = None):
 		"""the color gradient illustrates the stat compared to the weapon's base stat (i.e. at 0 m)"""
-		return self.apply_background_color(df, lambda w, i: w.color.with_alpha(safe_division(df.loc[w.name][i], df.loc[self.eb_or_parent_weapon(w, consider_eb).name].max())))
-	def stat_to_class_stat_gradient_coloring(self, df : pd.DataFrame, consider_eb : bool):
+		return self.apply_background_color(target, lambda w, i: w.color.with_alpha(safe_division(df.loc[w.name][i], df.loc[self.eb_or_parent_weapon(w, consider_eb).name].max())))
+	def stat_to_class_stat_gradient_coloring(self, target : pd.DataFrame, consider_eb : bool, source : pd.DataFrame = None):
 		"""the color gradient illustrates the stat compared to the weapon class' highest stat at the same distance"""
 		df2 = df if consider_eb else self.filter(df, lambda w: not w.is_extended_barrel)
 		class_max = {class_ : group_df.max(axis=0) for class_, group_df in df2.groupby(lambda name: self.weapons[name].class_)}
-		return self.apply_background_color(df, lambda w, i: w.color.with_alpha(safe_division(df.loc[w.name][i], class_max[w.class_][i])))
-	def stat_to_class_base_stat_gradient_coloring(self, df : pd.DataFrame, consider_eb : bool):
+		return self.apply_background_color(target, lambda w, i: w.color.with_alpha(safe_division(df.loc[w.name][i], class_max[w.class_][i])))
+	def stat_to_class_base_stat_gradient_coloring(self, target : pd.DataFrame, consider_eb : bool, source : pd.DataFrame = None):
 		"""the color gradient illustrates the stat compared to the weapon's class' highest base stat (i.e. at 0 m)"""
 		df2 = df if consider_eb else self.filter(df, lambda w: not w.is_extended_barrel)
 		class_base_max = {class_ : group_df.to_numpy().max() for class_, group_df in df2.groupby(lambda name: self.weapons[name].class_)}
-		return self.apply_background_color(df, lambda w, i: w.color.with_alpha(safe_division(df.loc[w.name][i], class_base_max[w.class_])))
-	def extended_barrel_is_improvement_coloring(self, df : pd.DataFrame, consider_eb : bool):
+		return self.apply_background_color(target, lambda w, i: w.color.with_alpha(safe_division(df.loc[w.name][i], class_base_max[w.class_])))
+	def extended_barrel_improvement_coloring(self, target : pd.DataFrame, consider_eb : bool, source : pd.DataFrame = None):
 		"""the colored areas show where the extended barrel attachment actually affects the stat"""
-		return self.apply_background_color(df, lambda w, i:
+		return self.apply_background_color(target, lambda w, i:
 									 w.color if
 									 w.is_extended_barrel and consider_eb and df.loc[w.name][i] != df.loc[w.extended_barrel_parent.name][i]
 									 else w.empty_color)
@@ -703,14 +731,15 @@ def get_operators_list(ws : list[Weapon], file_name : str) -> None:
 
 @dataclass
 class Stat:
-	name : str
-	short_name : str
 	_link : str
 	stat_method : typing.Callable[[Weapons, typing.Any], pd.DataFrame]
 	is_tdok : bool
 
 	def __post_init__(self):
 		self.link = f"https://github.com/hanslhansl/Rainbow-Six-Siege-Weapon-Statistics/#{self._link}"
+
+		self.short_name = self.stat_method.__name__.replace("_", " ")
+		self.name = self.stat_method.__doc__ if self.stat_method.__doc__ else self.short_name
 
 		if self.is_tdok:
 			self.additional_parameter_name = "hp"
@@ -721,22 +750,36 @@ class Stat:
 			self.additional_parameter_name = None
 			self.additional_parameters = None
 
+	@property
+	def display_name(self):
+		if self.short_name != self.name:
+			self.short_name + " - " + self.name
+		return self.name
+
+
 stats = (
-	Stat("damage per bullet", "damage per bullet", "damage-per-bullet", Weapons.damages, False),
-	Stat("damage per shot", "damage per shot", "damage-per-shot", Weapons.damages_per_shot, False),
-	Stat("damage per second", "dps", "damage-per-second---dps", Weapons.dps, False),
-	Stat("bullets to down or kill", "btdok", "bullets-to-down-or-kill---btdok", Weapons.btdok, True),
-	Stat("shots to down or kill", "stdok", "shots-to-down-or-kill---stdok", Weapons.stdok, True),
-	Stat("time to down or kill", "ttdok", "time-to-down-or-kill---ttdok", Weapons.ttdok, True),
-	Stat("theoretical stdok", "theoretical stdok", "shots-to-down-or-kill---stdok", Weapons.theoretical_stdok, True),
-	Stat("theoretical ttdok", "theoretical ttdok", "time-to-down-or-kill---ttdok", Weapons.theoretical_ttdok, True),
+	Stat("damage-per-bullet", Weapons.damage_per_bullet, False),
+	Stat("damage-per-shot", Weapons.damage_per_shot, False),
+	Stat("damage-per-second---dps", Weapons.dps, False),
+
+	Stat("bullets-to-down-or-kill---btdok", Weapons.btdok, True),
+	Stat("shots-to-down-or-kill---stdok", Weapons.stdok, True),
+	Stat("time-to-down-or-kill---ttdok", Weapons.ttdok, True),
+
+	Stat("bullets-to-down-or-kill---btdok", Weapons.btk, True),
+	Stat("shots-to-down-or-kill---stdok", Weapons.stk, True),
+	Stat("time-to-down-or-kill---ttdok", Weapons.ttk, True),
+
+	Stat("bullets-to-down-or-kill---btdok", Weapons.theoretical_btdok, True),
+	Stat("shots-to-down-or-kill---stdok", Weapons.theoretical_stdok, True),
+	Stat("time-to-down-or-kill---ttdok", Weapons.theoretical_ttdok, True),
 )
 stat_illustrations = (
 	Weapons.damage_drop_off_coloring,
 	Weapons.stat_to_base_stat_gradient_coloring,
 	Weapons.stat_to_class_stat_gradient_coloring,
 	Weapons.stat_to_class_base_stat_gradient_coloring,
-	Weapons.extended_barrel_is_improvement_coloring,
+	Weapons.extended_barrel_improvement_coloring,
 	)
 
 def add_worksheet_header(worksheet : typing.Any, stat : Stat | str, description : str, row : int, cols_inbetween : int):
