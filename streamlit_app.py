@@ -123,7 +123,19 @@ st.write(selected_illustration.__doc__)
 df = selected_stat.stat_method(weapons, additional_parameter).loc[selected_weapons]
 df.index.rename("weapons", inplace=True)
 
-styler = selected_illustration(weapons, df, consider_eb_for_illustration)
+cell_hover = {  # for row hover use <tr> instead of <td>
+    'selector': 'tr:hover',
+    'props': [('background-color', '#ffffb3')]
+}
+index_names = {
+    'selector': '.index_name',
+    'props': 'font-style: italic; color: darkgrey; font-weight:normal;'
+}
+headers = {
+    'selector': 'th:not(.index_name)',
+    'props': 'background-color: #000066; color: white;'
+}
+styler = selected_illustration(weapons, df, consider_eb_for_illustration)#.set_table_styles([cell_hover, index_names, headers])
 
 float_cols = df.select_dtypes(include='float').columns
 styler = styler.format({col: lambda x: f"{x:.1f}".rstrip('0').rstrip('.') for col in float_cols}).hide(axis="index")

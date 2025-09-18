@@ -22,9 +22,29 @@ first_distance = 0
 last_distance = 40 
 
 # weapon type background colors
-weapon_colors = {"AR":"5083EA", "SMG":"B6668E", "MP":"76A5AE", "LMG":"8771BD", "DMR":"7CB563", "SR":"DE2A00",
-					 "SG":"FFBC01", "Slug SG":"A64E06", "Handgun":"A3A3A3", "Revolver":"F48020", "Hand Canon":"948A54"}
+weapon_colors = {"AR":"#5083EA",
+				 "SMG":"#B6668E",
+				 "MP":"#76A5AE",
+				 "LMG":"#8771BD",
+				 "DMR":"#7CB563",
+				 "SR":"#DE2A00",
+				 "SG":"#FFBC01",
+				 "Slug SG":"#A64E06",
+				 "Handgun":"#A3A3A3",
+				 "Revolver":"#F48020",
+				 "Hand Canon":"#948A54"}
 
+weapon_colors = {"AR":"#1f77b4",
+				 "SMG":"#e377c2",
+				 "MP":"#1abc9c",
+				 "LMG":"#9467bd",
+				 "DMR":"#2ca02c",
+				 "SR":"#d62728",
+				 "SG":"#17becf",
+				 "Slug SG":"#8c564b",
+				 "Handgun":"#7f7f7f",
+				 "Revolver":"#ff7f0e",
+				 "Hand Canon":"#bcbd22"}
 
 ###################################################
 # settings end
