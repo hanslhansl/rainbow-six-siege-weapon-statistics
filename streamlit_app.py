@@ -134,8 +134,10 @@ if extended_barrel_difference:
     has_eb = weapons.filter(has_or_is_eb, lambda w: w.extended_barrel_weapon != None)
     is_eb = weapons.filter(has_or_is_eb, lambda w: w.is_extended_barrel)
 
+    pd.options.mode.chained_assignment, old = None, pd.options.mode.chained_assignment
     has_or_is_eb.loc[has_eb.index] -= has_eb.values
     has_or_is_eb.loc[is_eb.index] -= has_eb.values
+    pd.options.mode.chained_assignment = old
 
     target = (is_eb - has_eb.values).abs()
     source = has_or_is_eb
