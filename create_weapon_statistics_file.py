@@ -330,26 +330,29 @@ class Weapons:
 	# illustrations
 	def damage_drop_off_coloring(self, target : pd.DataFrame, consider_eb : bool, source : pd.DataFrame = None):
 		"""the colored areas represent steady damage, the colorless areas represent decreasing damage"""
+		if source is None: source = target
 		return self.apply_background_color(target, lambda w, i: w.color if
 									 self.is_in_damage_drop_off(self.eb_or_parent_weapon(w, consider_eb), i) else w.empty_color)
 	def stat_to_base_stat_gradient_coloring(self, target : pd.DataFrame, consider_eb : bool, source : pd.DataFrame = None):
-		"""the color gradient illustrates the stat compared to the weapon's base stat (i.e. at 0 m)"""
-		return self.apply_background_color(target, lambda w, i: w.color.with_alpha(safe_division(df.loc[w.name][i], df.loc[self.eb_or_parent_weapon(w, consider_eb).name].max())))
+		"""the color gradient illustrates the {stat} compared to the weapon's base {stat} (i.e. at 0 m)"""
+		if source is None: source = target
+		return self.apply_background_color(target, lambda w, i: w.color.with_alpha(safe_division(source.loc[w.name][i], source.loc[self.eb_or_parent_weapon(w, consider_eb).name].max())))
 	def stat_to_class_stat_gradient_coloring(self, target : pd.DataFrame, consider_eb : bool, source : pd.DataFrame = None):
-		"""the color gradient illustrates the stat compared to the weapon class' highest stat at the same distance"""
-		df2 = df if consider_eb else self.filter(df, lambda w: not w.is_extended_barrel)
-		class_max = {class_ : group_df.max(axis=0) for class_, group_df in df2.groupby(lambda name: self.weapons[name].class_)}
-		return self.apply_background_color(target, lambda w, i: w.color.with_alpha(safe_division(df.loc[w.name][i], class_max[w.class_][i])))
+		"""the color gradient illustrates the {stat} compared to the weapon class' highest {stat} at the same distance"""
+		if source is None: source = target
+		class_max = {class_ : group_df.max(axis=0) for class_, group_df in source.groupby(lambda name: self.weapons[name].class_)}
+		return self.apply_background_color(target, lambda w, i: w.color.with_alpha(safe_division(source.loc[w.name][i], class_max[w.class_][i])))
 	def stat_to_class_base_stat_gradient_coloring(self, target : pd.DataFrame, consider_eb : bool, source : pd.DataFrame = None):
-		"""the color gradient illustrates the stat compared to the weapon's class' highest base stat (i.e. at 0 m)"""
-		df2 = df if consider_eb else self.filter(df, lambda w: not w.is_extended_barrel)
-		class_base_max = {class_ : group_df.to_numpy().max() for class_, group_df in df2.groupby(lambda name: self.weapons[name].class_)}
-		return self.apply_background_color(target, lambda w, i: w.color.with_alpha(safe_division(df.loc[w.name][i], class_base_max[w.class_])))
+		"""the color gradient illustrates the {stat} compared to the weapon's class' highest base {stat} (i.e. at 0 m)"""
+		if source is None: source = target
+		class_base_max = {class_ : group_df.to_numpy().max() for class_, group_df in source.groupby(lambda name: self.weapons[name].class_)}
+		return self.apply_background_color(target, lambda w, i: w.color.with_alpha(safe_division(source.loc[w.name][i], class_base_max[w.class_])))
 	def extended_barrel_improvement_coloring(self, target : pd.DataFrame, consider_eb : bool, source : pd.DataFrame = None):
-		"""the colored areas show where the extended barrel attachment actually affects the stat"""
+		"""the colored areas show where the extended barrel attachment actually affects the {stat}"""
+		if source is None: source = target
 		return self.apply_background_color(target, lambda w, i:
-									 w.color if
-									 w.is_extended_barrel and consider_eb and df.loc[w.name][i] != df.loc[w.extended_barrel_parent.name][i]
+									 w.color
+									 if w.is_extended_barrel and consider_eb and source.loc[w.name][i] != source.loc[w.extended_barrel_parent.name][i]
 									 else w.empty_color)
 
 class Weapon:

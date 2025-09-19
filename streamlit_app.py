@@ -30,26 +30,15 @@ with st.container(border=True):
         cwsf.stats,
         format_func=lambda stat: stat.name if stat.name == stat.short_name else f"{stat.short_name} - {stat.name}"
         )
-    
-    selected_illustration = st.selectbox(
-        "choose a coloring scheme:",
-        cwsf.stat_illustrations,
-        format_func=lambda x: x.__name__.replace("_", " ")
-        )
-    
-    extended_barrel_difference = st.checkbox("calculate the difference between the weapon with and without extended barrel", False)
 
-    consider_eb_for_illustration = st.checkbox(
-        label="consider extended barrel stats for the coloring",
-        value=True,
-        disabled=extended_barrel_difference)
+    extended_barrel_difference = st.checkbox("calculate the difference between the weapon with and without extended barrel", False)
 
     additional_parameter = st.pills(
         label=f"choose {selected_stat.additional_parameter_name} level",
         options=selected_stat.additional_parameters,
         default=selected_stat.additional_parameters[0],
         format_func=lambda x: selected_stat.additional_parameters_descriptions[selected_stat.additional_parameters.index(x)],
-        label_visibility="collapsed"
+        label_visibility="collapsed",
         ) if selected_stat.additional_parameters else None
 
 """
@@ -120,42 +109,41 @@ with st.container(border=True):
 
 
 """
-### raw data
+### data
 """
-st.write(selected_illustration.__doc__)
+with st.container(border=True):
+    selected_illustration = st.selectbox(
+            "choose a coloring scheme:",
+            cwsf.stat_illustrations,
+            format_func=lambda x: x.__name__.replace("_", " ")
+            )
 
-df = selected_stat.stat_method(weapons, additional_parameter).loc[selected_weapons]
+    consider_eb_for_illustration = st.checkbox(
+        label="consider extended barrel stats for the coloring",
+        value=True,
+        disabled=extended_barrel_difference)
+    consider_eb_for_illustration = consider_eb_for_illustration if not extended_barrel_difference else True
 
+st.write(selected_illustration.__doc__.format(stat=selected_stat.short_name))
+
+target = selected_stat.stat_method(weapons, additional_parameter).loc[selected_weapons]
+
+source = None
 if extended_barrel_difference:
-    has_or_is_eb = weapons.filter(df, lambda w: w.is_extended_barrel or w.extended_barrel_weapon != None)
+    has_or_is_eb = weapons.filter(target, lambda w: w.is_extended_barrel or w.extended_barrel_weapon != None)
     has_eb = weapons.filter(has_or_is_eb, lambda w: w.extended_barrel_weapon != None)
+    is_eb = weapons.filter(has_or_is_eb, lambda w: w.is_extended_barrel)
 
-    df = pd.DataFrame(
-        np.abs(weapons.apply(has_or_is_eb, lambda w, i: has_or_is_eb[i][w.name] - has_or_is_eb[i][(w if w.is_extended_barrel else w.extended_barrel_weapon).name])),
-        index=has_or_is_eb.index,
-        columns=has_or_is_eb.columns)
+    has_or_is_eb.loc[has_eb.index] -= has_eb.values
+    has_or_is_eb.loc[is_eb.index] -= has_eb.values
 
+    target = (is_eb - has_eb.values).abs()
+    source = has_or_is_eb
 
-cell_hover = {  # for row hover use <tr> instead of <td>
-    'selector': 'tr:hover',
-    'props': [('background-color', '#ffffb3')]
-}
-index_names = {
-    'selector': '.index_name',
-    'props': 'font-style: italic; color: darkgrey; font-weight:normal;'
-}
-headers = {
-    'selector': 'th:not(.index_name)',
-    'props': 'background-color: #000066; color: white;'
-}
-styler = selected_illustration(weapons, df, consider_eb_for_illustration)#.set_table_styles([cell_hover, index_names, headers])
+styler = selected_illustration(weapons, target, consider_eb_for_illustration, source)
 
-float_cols = df.select_dtypes(include='float').columns
+float_cols = target.select_dtypes(include='float').columns
 styler = styler.format({col: lambda x: f"{x:.1f}".rstrip('0').rstrip('.') for col in float_cols})
-
-if extended_barrel_difference:
-    #styler = has_eb.style.use(styler.export())
-    pass
 
 #https://discuss.streamlit.io/t/select-all-on-a-streamlit-multiselect/9799
 
