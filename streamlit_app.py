@@ -153,6 +153,7 @@ styler = (selected_illustration(weapons, target, source)
 
 #https://discuss.streamlit.io/t/select-all-on-a-streamlit-multiselect/9799
 
+# maybe use aggrid for styling index labels
 
 with st.container():
     st.table(styler)
