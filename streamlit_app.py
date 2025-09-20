@@ -45,27 +45,34 @@ with st.container(border=True):
 ### choose weapons
 """
 with st.container(border=True):
-    cols = st.columns([1, 3])
+    cols = st.columns([1])
 
     # Create rows of buttons
-    with cols[0]:
-        cols_per_row = 4
-        for i in range(0, len(cwsf.Weapon.classes), cols_per_row):
-            inner_cols = st.columns(cols_per_row)
-            for j, label in enumerate(cwsf.Weapon.classes[i:i+cols_per_row]):
-                with inner_cols[j]:
-                    if st.button(label):
-                        print(f"{label} clicked")
+    selected_classes = []
+    cols_per_row = len(cwsf.Weapon.classes)
+    for i in range(0, len(cwsf.Weapon.classes), cols_per_row):
+        inner_cols = st.columns(cols_per_row)
+        for j, label in enumerate(cwsf.Weapon.classes[i:i+cols_per_row]):
+            with inner_cols[j]:
+                if st.button(label):
+                    selected_classes.append(label)
 
     # Suchfeld und Waffenfilter
-    with cols[1]:
+    with cols[0]:
         search_query = st.text_input("filter weapons")
-        filtered_weapons = [name for name in weapons.weapons if search_query.lower() in name.lower()]
+
+        filtered_weapons = [name for name, w in weapons.weapons.items() if not w.is_extended_barrel and search_query.lower() in name.lower()]
+
         selected_weapons = st.multiselect(
             label="select weapon(s)",
             options=filtered_weapons,
-            #default=list(st.session_state.selected_weapons),
+            default=[name for name in filtered_weapons if weapons.weapons[name].class_ in selected_classes],
             )
+
+    include_eb = st.checkbox(
+        label="include extended barrel stats",
+        value=True
+        )
 
 if len(selected_weapons):
     selected_weapons = selected_weapons
@@ -118,12 +125,6 @@ with st.container(border=True):
             format_func=lambda x: x.__name__.replace("_", " ")
             )
 
-    consider_eb_for_illustration = st.checkbox(
-        label="consider extended barrel stats for the coloring",
-        value=True,
-        disabled=extended_barrel_difference)
-    consider_eb_for_illustration = consider_eb_for_illustration if not extended_barrel_difference else True
-
 st.write(selected_illustration.__doc__.format(stat=selected_stat.short_name))
 
 target = selected_stat.stat_method(weapons, additional_parameter).loc[selected_weapons]
@@ -142,24 +143,13 @@ if extended_barrel_difference:
     target = (is_eb - has_eb.values).abs()
     source = has_or_is_eb
 
-styler = selected_illustration(weapons, target, consider_eb_for_illustration, source)
+styler = selected_illustration(weapons, target, source)
 
 float_cols = target.select_dtypes(include='float').columns
 styler = styler.format({col: lambda x: f"{x:.1f}".rstrip('0').rstrip('.') for col in float_cols})
 
 #https://discuss.streamlit.io/t/select-all-on-a-streamlit-multiselect/9799
 
-if False:
-    config = {col : st.column_config.Column(width=1) for col in df.columns}
-    #config["weapons"] = st.column_config.Column()
-    #config[1] = st.column_config.Column(pinned=True, width=200)
 
-    st.dataframe(
-        styler,
-        height=700,
-        column_config=config,
-        hide_index=False
-    )
-else:
-    with st.container():
-        st.table(styler)
+with st.container():
+    st.table(styler)

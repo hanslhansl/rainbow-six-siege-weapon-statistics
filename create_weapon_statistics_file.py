@@ -196,6 +196,17 @@ class Weapons:
 		Weapon.extended_barrel_damage_multiplier = 1.0 + attachment_categories["Barrels"]["Extended barrel"]["damage bonus"]
 		Weapon.laser_ads_speed_multiplier = 1.0 + attachment_categories["Under Barrel"]["Laser"]["ads speed bonus"]
 
+		# get operators
+		json_content = deserialize_json(operators_file_name)
+		if type(json_content) != dict:
+			raise Exception(f"{error()}: File '{operators_file_name}' doesn't deserialize to a dict of operators and weapons lists.")
+		if not all(isinstance(operator_name, str) for operator_name in json_content):
+			raise Exception(f"{error()}: The operator names in file '{operators_file_name}' don't deserialize to strings.")
+		if not all(isinstance(op, dict) for op in json_content.values()):
+			raise Exception(f"{error()}: The operators in file '{operators_file_name}' don't deserialize to dicts.")
+		self.operators = [Operator(js, op_name) for (op_name, js) in json_content.items()]
+
+		# get weapons
 		weapons : list[Weapon] = []
 		for file_name in os.listdir(weapon_data_dir):
 			file_path = os.path.join(weapon_data_dir, file_name)
@@ -207,36 +218,15 @@ class Weapons:
 				print(f"{message('Message: Excluding')} weapon '{message(file_name)}' because of _.")
 				continue
 		
-			w = Weapon(deserialize_json(file_path))
+			w = Weapon(deserialize_json(file_path), self.operators)
 			weapons.append(w)
-
-			"""# adjust Weapon.lowest_highest_base_dps
-			DPS = tuple(int(self.dps(index=i) + 0.5) for i in range(len(Weapon.distances)))
-			if self.class_ not in Weapon.lowest_highest_base_dps:
-				Weapon.lowest_highest_base_dps[self.class_] = min(DPS), max(DPS)
-			else:
-				Weapon.lowest_highest_base_dps[self.class_] = (
-					min(Weapon.lowest_highest_base_dps[self.class_][0], min(DPS)),
-					max(Weapon.lowest_highest_base_dps[self.class_][1], max(DPS))
-					)
-
-			# adjust Weapon.lowest_highest_base_ttdok
-			for hp in tdok_hp_levels:
-				if hp not in Weapon.lowest_highest_base_ttdok:
-					Weapon.lowest_highest_base_ttdok[hp] = {}
-				
-				TTDOK = tuple([int(self.ttdok(index=i, hp=hp) + 0.5) for i in range(len(Weapon.distances))])
-				if self.class_ not in Weapon.lowest_highest_base_ttdok[hp]:
-					Weapon.lowest_highest_base_ttdok[hp][self.class_] = min(TTDOK), max(TTDOK)
-				else:
-					Weapon.lowest_highest_base_ttdok[hp][self.class_] = (
-						min(Weapon.lowest_highest_base_ttdok[hp][self.class_][0], min(TTDOK)),
-						max(Weapon.lowest_highest_base_ttdok[hp][self.class_][1], max(TTDOK))
-						)"""
-
 		
-		# get all operator weapons
-		get_operators_list(weapons, operators_file_name)
+		# verify operator weapons
+		for op in self.operators:
+			for weapon_name in op._weapons:
+				if weapon_name not in op.weapons:
+					print(f"{warning('Warning:')} Weapon '{warning(weapon_name)}' found on operator '{op.name}' is {warning('not an actual weapon')}.")
+			del op._weapons
 
 		# add eb weapons
 		weapons += (w.extended_barrel_weapon for w in weapons if w.extended_barrel_weapon)
@@ -324,35 +314,33 @@ class Weapons:
 		return a, b, self.color
 
 	# illustrations helper
-	def eb_or_parent_weapon(self, w : "Weapon", consider_eb : bool):
-		return w if w.is_extended_barrel <= consider_eb else w.extended_barrel_parent
 
 	# illustrations
-	def damage_drop_off_coloring(self, target : pd.DataFrame, consider_eb : bool, source : pd.DataFrame = None):
+	def damage_drop_off_coloring(self, target : pd.DataFrame, source : pd.DataFrame = None):
 		"""the colored areas represent steady damage, the colorless areas represent decreasing damage"""
 		if source is None: source = target
 		return self.apply_background_color(target, lambda w, i: w.color if
-									 self.is_in_damage_drop_off(self.eb_or_parent_weapon(w, consider_eb), i) else w.empty_color)
-	def stat_to_base_stat_gradient_coloring(self, target : pd.DataFrame, consider_eb : bool, source : pd.DataFrame = None):
+									 self.is_in_damage_drop_off(w, i) else w.empty_color)
+	def stat_to_base_stat_gradient_coloring(self, target : pd.DataFrame, source : pd.DataFrame = None):
 		"""the color gradient illustrates the {stat} compared to the weapon's base {stat} (i.e. at 0 m)"""
 		if source is None: source = target
-		return self.apply_background_color(target, lambda w, i: w.color.with_alpha(safe_division(source.loc[w.name][i], source.loc[self.eb_or_parent_weapon(w, consider_eb).name].max())))
-	def stat_to_class_stat_gradient_coloring(self, target : pd.DataFrame, consider_eb : bool, source : pd.DataFrame = None):
+		return self.apply_background_color(target, lambda w, i: w.color.with_alpha(safe_division(source.loc[w.name][i], source.loc[w.name].max())))
+	def stat_to_class_stat_gradient_coloring(self, target : pd.DataFrame, source : pd.DataFrame = None):
 		"""the color gradient illustrates the {stat} compared to the weapon class' highest {stat} at the same distance"""
 		if source is None: source = target
 		class_max = {class_ : group_df.max(axis=0) for class_, group_df in source.groupby(lambda name: self.weapons[name].class_)}
 		return self.apply_background_color(target, lambda w, i: w.color.with_alpha(safe_division(source.loc[w.name][i], class_max[w.class_][i])))
-	def stat_to_class_base_stat_gradient_coloring(self, target : pd.DataFrame, consider_eb : bool, source : pd.DataFrame = None):
+	def stat_to_class_base_stat_gradient_coloring(self, target : pd.DataFrame, source : pd.DataFrame = None):
 		"""the color gradient illustrates the {stat} compared to the weapon's class' highest base {stat} (i.e. at 0 m)"""
 		if source is None: source = target
 		class_base_max = {class_ : group_df.to_numpy().max() for class_, group_df in source.groupby(lambda name: self.weapons[name].class_)}
 		return self.apply_background_color(target, lambda w, i: w.color.with_alpha(safe_division(source.loc[w.name][i], class_base_max[w.class_])))
-	def extended_barrel_improvement_coloring(self, target : pd.DataFrame, consider_eb : bool, source : pd.DataFrame = None):
+	def extended_barrel_improvement_coloring(self, target : pd.DataFrame, source : pd.DataFrame = None):
 		"""the colored areas show where the extended barrel attachment actually affects the {stat}"""
 		if source is None: source = target
 		return self.apply_background_color(target, lambda w, i:
 									 w.color
-									 if w.is_extended_barrel and consider_eb and source.loc[w.name][i] != source.loc[w.extended_barrel_parent.name][i]
+									 if w.is_extended_barrel and source.loc[w.name][i] != source.loc[w.extended_barrel_parent.name][i]
 									 else w.empty_color)
 
 class Weapon:
@@ -387,9 +375,7 @@ class Weapon:
 	
 	empty_color = RGBA(0,0,0,0)
 
-	def __init__(self, json_content):
-		self.operators : list[Operator] = []
-
+	def __init__(self, json_content, operators : list["Operator"]):
 		if type(json_content) != dict:
 			raise Exception(f"{error()}: Weapon '{self.name}' doesn't deserialize to a dict.")
 		
@@ -399,14 +385,27 @@ class Weapon:
 		if type(json_content["name"]) != str:
 			raise Exception(f"{error()}: Weapon has a name that doesn't deserialize to a string.")
 		self.name = json_content["name"]
+		self.base_name = self.name
+		self.display_name = self.name
 		
+		# get operators
+		self.operators : list[Operator] = []
+		for op in operators:
+			if self.name in op._weapons:
+				self.operators.append(op)
+				op.weapons.append(self)
+				op._weapons.remove(self.name)
+
+		# operators rich text
+		self.ex_operators_rich_text = CellRichText([elem for op in self.operators for elem in (op.rich_text_name, ", ")][:-1])
+
 		# get weapon class
 		if "class" not in json_content:
-			raise Exception(f"{error()}: Weapon '{self.name}' is missing a type.")
+			raise Exception(f"{error()}: Weapon '{self.name}' is missing a class.")
 		if type(json_content["class"]) != str:
-			raise Exception(f"{error()}: Weapon '{self.name}' has a type that doesn't deserialize to a string.")
+			raise Exception(f"{error()}: Weapon '{self.name}' has a class that doesn't deserialize to a string.")
 		if json_content["class"] not in self.classes:
-			raise Exception(f"{error()}: Weapon '{self.name}' has an invalid type.")
+			raise Exception(f"{error()}: Weapon '{self.name}' has an invalid weapon class '{json_content["class"]}'.")
 		self.class_ = json_content["class"]
 
 		# get weapon fire rate
@@ -526,7 +525,8 @@ class Weapon:
 			
 		self.extended_barrel_parent : Weapon | None = None
 		if has_extended_barrel == True:
-			potential_eb.name = self.name + " + eb"
+			potential_eb.name = self.name + " + extended barrel"
+			potential_eb.display_name = "+ extended barrel"
 			potential_eb.damage_drop_off_intervals = potential_eb.get_damage_drop_off_intervals()
 
 			potential_eb.extended_barrel_weapon = None
@@ -610,11 +610,6 @@ class Weapon:
 
 	# derived properties
 	@property
-	def display_name(self):
-		if self.is_extended_barrel:
-			return "+ extended barrel"
-		return self.name
-	@property
 	def rps(self):
 		return self.rpm / 60.
 	@property
@@ -655,33 +650,18 @@ class Weapon:
 				raise Exception(f"{error()}: A {self.class_} should have exactly 2 damage dropoff intervals but weapon '{self.name}' has {len(intervals)}.")
 			return intervals
 		return (intervals[0][0], intervals[-1][-1]),
-	def how_useful_is_extended_barrel(self, hp : int):
-		a = self.extended_barrel_parent.stdok(0, hp) - self.stdok(0, hp)
-		b = round(self.extended_barrel_parent.ttdok(0, hp) - self.ttdok(0, hp))
-		if a == 0:
-			return a, b, self.empty_color
-		return a, b, self.color
 
 	# excel properties
 	@property
 	def ex_border(self):
 		return self.ex_borders[self.class_]
-
-	# other excel styles
-	def ex_operators_rich_text(self):
-		elements = [op.rich_text_name for op in self.operators]
-		n = 1
-		i = n
-		while i < len(elements):
-			elements.insert(i, ', ')
-			i += (n+1)
-		return CellRichText(*elements)
 	
+
 class Operator:
 	attacker_color = RGBA.from_rgb_hex("#198FEB")
 	defender_color = RGBA.from_rgb_hex("#FB3636")
 
-	def __init__(self, json_content, name : str, ws : Weapons):
+	def __init__(self, json_content, name : str):
 		self.name = name
 
 		if "side" not in json_content:
@@ -698,39 +678,13 @@ class Operator:
 			raise Exception(f"{error()}: Operator '{self.name}' has weapons that don't deserialize to a list.")
 		if not all(isinstance(weapon, str) for weapon in json_content["weapons"]):
 			raise Exception(f"{error()}: Operator '{self.name}' has weapons that don't deserialize to strings.")
-		weapons_strings = list(json_content["weapons"])	# tuple of weapon names
+		setattr(self, "_weapons", set(json_content["weapons"]))	# tuple of weapon names
+		self.weapons : list[Weapon] = []
 		
-		weapons_strings_copy = copy.copy(weapons_strings)
-		self.weapons = []
-		for weapons_string in weapons_strings:
-			for weapon in ws:
-				if weapon.name == weapons_string:
-					self.weapons.append(weapon)
-					weapon.operators.append(self)
-					weapons_strings_copy.remove(weapons_string)
-					break
-
-		for fake_weapons_string in weapons_strings_copy:
-			print(f"{warning('Warning:')} Weapon '{warning(fake_weapons_string)}' found on operator '{self.name}' is {warning('not an actual weapon')}.")
-	
 		self.rich_text_name = TextBlock(InlineFont(color=Operator.defender_color.to_rgb_hex(False) if self.side else Operator.attacker_color.to_rgb_hex(False)), self.name)
 
 		return
 
-def get_operators_list(ws : list[Weapon], file_name : str) -> None:
-	json_content = deserialize_json(file_name)
-
-	if type(json_content) != dict:
-		raise Exception(f"{error()}: File '{file_name}' doesn't deserialize to a dict of operators and weapons lists.")
-
-	if not all(isinstance(operator_name, str) for operator_name in json_content):
-		raise Exception(f"{error()}: The operator names in file '{file_name}' don't deserialize to strings.")
-	if not all(isinstance(op, dict) for op in json_content.values()):
-		raise Exception(f"{error()}: The operators in file '{file_name}' don't deserialize to dicts.")
-
-	operators = [Operator(js, op_name, ws) for (op_name, js) in json_content.items()]
-		
-	return
 
 @dataclass
 class Stat:
@@ -858,8 +812,9 @@ def add_secondary_weapon_stats_header(worksheet : typing.Any, row : int, col : i
 	return row
 
 def add_secondary_weapon_stats(worksheet : typing.Any, weapon : Weapon, row : int, col : int):
-	values = [weapon.class_, weapon.rpm, weapon.capacity, weapon.extra_ammo, weapon.pellets, weapon.ads_time, weapon.ads_time_with_laser,
-		  #Weapon.getReload, Weapon.getReloadTimesWithAngledGrip
+	values = [weapon.class_, weapon.rpm, weapon.capacity, weapon.extra_ammo, weapon.pellets if weapon.pellets != 1 else None,
+		   weapon.ads_time, weapon.ads_time_with_laser,
+		   #Weapon.getReload, Weapon.getReloadTimesWithAngledGrip
 		  ]
 	skips = [2, 1, 1, 1, 2, 1, 7]
 
@@ -877,7 +832,7 @@ def add_secondary_weapon_stats(worksheet : typing.Any, weapon : Weapon, row : in
 		col += skip
 
 	c1 = worksheet.cell(row=row, column=col)
-	c1.value = weapon.ex_operators_rich_text()
+	c1.value = weapon.ex_operators_rich_text
 
 	return
 
@@ -1088,7 +1043,7 @@ def save_to_xlsx_file(ws : Weapons):
 
 			for param in stat.additional_parameters if stat.additional_parameters else ("", ):
 				df = stat.stat_method(ws, param)
-				styler = illustration(ws, df, True)
+				styler = illustration(ws, df)
 				styler.to_excel(writer, sheet_name=stat.short_name + str(param), header=False, startrow=8)
 
 	workbook = openpyxl.load_workbook(excel_buffer)
@@ -1119,17 +1074,17 @@ if __name__ == "__main__":
 
 	# verify
 	# group weapons by class and by base damage
-	weapons_sorted = sorted((w for w in ws.weapons.values() if not w.is_extended_barrel), key=lambda w: (w.class_, ws.damages()[0][w.name]))
-	grouped = [list(group) for key, group in itertools.groupby(weapons_sorted, key=lambda w: (w.class_, ws.damages()[0][w.name]))]
+	weapons_sorted = sorted((w for w in ws.weapons.values() if not w.is_extended_barrel), key=lambda w: (w.class_, ws.damage_per_bullet()[0][w.name]))
+	grouped = [list(group) for key, group in itertools.groupby(weapons_sorted, key=lambda w: (w.class_, ws.damage_per_bullet()[0][w.name]))]
 	# find all weapons with the same base damage but different damage drop-off
 	failed = False
 	for group in grouped:
 		if len(group) > 1:
 			for i, distance in enumerate(Weapon.distances):
-				if len(set(ws.damages()[i][weapon.name] for weapon in group)) > 1:
-					print(f"{warning()}: These {group[0].class_}s have the {warning('same base damage')} ({ws.damages()[0][group[0].name]}) but {warning('different damages')} at {distance}m:")
+				if len(set(ws.damage_per_bullet()[i][weapon.name] for weapon in group)) > 1:
+					print(f"{warning()}: These {group[0].class_}s have the {warning('same base damage')} ({ws.damage_per_bullet()[0][group[0].name]}) but {warning('different damages')} at {distance}m:")
 					for weapon in group:
-						print(f"{weapon.name}: {ws.damages()[i][weapon.name]}")
+						print(f"{weapon.name}: {ws.damage_per_bullet()[i][weapon.name]}")
 					failed = True
 	if failed: raise Exception(f"{error()}: See above warnings.")
 
