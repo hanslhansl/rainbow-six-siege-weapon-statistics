@@ -233,6 +233,7 @@ class Weapons:
 	
 		weapons_sorted = sorted(weapons, key=lambda w: (Weapon.classes.index(w.class_), w.name))
 		self.weapons = {w.name : w for w in weapons_sorted}
+		self.base_weapons = {n : w for n, w in self.weapons.items() if not w.is_extended_barrel}
 
 		self._damages = pd.DataFrame({name : w.damages for name, w in self.weapons.items()}).transpose()
 		self._damages.index.rename("weapons", inplace=True)
@@ -525,7 +526,7 @@ class Weapon:
 			
 		self.extended_barrel_parent : Weapon | None = None
 		if has_extended_barrel == True:
-			potential_eb.name = self.name + " + extended barrel"
+			potential_eb.name = self.name + " + eb"
 			potential_eb.display_name = "+ extended barrel"
 			potential_eb.damage_drop_off_intervals = potential_eb.get_damage_drop_off_intervals()
 

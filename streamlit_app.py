@@ -2,6 +2,8 @@ import create_weapon_statistics_file as cwsf, streamlit as st, matplotlib.pyplot
 import pandas.core.series
 # https://demo-stockpeers.streamlit.app/?ref=streamlit-io-gallery-favorites&stocks=AAPL%2CMSFT%2CGOOGL%2CNVDA%2CAMZN%2CTSLA%2CADP%2CACN%2CABBV%2CAMT%2CAXP%2CAMGN%2CAMD
 
+import streamlit as st
+
 
 @st.cache_data
 def get_weapons():
@@ -45,39 +47,38 @@ with st.container(border=True):
 ### choose weapons
 """
 with st.container(border=True):
-    cols = st.columns([1])
 
-    # Create rows of buttons
-    selected_classes = []
-    cols_per_row = len(cwsf.Weapon.classes)
-    for i in range(0, len(cwsf.Weapon.classes), cols_per_row):
-        inner_cols = st.columns(cols_per_row)
-        for j, label in enumerate(cwsf.Weapon.classes[i:i+cols_per_row]):
-            with inner_cols[j]:
-                if st.button(label):
-                    selected_classes.append(label)
+    def add_class_to_selection(class_):
+        st.session_state.selected_weapons_multiselect = list(dict.fromkeys(
+            st.session_state.selected_weapons_multiselect
+            + [name for name, w in weapons.base_weapons.items() if w.class_==class_]
+            ))
 
-    # Suchfeld und Waffenfilter
-    with cols[0]:
-        search_query = st.text_input("filter weapons")
-
-        filtered_weapons = [name for name, w in weapons.weapons.items() if not w.is_extended_barrel and search_query.lower() in name.lower()]
-
-        selected_weapons = st.multiselect(
-            label="select weapon(s)",
-            options=filtered_weapons,
-            default=[name for name in filtered_weapons if weapons.weapons[name].class_ in selected_classes],
-            )
+    selected_weapons = st.multiselect(
+        label="select weapon(s)",
+        options=weapons.base_weapons,
+        key="selected_weapons_multiselect"
+        )
 
     include_eb = st.checkbox(
         label="include extended barrel stats",
         value=True
         )
+    
+    # Create rows of buttons
+    for inner_col, class_ in zip(st.columns(len(cwsf.Weapon.classes)), cwsf.Weapon.classes):
+        with inner_col:
+            st.button(class_, on_click=lambda c=class_: add_class_to_selection(c))
 
-if len(selected_weapons):
-    selected_weapons = selected_weapons
-else:
-    selected_weapons = list(weapons.weapons)
+
+    if len(selected_weapons):
+        selected_weapons = selected_weapons
+    else:
+        selected_weapons = list(weapons.base_weapons)
+
+    if include_eb:
+        l = lambda w: [w.name, w.extended_barrel_weapon.name] if w.extended_barrel_weapon else [w.name]
+        selected_weapons = [x for n in selected_weapons for x in l(weapons.base_weapons[n])]
 
 _ = """
 ### plot
@@ -143,10 +144,12 @@ if extended_barrel_difference:
     target = (is_eb - has_eb.values).abs()
     source = has_or_is_eb
 
-styler = selected_illustration(weapons, target, source)
 
-float_cols = target.select_dtypes(include='float').columns
-styler = styler.format({col: lambda x: f"{x:.1f}".rstrip('0').rstrip('.') for col in float_cols})
+styler = (selected_illustration(weapons, target, source)
+          .format({col: lambda x: f"{x:.1f}".rstrip('0').rstrip('.') for col in target.select_dtypes(include='float').columns})
+          #.format_index({name : w.display_name for name, w in weapons.weapons.items()}, axis=0)
+          .format_index(lambda x: f"row_{x}", axis=0)
+          )
 
 #https://discuss.streamlit.io/t/select-all-on-a-streamlit-multiselect/9799
 
