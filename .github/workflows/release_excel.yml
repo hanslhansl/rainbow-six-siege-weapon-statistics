@@ -26,6 +26,8 @@ jobs:
           pip install -r requirements.txt
 
       - name: Run Python Script
+        env:
+          GOOGLE_SERVICE_ACCOUNT_CREDENTIALS: ${{ secrets.GOOGLE_SERVICE_ACCOUNT_CREDENTIALS }}
         run: python create_weapon_statistics_file.py ${{ github.event.inputs.tag_name }}
 
       - name: Create Release

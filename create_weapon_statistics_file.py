@@ -51,7 +51,7 @@ weapon_colors_ = {"AR":"#1f77b4",
 ###################################################
 
 #imports
-import os, json, typing, math, ctypes, copy, sys, itertools, colorama, sys, colorsys, pandas as pd, numpy as np, io, marshmallow.exceptions
+import os, json, typing, copy, sys, itertools, colorama, sys, colorsys, pandas as pd, numpy as np, io, marshmallow.exceptions
 import openpyxl, dataclasses_json, warnings
 import openpyxl.workbook.workbook
 from openpyxl.cell.text import InlineFont
@@ -939,6 +939,11 @@ def save_to_output_files(ws : Weapons):
     return
 
 if __name__ == "__main__":
+
+
+    if "GOOGLE_SERVICE_ACCOUNT_CREDENTIALS" in os.environ:
+        print("=======================its here")
+
     # get all weapons from the files
     ws = Weapons()
 
