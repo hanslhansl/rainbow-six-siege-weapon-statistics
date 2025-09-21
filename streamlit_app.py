@@ -35,13 +35,19 @@ with st.container(border=True):
 
     extended_barrel_difference = st.checkbox("calculate the difference between the weapon with and without extended barrel", False)
 
-    additional_parameter = st.pills(
-        label=f"choose {selected_stat.additional_parameter_name} level",
-        options=selected_stat.additional_parameters,
-        default=selected_stat.additional_parameters[0],
-        format_func=lambda x: selected_stat.additional_parameters_descriptions[selected_stat.additional_parameters.index(x)],
-        label_visibility="collapsed",
-        ) if selected_stat.additional_parameters else None
+    additional_parameter = None
+    if selected_stat.additional_parameters:
+        pass
+        additional_parameter = st.pills(
+            label=f"choose {selected_stat.additional_parameter_name} level",
+            options=selected_stat.additional_parameters,
+            selection_mode="multi",
+            default=selected_stat.additional_parameters[0],
+            format_func=lambda x: selected_stat.additional_parameters_descriptions[selected_stat.additional_parameters.index(x)],
+            label_visibility="collapsed",
+            )
+        if not len(additional_parameter):
+            additional_parameter = selected_stat.additional_parameters
 
 """
 ### choose weapons
@@ -128,7 +134,10 @@ with st.container(border=True):
 
 st.write(selected_illustration.__doc__.format(stat=selected_stat.short_name))
 
-target = selected_stat.stat_method(weapons, additional_parameter).loc[selected_weapons]
+target = selected_stat.stat_method(weapons, additional_parameter)#.loc[selected_weapons]
+
+target
+st.stop()
 
 source = None
 if extended_barrel_difference:

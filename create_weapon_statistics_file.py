@@ -1,3 +1,16 @@
+"""import pandas as pd, sys
+
+df = pd.DataFrame({'c1': [10, 11, 12], 'c2': [100, 110, 120]})
+df = df.reset_index()  # make sure indexes pair with number of rows
+
+print(df)
+for index, row in df.iterrows():
+    print(row)
+
+for row in df:
+    print(row)
+
+sys.exit()"""
 
 ###################################################
 # settings
@@ -198,10 +211,6 @@ class Weapons:
         json_content = deserialize_json(operators_file_name)
         if type(json_content) != dict:
             raise Exception(f"{error()}: File '{operators_file_name}' doesn't deserialize to a dict of operators and weapons lists.")
-        if not all(isinstance(operator_name, str) for operator_name in json_content):
-            raise Exception(f"{error()}: The operator names in file '{operators_file_name}' don't deserialize to strings.")
-        if not all(isinstance(op, dict) for op in json_content.values()):
-            raise Exception(f"{error()}: The operators in file '{operators_file_name}' don't deserialize to dicts.")
         self.operators = [Operator(js, op_name) for (op_name, js) in json_content.items()]
 
         # get weapons
@@ -260,7 +269,7 @@ class Weapons:
     # stats helper
     def is_in_damage_drop_off(self, w : "Weapon", index : int):
         return is_index_in_intervals(index, w.damage_drop_off_intervals) is None
-
+   
     # primary stats
     def damage_per_bullet(self, _ = None):
         return self._damages
@@ -275,10 +284,15 @@ class Weapons:
     def btdok(self, hp : int):
         """bullets to down or kill"""
         return np.ceil(hp / self._damages)
-    def stdok(self, hp : int):
+    
+    def _stdok(self, hp : int):
         """shots to down or kill"""
         pellets = {name : w.pellets for name, w in self.weapons.items()}
         return np.ceil((hp / self._damages).div(pellets, axis=0))
+    def stdok(self, hps : tuple[int,...]):
+        """shots to down or kill"""
+        return self.vectorize_and_interleave(self._stdok, hps)
+    
     def ttdok(self, hp : int):
         """time to down or kill"""
         rpms = {name : w.rpms for name, w in self.weapons.items()}
@@ -314,10 +328,23 @@ class Weapons:
         return a, b, self.color
 
     # illustrations helper
+    def vectorize_and_interleave(self, func : typing.Callable[["Weapons", typing.Any], pd.DataFrame], params : tuple):
+        if len(params) == 1:
+            return func(self, params[0])
+        dfs = [func(self, p) for p in params]
+        dfs.insert(0, pd.DataFrame(np.nan, index=dfs[0].index, columns=dfs[0].columns))
+        [df.rename(lambda s, add="\\" + str(i): s + add, inplace=True) for i, df in enumerate(dfs[1:])]
+        interleaved_rows = [row for pair in zip(*(df.iterrows() for df in dfs)) for row in pair]
+        return pd.DataFrame([row[1] for row in interleaved_rows])
 
     # illustrations
-    def damage_drop_off_coloring(self, target : pd.DataFrame, source : pd.DataFrame = None):
+    def damage_drop_off_coloring(self, 
+                                 stat_method : typing.Callable[["Weapons", typing.Any], pd.DataFrame],
+                                 params : tuple):
         """the colored areas represent steady damage, the colorless areas represent decreasing damage"""
+
+        self.vectorize_and_interleave(stat_method, params)
+
         if source is None: source = target
         return self.apply_background_color(target, lambda w, i: w.color if
                                      self.is_in_damage_drop_off(w, i) else w.empty_color)
@@ -911,18 +938,26 @@ def save_to_xlsx_file(ws : Weapons):
             stat = stats[i_stat]
             illustration = stat_illustrations[i_illustration]
 
-            for param in stat.additional_parameters if stat.additional_parameters else ("", ):
-                df = stat.stat_method(ws, param)
+            if stat.additional_parameters:
+                df = stat.stat_method(ws, stat.additional_parameters)
                 styler = illustration(ws, df)
-                styler.to_excel(writer, sheet_name=stat.short_name + str(param), header=False, startrow=8)
+
+                """for param in stat.additional_parameters:
+                    df = stat.stat_method(ws, param)
+                    styler = illustration(ws, df)
+                    styler.to_excel(writer, sheet_name=stat.short_name + str(param), header=False, startrow=8)"""
+            else:
+                df = stat.stat_method(ws, None)
+                styler = illustration(ws, df)
+            styler.to_excel(writer, sheet_name=stat.short_name, header=False, startrow=8)
 
     workbook = openpyxl.load_workbook(excel_buffer)
 
-    for i_stat, i_illustration in zip(stat_indices, illustration_indices):
+    """for i_stat, i_illustration in zip(stat_indices, illustration_indices):
         stat = stats[i_stat]
         illustration = stat_illustrations[i_illustration]
 
-        modify_stats_worksheet(workbook, ws, stat, illustration)
+        modify_stats_worksheet(workbook, ws, stat, illustration)"""
 
 
     #add_attachment_overview(workbook, ws)
