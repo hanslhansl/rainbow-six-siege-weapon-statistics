@@ -2,3 +2,6 @@ openpyxl
 colorama
 streamlit
 dataclasses_json
+pandas
+google-api-python-client
+google-auth

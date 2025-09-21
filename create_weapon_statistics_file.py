@@ -52,8 +52,8 @@ weapon_colors_ = {"AR":"#1f77b4",
 
 #imports
 import os, json, typing, copy, sys, itertools, colorama, sys, colorsys, pandas as pd, numpy as np, io, marshmallow.exceptions
-import openpyxl, dataclasses_json, warnings
-import openpyxl.workbook.workbook
+import openpyxl, dataclasses_json, warnings, googleapiclient.http, openpyxl.workbook.workbook, googleapiclient.discovery
+import google.oauth2.service_account
 from openpyxl.cell.text import InlineFont
 from openpyxl.cell.rich_text import TextBlock, CellRichText
 from openpyxl.styles import PatternFill, Border, Alignment, NamedStyle, Side, Font
@@ -930,19 +930,9 @@ def save_to_xlsx_file(ws : Weapons):
     # save to file
     workbook.save(xlsx_output_file_name)
     
-    os.system("start " + xlsx_output_file_name)
-    return
-
-def save_to_output_files(ws : Weapons):
-    #save_to_html_file(weapons, stat_names)
-    save_to_xlsx_file(ws)
-    return
+    return xlsx_output_file_name
 
 if __name__ == "__main__":
-
-
-    if "GOOGLE_SERVICE_ACCOUNT_CREDENTIALS" in os.environ:
-        print("=======================its here")
 
     # get all weapons from the files
     ws = Weapons()
@@ -965,6 +955,39 @@ if __name__ == "__main__":
 
 
     # save to excel file
-    save_to_output_files(ws)
-    #input("Completed!")
+    excel_file_name = save_to_xlsx_file(ws)
 
+    if "GOOGLE_SERVICE_ACCOUNT_CREDENTIALS" in os.environ:
+        # we are in the github action
+        credentials_json = os.environ["GOOGLE_SERVICE_ACCOUNT_CREDENTIALS"]
+        info = json.loads(credentials_json)
+
+        # create service account credentials
+        creds = google.oauth2.service_account.Credentials.from_service_account_info(
+            info,
+            scopes=["https://www.googleapis.com/auth/drive"]
+        )
+
+        drive_service = googleapiclient.discovery.build("drive", "v3", credentials=creds)
+
+        # Google Sheet ID
+        sheet_id = "1QgbGALNZGLlvf6YyPLtywZnvgIHkstCwGl1tvCt875Q"
+
+        # upload excel file replace sheet
+        file_metadata = {"mimeType": "application/vnd.google-apps.spreadsheet"}
+        media = googleapiclient.http.MediaFileUpload(
+            excel_file_name,
+            mimetype="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            resumable=True
+        )
+
+        updated_file = drive_service.files().update(
+            fileId=sheet_id,
+            media_body=media,
+            body=file_metadata,
+            fields="id"
+        ).execute()
+
+    else:
+        # we are local
+        os.system("start " + excel_file_name)
