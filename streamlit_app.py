@@ -30,7 +30,7 @@ with st.container(border=True):
     selected_stat = st.selectbox(
         "choose a stat:",
         cwsf.stats,
-        format_func=lambda stat: stat.name if stat.name == stat.short_name else f"{stat.short_name} - {stat.name}"
+        format_func=lambda stat: stat.display_name
         )
 
     extended_barrel_difference = st.checkbox("calculate the difference between the weapon with and without extended barrel", False)
