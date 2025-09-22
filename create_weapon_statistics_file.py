@@ -792,7 +792,7 @@ def add_secondary_weapon_stats_header(worksheet : typing.Any, row : int, col : i
 
     worksheet.merge_cells(start_row=row, end_row=row, start_column=col-4, end_column=col-4+1)
 
-    return row
+    return row, col
 
 def add_secondary_weapon_stats(worksheet : typing.Any, weapon : Weapon, row : int, col : int):
     values = [weapon.class_, weapon.rpm, weapon.capacity, weapon.extra_ammo, weapon.pellets if weapon.pellets != 1 else None,
@@ -947,7 +947,10 @@ def modify_stats_worksheet(worksheet : typing.Any, ws : Weapons, stat : Stat, il
         worksheet.column_dimensions[get_column_letter(col)].width = 4.8
         col += 1
 
-    row = add_secondary_weapon_stats_header(worksheet, row, col)
+    row, col = add_secondary_weapon_stats_header(worksheet, row, col)
+    border = Border(bottom=Side(style="thick"))
+    for c in range(1, col):
+        worksheet.cell(row=row, column=c).border = border
     worksheet.freeze_panes = worksheet.cell(row=row+1, column=2)
     row += 2
 

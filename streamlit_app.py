@@ -54,29 +54,44 @@ with st.container(border=True):
 ### choose weapons
 """
 with st.container(border=True):
+    css_lines = [
+        "<style>",
+        # optional base override to make colors more visible
+        "span[data-baseweb='tag']{ color: black !important; }",
+    ]
+    for opt in weapons.base_weapons:
+        # escape any double quotes in the label
+        safe = opt.replace('"', '\\"')
+        css_lines.append(
+            f'span[data-baseweb="tag"]:has(span[title="{safe}"]) {{'
+            f'  background-color: {weapons.base_weapons[opt].color.to_css()} !important;'
+            f'  color: black !important;'
+            f'}}'
+        )
+    css_lines.append("</style>")
+    st.markdown("\n".join(css_lines), unsafe_allow_html=True)
 
-    def add_class_to_selection(class_):
-        st.session_state.selected_weapons_multiselect = list(dict.fromkeys(
-            st.session_state.selected_weapons_multiselect
-            + [name for name, w in weapons.base_weapons.items() if w.class_==class_]
-            ))
-
+    # weapon multiselect
     selected_weapons = st.multiselect(
         label="select weapon(s)",
         options=weapons.base_weapons,
         key="selected_weapons_multiselect"
         )
 
+    # checkbox whether to show eb stats
     include_eb = st.checkbox(
         label="include extended barrel stats",
         value=True
         )
     
-    # Create rows of buttons
+    # Create rows of buttons for weapon classes
+    def add_class_to_selection(class_):
+        st.session_state.selected_weapons_multiselect = list(dict.fromkeys(
+            st.session_state.selected_weapons_multiselect + [name for name, w in weapons.base_weapons.items() if w.class_==class_]
+            ))
     for inner_col, class_ in zip(st.columns(len(cwsf.Weapon.classes)), cwsf.Weapon.classes):
         with inner_col:
             st.button(class_, on_click=lambda c=class_: add_class_to_selection(c))
-
 
     if len(selected_weapons):
         selected_weapons = selected_weapons
