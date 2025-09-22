@@ -821,57 +821,44 @@ def add_secondary_weapon_stats(worksheet : typing.Any, weapon : Weapon, row : in
     return
 
 def add_extended_barrel_overview(worksheet : typing.Any, ws : Weapons, row : int, col : int, with_secondary_weapon_stats : bool):
-    col_names = tdok_levels_descriptions_short
-    original_col = col
+    original_row = row
 
-    """worksheet.merge_cells(start_row=row, end_row=row, start_column=col+1, end_column=+len(col_names))
-    c = worksheet.cell(row=row, column=col+1)
-    c.value = "stdok"
-    c.alignment = center_alignment
-
-    worksheet.column_dimensions[get_column_letter(col+len(col_names)+1)].width = 5
-    
-    worksheet.merge_cells(start_row=row, end_row=row, start_column=col+len(col_names)+2, end_column=col+len(col_names)*2+1)
-    c = worksheet.cell(row=row, column=col+8)
-    c.value = "ttdok"
-    c.alignment = center_alignment"""
-    
-    row += 1
-    
     c = worksheet.cell(row=row, column=col)
     c.value = "weapon"
     worksheet.column_dimensions[get_column_letter(col)].width = 22
 
-    col = original_col + 1
-    row += 1
-    original_row = row
+    col += 1
     selected_stats = [stats[x] for x in (4, 5)]
     # loop over stats, stdok and ttdok
     for i, stat in enumerate(selected_stats):
+        row = original_row
+
         # stat name
-        worksheet.merge_cells(start_row=row-2, end_row=row-2, start_column=col, end_column=col+len(stat.additional_parameters))
-        c = worksheet.cell(row=row-2, column=col)
+        worksheet.merge_cells(start_row=row, end_row=row, start_column=col, end_column=col+len(stat.additional_parameters)-1)
+        c = worksheet.cell(row=row, column=col)
         c.value = stat.short_name
         c.alignment = center_alignment
-        worksheet.column_dimensions[get_column_letter(col+len(col_names)+1)].width = 5
+        row += 1
 
         # loop over health ratings
         for j, (param, d, sd) in enumerate(stat.additional_parameters):
-            target, _ = ws.extended_barrel_difference(stat.stat_method)(ws, param)
             row = original_row
-
-            # health rating
-            c = worksheet.cell(row=row-1, column=col)
-            c.value = sd
-            c.alignment = center_alignment
-            worksheet.column_dimensions[get_column_letter(col)].width = 9
 
             # secondary weapon stats header
             secondary_column_offset = len(selected_stats)*(len(stat.additional_parameters)+1) - 1
             if i == 0 and j == 0 and with_secondary_weapon_stats:
-                add_secondary_weapon_stats_header(worksheet, row-1, col + secondary_column_offset)
+                add_secondary_weapon_stats_header(worksheet, row, col + secondary_column_offset)
+
+            row += 1
+
+            # health rating
+            c = worksheet.cell(row=row, column=col)
+            c.value = sd
+            c.alignment = center_alignment
+            worksheet.column_dimensions[get_column_letter(col)].width = 9
 
             # loop over weapons
+            target, _ = ws.extended_barrel_difference(stat.stat_method)(ws, param)
             for name, row_data in target.iterrows():
                 w = ws.base_weapons[name]
 
@@ -895,6 +882,7 @@ def add_extended_barrel_overview(worksheet : typing.Any, ws : Weapons, row : int
 
                 row += 1
             col += 1
+            worksheet.column_dimensions[get_column_letter(col)].width = 3
         col += 1
 
     return row
