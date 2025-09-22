@@ -35,19 +35,20 @@ with st.container(border=True):
 
     extended_barrel_difference = st.checkbox("calculate the difference between the weapon with and without extended barrel", False)
 
-    additional_parameter = None
-    if selected_stat.additional_parameters:
-        pass
-        additional_parameter = st.pills(
-            label=f"choose {selected_stat.additional_parameter_name} level",
-            options=selected_stat.additional_parameters,
-            selection_mode="multi",
-            default=selected_stat.additional_parameters[0],
-            format_func=lambda x: selected_stat.additional_parameters_descriptions[selected_stat.additional_parameters.index(x)],
-            label_visibility="collapsed",
-            )
-        if not len(additional_parameter):
-            additional_parameter = selected_stat.additional_parameters
+    additional_parameter_indices = st.pills(
+        label=f"choose {selected_stat.additional_parameter_name} level",
+        options=range(len(selected_stat.additional_parameters)),
+        selection_mode="multi",
+        default=0,
+        format_func=lambda x: selected_stat.additional_parameters[x][1],
+        disabled=len(selected_stat.additional_parameters)==1,
+        label_visibility="collapsed",
+        width="stretch"
+        )
+    if not len(additional_parameter_indices):
+        additional_parameter = selected_stat.additional_parameters
+    else:
+        additional_parameter = [selected_stat.additional_parameters[i] for i in additional_parameter_indices]
 
 """
 ### choose weapons
@@ -134,9 +135,11 @@ with st.container(border=True):
 
 st.write(selected_illustration.__doc__.format(stat=selected_stat.short_name))
 
-target = selected_stat.stat_method(weapons, additional_parameter)#.loc[selected_weapons]
+target = selected_illustration(weapons, selected_stat.stat_method, additional_parameter)
+#target = target.format({col: lambda x: f"{x:.1f}".rstrip('0').rstrip('.') for col in target.columns})
+#target = selected_stat.stat_method(weapons, additional_parameter)#.loc[selected_weapons]
 
-target
+st.table(target)
 st.stop()
 
 source = None

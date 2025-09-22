@@ -1,14 +1,18 @@
-"""import pandas as pd, sys
+import pandas as pd, sys
 
-df = pd.DataFrame({'c1': [10, 11, 12], 'c2': [100, 110, 120]})
-df = df.reset_index()  # make sure indexes pair with number of rows
 
+"""df = pd.DataFrame({'A': range(20)})
+df.index = [f"junk_{i}" for i in range(len(df))]
 print(df)
-for index, row in df.iterrows():
-    print(row)
 
-for row in df:
-    print(row)
+df.index = [(i-i % 7 if i%7 != 0 else s) for i, s in enumerate(df.index)]
+print(df)
+
+i = df.index
+
+print(df.reset_index(drop=True))
+
+print(i)
 
 sys.exit()"""
 
@@ -257,14 +261,39 @@ class Weapons:
             w = self.weapons[x.name]
             return pd.Series(callback(w, i) for i, v in x.items())
         return df.apply(cb, axis=1)
-    def apply_style(self, df : pd.DataFrame, callback : typing.Callable[["Weapon", int], str]):
-        def cb(x):
-            w = self.weapons[x.name]
-            return pd.Series(callback(w, i) for i in df.columns)
+    def apply_style(self, df : pd.DataFrame, callback : typing.Callable[["Weapon", int, typing.Any], str], params_len : int):
+        if params_len == 1:
+            def cb(x):
+                w = self.weapons[x.name]
+                return pd.Series(callback(w, i, 0) for i in df.columns)
+        else:
+            def cb(x):
+                if isinstance(x.name, str):
+                    # empty row
+                    return [None] * len(x)
+                # data row
+                len_plus = params_len + 1
+                pi = x.name % len_plus - 1
+                w = self.weapons[df.index[x.name//len_plus*len_plus]]
+                return [callback(w, i, pi) for i in df.columns]
         return df.style.apply(cb, axis=1)
-    def apply_background_color(self, df : pd.DataFrame, callback : typing.Callable[["Weapon", int], RGBA]):
+    def apply_background_color(self, df : pd.DataFrame, callback : typing.Callable[["Weapon", int, int], RGBA], params : tuple):
         convert_color = RGBA.to_rgb_hex if __name__ == "__main__" else RGBA.to_css
-        return self.apply_style(df, lambda *args: f"background-color: {convert_color(callback(*args))}")
+        def format_value(val):
+            if pd.isna(val):
+                return ""
+            elif isinstance(val, float):
+                return f"{val:.2f}".rstrip('0').rstrip('.')
+            return val
+        def format_index(val):
+            if isinstance(val, str):
+                return val
+            return params[val%(len(params)+1) - 1][1]
+
+        return (self.apply_style(df, lambda *args: f"background-color: {convert_color(callback(*args))}", len(params))
+                .format(format_value)
+                .relabel_index([format_index(x) for x in df.index], axis=0) # not working
+                )
 
     # stats helper
     def is_in_damage_drop_off(self, w : "Weapon", index : int):
@@ -284,15 +313,10 @@ class Weapons:
     def btdok(self, hp : int):
         """bullets to down or kill"""
         return np.ceil(hp / self._damages)
-    
-    def _stdok(self, hp : int):
+    def stdok(self, hp : int):
         """shots to down or kill"""
         pellets = {name : w.pellets for name, w in self.weapons.items()}
         return np.ceil((hp / self._damages).div(pellets, axis=0))
-    def stdok(self, hps : tuple[int,...]):
-        """shots to down or kill"""
-        return self.vectorize_and_interleave(self._stdok, hps)
-    
     def ttdok(self, hp : int):
         """time to down or kill"""
         rpms = {name : w.rpms for name, w in self.weapons.items()}
@@ -329,49 +353,84 @@ class Weapons:
 
     # illustrations helper
     def vectorize_and_interleave(self, func : typing.Callable[["Weapons", typing.Any], pd.DataFrame], params : tuple):
-        if len(params) == 1:
-            return func(self, params[0])
-        dfs = [func(self, p) for p in params]
-        dfs.insert(0, pd.DataFrame(np.nan, index=dfs[0].index, columns=dfs[0].columns))
-        [df.rename(lambda s, add="\\" + str(i): s + add, inplace=True) for i, df in enumerate(dfs[1:])]
-        interleaved_rows = [row for pair in zip(*(df.iterrows() for df in dfs)) for row in pair]
-        return pd.DataFrame([row[1] for row in interleaved_rows])
+        #print(params)
+        dfs = [func(self, p) for p, s in params]
+        params_len = len(params)
+        if params_len == 1:
+            return dfs[0], dfs
+        exdfs = [pd.DataFrame(np.nan, index=dfs[0].index, columns=dfs[0].columns)] + dfs
+        interleaved_rows = [row for pair in zip(*(df.iterrows() for df in exdfs)) for row in pair]
+        df = pd.DataFrame([row[1] for row in interleaved_rows])
+        df.index = [(i if i%(params_len+1)!=0 else s) for i, s in enumerate(df.index)]
+        return df, dfs
 
     # illustrations
-    def damage_drop_off_coloring(self, 
-                                 stat_method : typing.Callable[["Weapons", typing.Any], pd.DataFrame],
-                                 params : tuple):
+    def damage_drop_off_coloring(self, stat_method : typing.Callable[["Weapons", typing.Any], pd.DataFrame], params : tuple):
         """the colored areas represent steady damage, the colorless areas represent decreasing damage"""
-
-        self.vectorize_and_interleave(stat_method, params)
-
-        if source is None: source = target
-        return self.apply_background_color(target, lambda w, i: w.color if
-                                     self.is_in_damage_drop_off(w, i) else w.empty_color)
-    def stat_to_base_stat_gradient_coloring(self, target : pd.DataFrame, source : pd.DataFrame = None):
+        target, dfs = self.vectorize_and_interleave(stat_method, params)
+        return self.apply_background_color(
+            target,
+            lambda w, i, pi: w.color if self.is_in_damage_drop_off(w, i) else w.empty_color,
+            params
+            )
+    
+    def stat_to_base_stat_gradient_coloring(self, stat_method : typing.Callable[["Weapons", typing.Any], pd.DataFrame], params : tuple):
         """the color gradient illustrates the {stat} compared to the weapon's base {stat} (i.e. at 0 m)"""
-        if source is None: source = target
-        return self.apply_background_color(target, lambda w, i: w.color.with_alpha(safe_division(source.loc[w.name][i], source.loc[w.name].max())))
-    def stat_to_class_stat_gradient_coloring(self, target : pd.DataFrame, source : pd.DataFrame = None):
-        """the color gradient illustrates the {stat} compared to the weapon class' highest {stat} at the same distance"""
-        if source is None: source = target
-        class_max = {class_ : group_df.max(axis=0) for class_, group_df in source.groupby(lambda name: self.weapons[name].class_)}
-        return self.apply_background_color(target, lambda w, i: w.color.with_alpha(safe_division(source.loc[w.name][i], class_max[w.class_][i])))
-    def stat_to_class_base_stat_gradient_coloring(self, target : pd.DataFrame, source : pd.DataFrame = None):
-        """the color gradient illustrates the {stat} compared to the weapon's class' highest base {stat} (i.e. at 0 m)"""
-        if source is None: source = target
-        class_base_max = {class_ : group_df.to_numpy().max() for class_, group_df in source.groupby(lambda name: self.weapons[name].class_)}
-        return self.apply_background_color(target, lambda w, i: w.color.with_alpha(safe_division(source.loc[w.name][i], class_base_max[w.class_])))
-    def extended_barrel_improvement_coloring(self, target : pd.DataFrame, source : pd.DataFrame = None):
+        target, dfs = self.vectorize_and_interleave(stat_method, params)
+        return self.apply_background_color(
+            target,
+            lambda w, i, pi: w.color.with_alpha(safe_division(dfs[pi].loc[w.name][i], dfs[pi].loc[w.name][0])),
+            params
+            )
+    def stat_to_stat_max_gradient_coloring(self, stat_method : typing.Callable[["Weapons", typing.Any], pd.DataFrame], params : tuple):
+        """the color gradient illustrates the {stat} compared to the weapon's maximum {stat}"""
+        target, dfs = self.vectorize_and_interleave(stat_method, params)
+        return self.apply_background_color(
+            target,
+            lambda w, i, pi: w.color.with_alpha(safe_division(dfs[pi].loc[w.name][i], dfs[pi].loc[w.name].max())),
+            params
+            )
+
+    def stat_to_class_stat_gradient_coloring(self, stat_method : typing.Callable[["Weapons", typing.Any], pd.DataFrame], params : tuple):
+        """the color gradient illustrates the {stat} compared to the weapon class' maximum {stat} at the same distance"""
+        target, dfs = self.vectorize_and_interleave(stat_method, params)
+        class_max = [{class_ : group_df.max(axis=0) for class_, group_df in df.groupby(lambda name: self.weapons[name].class_)} for pi, df in enumerate(dfs)]
+        return self.apply_background_color(
+            target,
+            lambda w, i, pi: w.color.with_alpha(safe_division(dfs[pi].loc[w.name][i], class_max[pi][w.class_][i])),
+            params
+            )
+
+    def stat_to_class_base_stat_gradient_coloring(self, stat_method : typing.Callable[["Weapons", typing.Any], pd.DataFrame], params : tuple):
+        """the color gradient illustrates the {stat} compared to the weapon's class' maximum base {stat} (i.e. at 0 m)"""
+        target, dfs = self.vectorize_and_interleave(stat_method, params)
+        class_base_max = [{class_ : group_df.iloc[:, 0].max() for class_, group_df in df.groupby(lambda name: self.weapons[name].class_)} for pi, df in enumerate(dfs)]
+        return self.apply_background_color(
+            target,
+            lambda w, i, pi: w.color.with_alpha(safe_division(dfs[pi].loc[w.name][i], class_base_max[pi][w.class_])),
+            params
+            )
+    def stat_to_class_stat_max_gradient_coloring(self, stat_method : typing.Callable[["Weapons", typing.Any], pd.DataFrame], params : tuple):
+        """the color gradient illustrates the {stat} compared to the weapon's class' maximum {stat}"""
+        target, dfs = self.vectorize_and_interleave(stat_method, params)
+        class_max = [{class_ : group_df.to_numpy().max() for class_, group_df in df.groupby(lambda name: self.weapons[name].class_)} for pi, df in enumerate(dfs)]
+        return self.apply_background_color(
+            target,
+            lambda w, i, pi: w.color.with_alpha(safe_division(dfs[pi].loc[w.name][i], class_max[pi][w.class_])),
+            params
+            )
+    
+    def extended_barrel_improvement_coloring(self, stat_method : typing.Callable[["Weapons", typing.Any], pd.DataFrame], params : tuple):
         """the colored areas show where the extended barrel attachment actually affects the {stat}"""
-        if source is None: source = target
-        return self.apply_background_color(target, lambda w, i:
-                                     w.color
-                                     if w.is_extended_barrel and source.loc[w.name][i] != source.loc[w.extended_barrel_parent.name][i]
-                                     else w.empty_color)
+        target, dfs = self.vectorize_and_interleave(stat_method, params)
+        return self.apply_background_color(
+            target,
+            lambda w, i, pi: w.color if w.is_extended_barrel and dfs[pi].loc[w.name][i] != dfs[pi].loc[w.extended_barrel_parent.name][i] else w.empty_color,
+            params
+            )
 
 
-@dataclasses_json.dataclass_json#(undefined=dataclasses_json.Undefined.EXCLUDE)
+@dataclasses_json.dataclass_json
 @dataclass
 class _Weapon:
     name : str
@@ -597,11 +656,10 @@ class Stat:
 
         if self.is_tdok:
             self.additional_parameter_name = "hp"
-            self.additional_parameters = tdok_hp_levels
-            self.additional_parameters_descriptions = tdok_levels_descriptions
+            self.additional_parameters = tuple(zip(tdok_hp_levels, tdok_levels_descriptions))
         else:
-            self.additional_parameter_name = None
-            self.additional_parameters = None
+            self.additional_parameter_name = ""
+            self.additional_parameters = (None, ""),
 
     @property
     def display_name(self):
@@ -629,9 +687,11 @@ stats = (
 )
 stat_illustrations = (
     Weapons.damage_drop_off_coloring,
-    Weapons.stat_to_base_stat_gradient_coloring,
+    #Weapons.stat_to_base_stat_gradient_coloring,
+    Weapons.stat_to_stat_max_gradient_coloring,
     Weapons.stat_to_class_stat_gradient_coloring,
-    Weapons.stat_to_class_base_stat_gradient_coloring,
+    #Weapons.stat_to_class_base_stat_gradient_coloring,
+    Weapons.stat_to_class_stat_max_gradient_coloring,
     Weapons.extended_barrel_improvement_coloring,
     )
 
@@ -845,22 +905,7 @@ def add_attachment_overview(workbook : typing.Any, ws : Weapons):
             
         row += 1
 
-def modify_stats_worksheet(workbook : openpyxl.workbook.workbook.Workbook, ws : Weapons, stat : Stat, illustration):
-
-    if stat.additional_parameters:
-        if False: # eb in between: 100hp, eb, 110hp, eb, 125hp, eb, 120hp, eb, 130hp, eb, 145hp
-            skip = 2
-            inline_skip = 1
-            final_skip = 0
-        else: # eb afterwards: 100hp, 110hp, 125hp, 120hp, 130hp, 145hp, eb, eb, eb, eb, eb, eb
-            skip = 1
-            inline_skip = len(stat.additional_parameters)
-            final_skip = len(stat.additional_parameters)
-
-        worksheet = workbook.create_sheet(stat.short_name)
-    else:
-        worksheet = workbook[stat.short_name]
-
+def modify_stats_worksheet(worksheet : typing.Any, ws : Weapons, stat : Stat, illustration):
     row = 1
 
     c = worksheet.cell(row=row, column=1)
@@ -882,46 +927,33 @@ def modify_stats_worksheet(workbook : openpyxl.workbook.workbook.Workbook, ws : 
     row = add_worksheet_header(worksheet, stat, illustration.__doc__.format(stat=stat.short_name), row, len(Weapon.distances))
     row += 1
 
-    table_first_row = row
-    for wi, weapon in enumerate(ws.weapons.values()):
+    is_1d_stat = len(stat.additional_parameters) == 1
+    for weapon in ws.weapons.values():
+        # weapon name cell
         c = worksheet.cell(row=row, column=1)
         c.value = weapon.display_name
         c.style = "Normal"
-        c.alignment = left_alignment
         c.fill = weapon.name_color.to_ex_fill()
-        c.border = weapon.ex_border
 
         if not weapon.is_extended_barrel:
+            c.border = weapon.ex_border
             add_secondary_weapon_stats(worksheet, weapon, row, len(Weapon.distances) + 3)
 
-        if stat.additional_parameters:
-            row += 1
-            for j, additional_parameter in enumerate(stat.additional_parameters):
+        if not is_1d_stat: row += 1
+        for additional_parameter in stat.additional_parameters:
+            if not is_1d_stat:
+                # parameter description cell
                 c = worksheet.cell(row=row, column=1)
-                c.value = stat.additional_parameters_descriptions[j]
+                c.value = additional_parameter[1]
+                c.style = "Normal"
 
-                source_sheet = workbook[stat.short_name+str(additional_parameter)]
-                for i in range(len(Weapon.distances)):
-                    source_cell = source_sheet.cell(row=table_first_row+wi, column=i+2)
-                    c = worksheet.cell(row=row, column=i+2)
-
-                    c.value = source_cell.value
-                    c.fill = copy.copy(source_cell.fill)
-                    c.border = weapon.ex_border
-                    c.alignment = center_alignment
-
-                row += 1
-        else:
+            # stat cells
             for i in range(len(Weapon.distances)):
                 c = worksheet.cell(row=row, column=i+2)
                 c.border = weapon.ex_border
                 c.alignment = center_alignment
+
             row += 1
-
-
-    if stat.additional_parameters:
-        for additional_parameter in stat.additional_parameters:
-            del workbook[stat.short_name+str(additional_parameter)]
 
     return
 
@@ -934,30 +966,23 @@ def save_to_xlsx_file(ws : Weapons):
 
     excel_buffer = io.BytesIO()
     with pd.ExcelWriter(excel_buffer) as writer:
+        print("to excel engine:", writer.engine)
+
         for i_stat, i_illustration in zip(stat_indices, illustration_indices):
             stat = stats[i_stat]
             illustration = stat_illustrations[i_illustration]
 
-            if stat.additional_parameters:
-                df = stat.stat_method(ws, stat.additional_parameters)
-                styler = illustration(ws, df)
-
-                """for param in stat.additional_parameters:
-                    df = stat.stat_method(ws, param)
-                    styler = illustration(ws, df)
-                    styler.to_excel(writer, sheet_name=stat.short_name + str(param), header=False, startrow=8)"""
-            else:
-                df = stat.stat_method(ws, None)
-                styler = illustration(ws, df)
+            styler = illustration(ws, stat.stat_method, stat.additional_parameters)
             styler.to_excel(writer, sheet_name=stat.short_name, header=False, startrow=8)
 
     workbook = openpyxl.load_workbook(excel_buffer)
 
-    """for i_stat, i_illustration in zip(stat_indices, illustration_indices):
+    for i_stat, i_illustration in zip(stat_indices, illustration_indices):
         stat = stats[i_stat]
         illustration = stat_illustrations[i_illustration]
+        worksheet = workbook[stat.short_name]
 
-        modify_stats_worksheet(workbook, ws, stat, illustration)"""
+        modify_stats_worksheet(worksheet, ws, stat, illustration)
 
 
     #add_attachment_overview(workbook, ws)
