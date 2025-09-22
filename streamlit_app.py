@@ -135,8 +135,10 @@ with st.container(border=True):
 
 st.write(selected_illustration.__doc__.format(stat=selected_stat.short_name))
 
-target = selected_illustration(weapons, selected_stat.stat_method, additional_parameter)
-#target = target.format({col: lambda x: f"{x:.1f}".rstrip('0').rstrip('.') for col in target.columns})
+if extended_barrel_difference:
+    target = selected_illustration(weapons, weapons.extended_barrel_difference(selected_stat.stat_method), additional_parameter)
+else:
+    target = selected_illustration(weapons, selected_stat.stat_method, additional_parameter)
 #target = selected_stat.stat_method(weapons, additional_parameter)#.loc[selected_weapons]
 
 st.table(target)
@@ -167,5 +169,4 @@ styler = (selected_illustration(weapons, target, source)
 
 # maybe use aggrid for styling index labels
 
-with st.container():
-    st.table(styler)
+st.table(styler)
