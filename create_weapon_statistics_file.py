@@ -962,8 +962,8 @@ def modify_stats_worksheet(worksheet : typing.Any, ws : Weapons, stat : Stat, il
         c.style = "Normal"
         c.fill = weapon.name_color.to_ex_fill()
 
+        c.border = weapon.ex_border
         if not weapon.is_extended_barrel:
-            c.border = weapon.ex_border
             add_secondary_weapon_stats(worksheet, weapon, row, col)
 
         if not is_1d_stat: row += 1
@@ -973,12 +973,13 @@ def modify_stats_worksheet(worksheet : typing.Any, ws : Weapons, stat : Stat, il
                 c = worksheet.cell(row=row, column=1)
                 c.value = additional_parameter[1]
                 c.style = "Normal"
+                c.border = weapon.ex_border
 
             # stat cells
             for i in range(len(Weapon.distances)):
                 c = worksheet.cell(row=row, column=i+2)
-                c.border = weapon.ex_border
                 c.alignment = center_alignment
+                c.border = weapon.ex_border
 
             row += 1
 

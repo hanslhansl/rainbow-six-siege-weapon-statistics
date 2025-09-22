@@ -6,7 +6,9 @@ on:
       tag_name:
         description: 'Tag & Release Name (e.g. Y9S3.1)'
         required: true
-
+      release_body:
+        description: 'Release notes'
+        required: true
 jobs:
   build-and-release:
     runs-on: ubuntu-latest
@@ -35,6 +37,7 @@ jobs:
         with:
           tag_name: ${{ github.event.inputs.tag_name }}
           name: ${{ github.event.inputs.tag_name }}
+          body: ${{ github.event.inputs.release_body }}
           files: rainbow-six-siege-weapon-statistics.xlsx
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
