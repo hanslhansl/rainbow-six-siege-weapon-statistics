@@ -93,9 +93,9 @@ with st.container(border=True):
                 if w.extended_barrel_weapon:
                     selected_weapons.insert(i + 1, w.extended_barrel_weapon.name)
     elif include_eb:
-        selected_weapons = list(ws.base_weapons)
-    else:
         selected_weapons = list(ws.weapons)
+    else:
+        selected_weapons = list(ws.base_weapons)
 
     
 _ = """
