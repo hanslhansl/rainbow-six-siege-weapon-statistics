@@ -1,6 +1,6 @@
 import create_weapon_statistics_file as cwsf, streamlit as st, pandas as pd, altair as alt, sys
 
-@st.cache_data
+@st.cache_resource
 def get_weapons():
     return cwsf.Weapons()
 
@@ -32,16 +32,16 @@ with st.container(border=True):
         label=f"choose {selected_stat.additional_parameter_name} level",
         options=range(len(selected_stat.additional_parameters)),
         selection_mode="multi",
-        default=0,
+        #default=0,
         format_func=lambda x: selected_stat.additional_parameters[x][1],
         disabled=len(selected_stat.additional_parameters)==1,
         label_visibility="collapsed",
         width="stretch"
         )
-    if not len(additional_parameter_indices):
-        additional_parameter = selected_stat.additional_parameters
-    else:
+    if len(additional_parameter_indices):
         additional_parameter = [selected_stat.additional_parameters[i] for i in additional_parameter_indices]
+    else:
+        additional_parameter = selected_stat.additional_parameters
 
 """
 ### choose weapons
@@ -92,10 +92,11 @@ with st.container(border=True):
                 w = ws.base_weapons[selected_weapons[i]]
                 if w.extended_barrel_weapon:
                     selected_weapons.insert(i + 1, w.extended_barrel_weapon.name)
+        selected_weapons = tuple(selected_weapons)
     elif include_eb:
-        selected_weapons = list(ws.weapons)
+        selected_weapons = None # all weapons
     else:
-        selected_weapons = list(ws.base_weapons)
+        selected_weapons = tuple(ws.base_weapons)
 
     
 _ = """
@@ -154,4 +155,18 @@ else:
 styler = selected_illustration(ws, data, additional_parameter)
 
 # maybe use aggrid for styling index labels
+
+
+st.markdown("""
+    <style>
+        table td {
+            padding: 1px !important;
+            text-align: center !important;
+        }
+        table th {
+            padding: 1px !important;
+        }
+    </style>
+    """, unsafe_allow_html=True)
+
 st.table(styler)

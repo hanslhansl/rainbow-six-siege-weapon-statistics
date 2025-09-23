@@ -69,7 +69,7 @@ weapon_colors_ = {"AR":"#1f77b4",
 
 #imports
 import os, json, typing, copy, sys, itertools, colorama, sys, colorsys, pandas as pd, numpy as np, io, marshmallow.exceptions
-import openpyxl, dataclasses_json, warnings, googleapiclient.http, openpyxl.workbook.workbook, googleapiclient.discovery
+import openpyxl, dataclasses_json, warnings, googleapiclient.http, openpyxl.workbook.workbook, googleapiclient.discovery, functools
 import google.oauth2.service_account
 from openpyxl.cell.text import InlineFont
 from openpyxl.cell.rich_text import TextBlock, CellRichText
@@ -229,7 +229,6 @@ class Weapons:
                 print(f"{message('Message: Excluding')} weapon '{message(file_name)}' because of _.")
                 continue
         
-
             w = Weapon(file_path, self.operators)
             weapons.append(w)
         
@@ -319,23 +318,29 @@ class Weapons:
         return _extended_barrel_difference
 
     # primary stats
+    @functools.cache
     def damage_per_bullet(self, _ = None):
         return self._damages
+    @functools.cache
     def damage_per_shot(self, _ = None):
         pellets = {name : w.pellets for name, w in self.weapons.items()}
         return self._damages.mul(pellets, axis=0)
+    @functools.cache
     def dps(self, _ = None):
         """damage per second"""
         bullets_per_second = {name : w.pellets * w.rps for name, w in self.weapons.items()}
         return self._damages.mul(bullets_per_second, axis=0).round()
     
+    @functools.cache
     def btdok(self, hp : int):
         """bullets to down or kill"""
         return np.ceil(hp / self._damages)
+    @functools.cache
     def stdok(self, hp : int):
         """shots to down or kill"""
         pellets = {name : w.pellets for name, w in self.weapons.items()}
         return np.ceil((hp / self._damages).div(pellets, axis=0))
+    @functools.cache
     def ttdok(self, hp : int):
         """time to down or kill"""
         rpms = {name : w.rpms for name, w in self.weapons.items()}
@@ -353,39 +358,43 @@ class Weapons:
         pellets_rpms = {name : w.pellets * w.rpms for name, w in self.weapons.items()}
         return (hp / self._damages).div(pellets_rpms, axis=0)
 
+    @functools.cache
     def btk(self, hp : int):
         """bullets to kill"""
         return self.btdok(hp + 20)
+    @functools.cache
     def stk(self, hp : int):
         """shots to kill"""
         return self.stdok(hp + 20)
+    @functools.cache
     def ttk(self, hp : int):
         """time to kill"""
         return self.ttdok(hp + 20)
     
-    def how_useful_is_extended_barrel(self, hp : int):
-        a = self.extended_barrel_parent.stdok(0, hp) - self.stdok(0, hp)
-        b = round(self.extended_barrel_parent.ttdok(0, hp) - self.ttdok(0, hp))
-        if a == 0:
-            return a, b, self.empty_color
-        return a, b, self.color
-
     # illustrations helper
-    def vectorize_and_interleave(self, func : typing.Callable[["Weapons", typing.Any], pd.DataFrame], params : tuple, filter : list[str]):
-        sources : list[pd.DataFrame] = []
-        targets : list[pd.DataFrame] = []
-        for p, d, sd in params:
-            x = func(self, p)
-            target, source = (x, x) if isinstance(x, pd.DataFrame) else x
-            sources.append(source)
-            targets.append(target.loc[filter])
-        if len(params) == 1:
+    def _vectorize_and_interleave(_self, targets : list[pd.DataFrame], sources : list[pd.DataFrame], params_len : int):
+        self = _self
+        if params_len == 1:
             return targets[0], sources
         dfs = [pd.DataFrame(np.nan, index=targets[0].index, columns=targets[0].columns)] + targets
         interleaved_rows = [row for pair in zip(*(df.iterrows() for df in dfs)) for row in pair]
         target = pd.DataFrame([row[1] for row in interleaved_rows])
-        target.index = [(i if i%(len(params)+1)!=0 else s) for i, s in enumerate(target.index)]
+        target.index = [(i if i%(params_len+1)!=0 else s) for i, s in enumerate(target.index)]
         return target, sources
+    @functools.cache
+    def vectorize_and_interleave(self, func : typing.Callable[["Weapons", typing.Any], pd.DataFrame], params : tuple, filter : tuple[str] = None):
+        sources : list[pd.DataFrame] = []
+        targets : list[pd.DataFrame] = []
+        if filter is not None: filter = list(filter)
+        for p, d, sd in params:
+            x = func(self, p)
+            target, source = (x, x) if isinstance(x, pd.DataFrame) else x
+            sources.append(source)
+            if filter is None:
+                targets.append(target)
+            else:
+                targets.append(target.loc[filter])
+        return self._vectorize_and_interleave(targets, sources, len(params))
 
     # illustrations
     def damage_drop_off_coloring(self, data : tuple[pd.DataFrame, list[pd.DataFrame]], params : tuple):
@@ -677,7 +686,7 @@ class Stat:
         self.link = f"https://github.com/hanslhansl/Rainbow-Six-Siege-Weapon-Statistics/#{self._link}"
 
         self.short_name = self.stat_method.__name__.replace("_", " ")
-        self.name = self.stat_method.__doc__ if self.stat_method.__doc__ else self.short_name
+        self.name = self.short_name if self.stat_method.__doc__ is None else self.stat_method.__doc__
 
         if self.is_tdok:
             self.additional_parameter_name = "hp"
