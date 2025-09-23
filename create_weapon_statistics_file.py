@@ -372,15 +372,6 @@ class Weapons:
         return self.ttdok(hp + 20)
     
     # illustrations helper
-    def _vectorize_and_interleave(_self, targets : list[pd.DataFrame], sources : list[pd.DataFrame], params_len : int):
-        self = _self
-        if params_len == 1:
-            return targets[0], sources
-        dfs = [pd.DataFrame(np.nan, index=targets[0].index, columns=targets[0].columns)] + targets
-        interleaved_rows = [row for pair in zip(*(df.iterrows() for df in dfs)) for row in pair]
-        target = pd.DataFrame([row[1] for row in interleaved_rows])
-        target.index = [(i if i%(params_len+1)!=0 else s) for i, s in enumerate(target.index)]
-        return target, sources
     @functools.cache
     def vectorize_and_interleave(self, func : typing.Callable[["Weapons", typing.Any], pd.DataFrame], params : tuple, filter : tuple[str] = None):
         sources : list[pd.DataFrame] = []
@@ -394,7 +385,14 @@ class Weapons:
                 targets.append(target)
             else:
                 targets.append(target.loc[filter])
-        return self._vectorize_and_interleave(targets, sources, len(params))
+        params_len = len(params)
+        if params_len == 1:
+            return targets[0], sources
+        dfs = [pd.DataFrame(np.nan, index=targets[0].index, columns=targets[0].columns)] + targets
+        interleaved_rows = [row for pair in zip(*(df.iterrows() for df in dfs)) for row in pair]
+        target = pd.DataFrame([row[1] for row in interleaved_rows])
+        target.index = [(i if i%(params_len+1)!=0 else s) for i, s in enumerate(target.index)]
+        return target, sources
 
     # illustrations
     def damage_drop_off_coloring(self, data : tuple[pd.DataFrame, list[pd.DataFrame]], params : tuple):
