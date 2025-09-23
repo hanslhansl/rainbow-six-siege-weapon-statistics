@@ -371,15 +371,14 @@ class Weapons:
         return a, b, self.color
 
     # illustrations helper
-    def vectorize_and_interleave(self, func : typing.Callable[["Weapons", typing.Any], pd.DataFrame], params : tuple):
+    def vectorize_and_interleave(self, func : typing.Callable[["Weapons", typing.Any], pd.DataFrame], params : tuple, filter : list[str]):
         sources : list[pd.DataFrame] = []
         targets : list[pd.DataFrame] = []
         for p, d, sd in params:
             x = func(self, p)
             target, source = (x, x) if isinstance(x, pd.DataFrame) else x
             sources.append(source)
-            targets.append(target)
-        dfs = [func(self, p) for p, d, sd in params]
+            targets.append(target.loc[filter])
         if len(params) == 1:
             return targets[0], sources
         dfs = [pd.DataFrame(np.nan, index=targets[0].index, columns=targets[0].columns)] + targets
@@ -389,35 +388,35 @@ class Weapons:
         return target, sources
 
     # illustrations
-    def damage_drop_off_coloring(self, stat_method : typing.Callable[["Weapons", typing.Any], pd.DataFrame], params : tuple):
+    def damage_drop_off_coloring(self, data : tuple[pd.DataFrame, list[pd.DataFrame]], params : tuple):
         """the colored areas represent steady damage, the colorless areas represent decreasing damage"""
-        target, dfs = self.vectorize_and_interleave(stat_method, params)
+        target, dfs = data
         return self.apply_background_color(
             target,
             lambda w, i, pi: w.color if self.is_in_damage_drop_off(w, i) else w.empty_color,
             params
             )
     
-    def stat_to_base_stat_gradient_coloring(self, stat_method : typing.Callable[["Weapons", typing.Any], pd.DataFrame], params : tuple):
+    def stat_to_base_stat_gradient_coloring(self, data : tuple[pd.DataFrame, list[pd.DataFrame]], params : tuple):
         """the color gradient illustrates the {stat} compared to the weapon's base {stat} (i.e. at 0 m)"""
-        target, dfs = self.vectorize_and_interleave(stat_method, params)
+        target, dfs = data
         return self.apply_background_color(
             target,
             lambda w, i, pi: w.color.with_alpha(safe_division(dfs[pi].loc[w.name][i], dfs[pi].loc[w.name][0])),
             params
             )
-    def stat_to_stat_max_gradient_coloring(self, stat_method : typing.Callable[["Weapons", typing.Any], pd.DataFrame], params : tuple):
+    def stat_to_stat_max_gradient_coloring(self, data : tuple[pd.DataFrame, list[pd.DataFrame]], params : tuple):
         """the color gradient illustrates the {stat} compared to the weapon's maximum {stat}"""
-        target, dfs = self.vectorize_and_interleave(stat_method, params)
+        target, dfs = data
         return self.apply_background_color(
             target,
             lambda w, i, pi: w.color.with_alpha(safe_division(dfs[pi].loc[w.name][i], dfs[pi].loc[w.name].max())),
             params
             )
 
-    def stat_to_class_stat_gradient_coloring(self, stat_method : typing.Callable[["Weapons", typing.Any], pd.DataFrame], params : tuple):
+    def stat_to_class_stat_gradient_coloring(self, data : tuple[pd.DataFrame, list[pd.DataFrame]], params : tuple):
         """the color gradient illustrates the {stat} compared to the weapon class' maximum {stat} at the same distance"""
-        target, dfs = self.vectorize_and_interleave(stat_method, params)
+        target, dfs = data
         class_max = [{class_ : group_df.max(axis=0) for class_, group_df in df.groupby(lambda name: self.weapons[name].class_)} for pi, df in enumerate(dfs)]
         return self.apply_background_color(
             target,
@@ -425,18 +424,18 @@ class Weapons:
             params
             )
 
-    def stat_to_class_base_stat_gradient_coloring(self, stat_method : typing.Callable[["Weapons", typing.Any], pd.DataFrame], params : tuple):
+    def stat_to_class_base_stat_gradient_coloring(self, data : tuple[pd.DataFrame, list[pd.DataFrame]], params : tuple):
         """the color gradient illustrates the {stat} compared to the weapon's class' maximum base {stat} (i.e. at 0 m)"""
-        target, dfs = self.vectorize_and_interleave(stat_method, params)
+        target, dfs = data
         class_base_max = [{class_ : group_df.iloc[:, 0].max() for class_, group_df in df.groupby(lambda name: self.weapons[name].class_)} for pi, df in enumerate(dfs)]
         return self.apply_background_color(
             target,
             lambda w, i, pi: w.color.with_alpha(safe_division(dfs[pi].loc[w.name][i], class_base_max[pi][w.class_])),
             params
             )
-    def stat_to_class_stat_max_gradient_coloring(self, stat_method : typing.Callable[["Weapons", typing.Any], pd.DataFrame], params : tuple):
+    def stat_to_class_stat_max_gradient_coloring(self, data : tuple[pd.DataFrame, list[pd.DataFrame]], params : tuple):
         """the color gradient illustrates the {stat} compared to the weapon's class' maximum {stat}"""
-        target, dfs = self.vectorize_and_interleave(stat_method, params)
+        target, dfs = data
         class_max = [{class_ : group_df.to_numpy().max() for class_, group_df in df.groupby(lambda name: self.weapons[name].class_)} for pi, df in enumerate(dfs)]
         return self.apply_background_color(
             target,
@@ -444,9 +443,9 @@ class Weapons:
             params
             )
     
-    def extended_barrel_effect_coloring(self, stat_method : typing.Callable[["Weapons", typing.Any], pd.DataFrame], params : tuple):
+    def extended_barrel_effect_coloring(self, data : tuple[pd.DataFrame, list[pd.DataFrame]], params : tuple):
         """the colored areas show where the extended barrel attachment actually affects the {stat}"""
-        target, dfs = self.vectorize_and_interleave(stat_method, params)
+        target, dfs = data
         pred = (lambda w, i, pi: (w.is_extended_barrel and dfs[pi].loc[w.name][i] != dfs[pi].loc[w.base_name][i])
                 or (w.extended_barrel_weapon and dfs[pi].loc[w.name][i] != dfs[pi].loc[w.extended_barrel_weapon.name][i]))
         return self.apply_background_color(
@@ -947,7 +946,7 @@ def modify_stats_worksheet(worksheet : typing.Any, ws : Weapons, stat : Stat, il
         worksheet.column_dimensions[get_column_letter(col)].width = 4.8
         col += 1
 
-    row, col = add_secondary_weapon_stats_header(worksheet, row, col)
+    row, _ = add_secondary_weapon_stats_header(worksheet, row, col)
     border = Border(bottom=Side(style="thick"))
     for c in range(1, col):
         worksheet.cell(row=row, column=c).border = border
@@ -964,8 +963,9 @@ def modify_stats_worksheet(worksheet : typing.Any, ws : Weapons, stat : Stat, il
         c.value = weapon.display_name
         c.style = "Normal"
         c.fill = weapon.name_color.to_ex_fill()
-
         c.border = weapon.ex_border
+
+        # secondary weapn stats
         if not weapon.is_extended_barrel:
             add_secondary_weapon_stats(worksheet, weapon, row, col)
 
@@ -1003,7 +1003,8 @@ def save_to_xlsx_file(ws : Weapons):
             stat = stats[i_stat]
             illustration = stat_illustrations[i_illustration]
 
-            styler = illustration(ws, stat.stat_method, stat.additional_parameters)
+            data = ws.vectorize_and_interleave(stat.stat_method, stat.additional_parameters)
+            styler = illustration(ws, data, stat.additional_parameters)
             styler.to_excel(writer, sheet_name=stat.short_name, header=False, startrow=8)
 
     workbook = openpyxl.load_workbook(excel_buffer)

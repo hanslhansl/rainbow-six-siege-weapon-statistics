@@ -10,7 +10,7 @@ def get_weapons():
     return cwsf.Weapons()
 
 # Load data
-weapons = get_weapons()
+ws = get_weapons()
 #raw_data = pd.DataFrame({w.name : w.damages for w in weapons.values()}).transpose()
 
 # Streamlit UI
@@ -19,9 +19,8 @@ st.set_page_config(
     page_icon=":material/looks_6:", # counter_6 looks_6
     layout="wide",
 )
-st.markdown("## rainbow six siege weapon statistics")
-st.markdown("interactive visualisation of damage data over different distances")
-#st.markdown(f"find the [project on github]({cwsf.github_url})")
+st.markdown(f"## [rainbow six siege weapon statistics]({cwsf.github_link})")
+st.markdown("interactive visualisation of damage data")
 
 """
 ### choose stat
@@ -59,12 +58,12 @@ with st.container(border=True):
         # optional base override to make colors more visible
         "span[data-baseweb='tag']{ color: black !important; }",
     ]
-    for opt in weapons.base_weapons:
+    for opt in ws.base_weapons:
         # escape any double quotes in the label
         safe = opt.replace('"', '\\"')
         css_lines.append(
             f'span[data-baseweb="tag"]:has(span[title="{safe}"]) {{'
-            f'  background-color: {weapons.base_weapons[opt].color.to_css()} !important;'
+            f'  background-color: {ws.base_weapons[opt].color.to_css()} !important;'
             f'  color: black !important;'
             f'}}'
         )
@@ -74,7 +73,7 @@ with st.container(border=True):
     # weapon multiselect
     selected_weapons = st.multiselect(
         label="select weapon(s)",
-        options=weapons.base_weapons,
+        options=ws.base_weapons,
         key="selected_weapons_multiselect"
         )
 
@@ -87,21 +86,24 @@ with st.container(border=True):
     # Create rows of buttons for weapon classes
     def add_class_to_selection(class_):
         st.session_state.selected_weapons_multiselect = list(dict.fromkeys(
-            st.session_state.selected_weapons_multiselect + [name for name, w in weapons.base_weapons.items() if w.class_==class_]
+            st.session_state.selected_weapons_multiselect + [name for name, w in ws.base_weapons.items() if w.class_==class_]
             ))
     for inner_col, class_ in zip(st.columns(len(cwsf.Weapon.classes)), cwsf.Weapon.classes):
         with inner_col:
             st.button(class_, on_click=lambda c=class_: add_class_to_selection(c))
 
     if len(selected_weapons):
-        selected_weapons = selected_weapons
+        if include_eb:
+            for i in range(len(selected_weapons) - 1, -1, -1):
+                w = ws.base_weapons[selected_weapons[i]]
+                if w.extended_barrel_weapon:
+                    selected_weapons.insert(i + 1, w.extended_barrel_weapon.name)
+    elif include_eb:
+        selected_weapons = list(ws.base_weapons)
     else:
-        selected_weapons = list(weapons.base_weapons)
+        selected_weapons = list(ws.weapons)
 
-    if include_eb:
-        l = lambda w: [w.name, w.extended_barrel_weapon.name] if w.extended_barrel_weapon else [w.name]
-        selected_weapons = [x for n in selected_weapons for x in l(weapons.base_weapons[n])]
-
+    
 _ = """
 ### plot
 
@@ -151,37 +153,11 @@ with st.container(border=True):
 st.write(selected_illustration.__doc__.format(stat=selected_stat.short_name))
 
 if extended_barrel_difference:
-    target = selected_illustration(weapons, weapons.extended_barrel_difference(selected_stat.stat_method), additional_parameter)
+    data = ws.vectorize_and_interleave(ws.extended_barrel_difference(selected_stat.stat_method), additional_parameter, selected_weapons)
 else:
-    target = selected_illustration(weapons, selected_stat.stat_method, additional_parameter)
-#target = selected_stat.stat_method(weapons, additional_parameter)#.loc[selected_weapons]
+    data = ws.vectorize_and_interleave(selected_stat.stat_method, additional_parameter, selected_weapons)
 
-st.table(target)
-st.stop()
-
-source = None
-if extended_barrel_difference:
-    has_or_is_eb = weapons.filter(target, lambda w: w.is_extended_barrel or w.extended_barrel_weapon != None)
-    has_eb = weapons.filter(has_or_is_eb, lambda w: w.extended_barrel_weapon != None)
-    is_eb = weapons.filter(has_or_is_eb, lambda w: w.is_extended_barrel)
-
-    pd.options.mode.chained_assignment, old = None, pd.options.mode.chained_assignment
-    has_or_is_eb.loc[has_eb.index] -= has_eb.values
-    has_or_is_eb.loc[is_eb.index] -= has_eb.values
-    pd.options.mode.chained_assignment = old
-
-    target = (is_eb - has_eb.values).abs()
-    source = has_or_is_eb
-
-
-styler = (selected_illustration(weapons, target, source)
-          .format({col: lambda x: f"{x:.1f}".rstrip('0').rstrip('.') for col in target.select_dtypes(include='float').columns})
-          #.format_index({name : w.display_name for name, w in weapons.weapons.items()}, axis=0)
-          .format_index(lambda x: f"row_{x}", axis=0)
-          )
-
-#https://discuss.streamlit.io/t/select-all-on-a-streamlit-multiselect/9799
+styler = selected_illustration(ws, data, additional_parameter)
 
 # maybe use aggrid for styling index labels
-
 st.table(styler)
