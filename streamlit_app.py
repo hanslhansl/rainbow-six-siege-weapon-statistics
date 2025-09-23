@@ -11,7 +11,6 @@ def get_weapons():
 
 # Load data
 ws = get_weapons()
-#raw_data = pd.DataFrame({w.name : w.damages for w in weapons.values()}).transpose()
 
 # Streamlit UI
 st.set_page_config(
