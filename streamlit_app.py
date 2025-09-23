@@ -1,9 +1,4 @@
-import create_weapon_statistics_file as cwsf, streamlit as st, matplotlib.pyplot as plt, pandas as pd, altair as alt, numpy as np, sys
-import pandas.core.series
-# https://demo-stockpeers.streamlit.app/?ref=streamlit-io-gallery-favorites&stocks=AAPL%2CMSFT%2CGOOGL%2CNVDA%2CAMZN%2CTSLA%2CADP%2CACN%2CABBV%2CAMT%2CAXP%2CAMGN%2CAMD
-
-import streamlit as st
-
+import create_weapon_statistics_file as cwsf, streamlit as st, pandas as pd, altair as alt, sys
 
 @st.cache_data
 def get_weapons():
