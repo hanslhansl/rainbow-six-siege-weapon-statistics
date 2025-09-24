@@ -1,4 +1,4 @@
-import create_weapon_statistics_file as cwsf, streamlit as st, pandas as pd, altair as alt, sys
+import create_weapon_statistics_file as cwsf, streamlit as st, pandas as pd, altair as alt, sys, time
 
 @st.cache_resource
 def get_weapons():
@@ -147,16 +147,26 @@ with st.container(border=True):
 
 st.write(selected_illustration.__doc__.format(stat=selected_stat.short_name))
 
+
+start_time = time.time()
 if extended_barrel_difference:
     data = ws.vectorize_and_interleave(ws.extended_barrel_difference(selected_stat.stat_method), additional_parameter, selected_weapons)
 else:
     data = ws.vectorize_and_interleave(selected_stat.stat_method, additional_parameter, selected_weapons)
 
+end_time = time.time()
+execution_time = end_time - start_time
+print(f"Execution time 1: {execution_time:.6f} seconds")
+start_time = time.time()
+
 styler = selected_illustration(ws, data, additional_parameter)
 
+end_time = time.time()
+execution_time = end_time - start_time
+print(f"Execution time 2: {execution_time:.6f} seconds")
+start_time = time.time()
+
 # maybe use aggrid for styling index labels
-
-
 st.markdown("""
     <style>
         table td {
@@ -169,4 +179,14 @@ st.markdown("""
     </style>
     """, unsafe_allow_html=True)
 
+end_time = time.time()
+execution_time = end_time - start_time
+print(f"Execution time 3: {execution_time:.6f} seconds")
+start_time = time.time()
+
 st.table(styler)
+
+end_time = time.time()
+execution_time = end_time - start_time
+print(f"Execution time 4: {execution_time:.6f} seconds")
+start_time = time.time()

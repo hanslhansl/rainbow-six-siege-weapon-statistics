@@ -75,7 +75,7 @@ from openpyxl.cell.text import InlineFont
 from openpyxl.cell.rich_text import TextBlock, CellRichText
 from openpyxl.styles import PatternFill, Border, Alignment, NamedStyle, Side, Font
 from openpyxl.utils import get_column_letter
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, InitVar
 
 def warning(s = "Warning"):
     return f"\x1b[38;2;255;255;0m{s}\033[0m"
@@ -205,6 +205,7 @@ left_alignment = Alignment("left", wrapText=True)
 
 attachment_overview_json = deserialize_json(attachment_overview_file_name)
 
+
 class Weapons:
     def __init__(self):
         attachment_categories = deserialize_json(attachment_overview_file_name)
@@ -317,56 +318,63 @@ class Weapons:
         
         return _extended_barrel_difference
 
+    # return Stat("", "", "", self._damages, (self._damages,), tdok_hp_levels, tdok_levels_descriptions_short, tdok_levels_descriptions)
+
     # primary stats
-    @functools.cache
-    def damage_per_bullet(self, _ = None):
-        return self._damages
-    @functools.cache
-    def damage_per_shot(self, _ = None):
+    @functools.cached_property
+    def damage_per_bullet(self):
+        return Stat("damage per bullet", "damage per bullet", "damage-per-bullet", self._damages, (self._damages,))
+    @functools.cached_property
+    def damage_per_shot(self):
         pellets = {name : w.pellets for name, w in self.weapons.items()}
-        return self._damages.mul(pellets, axis=0)
-    @functools.cache
-    def dps(self, _ = None):
+        res = self._damages.mul(pellets, axis=0)
+        return Stat("damage per shot", "damage per shot", "damage-per-shot", res, (res,))
+    @functools.cached_property
+    def dps(self):
         """damage per second"""
         bullets_per_second = {name : w.pellets * w.rps for name, w in self.weapons.items()}
-        return self._damages.mul(bullets_per_second, axis=0).round()
+        res = self._damages.mul(bullets_per_second, axis=0)
+        return Stat("dps", "damage per second", "damage-per-second---dps", res, (res,))
     
-    @functools.cache
+    @functools.cached_property
     def btdok(self, hp : int):
         """bullets to down or kill"""
         return np.ceil(hp / self._damages)
-    @functools.cache
+    @functools.cached_property
     def stdok(self, hp : int):
         """shots to down or kill"""
         pellets = {name : w.pellets for name, w in self.weapons.items()}
         return np.ceil((hp / self._damages).div(pellets, axis=0))
-    @functools.cache
+    @functools.cached_property
     def ttdok(self, hp : int):
         """time to down or kill"""
         rpms = {name : w.rpms for name, w in self.weapons.items()}
         return (self.stdok(hp) - 1).div(rpms, axis=0).round()
     
+    @functools.cached_property
     def theoretical_btdok(self, hp : int):
         """"""
         return hp / self._damages
+    @functools.cached_property
     def theoretical_stdok(self, hp : int):
         """"""
         pellets = {name : w.pellets for name, w in self.weapons.items()}
         return (hp / self._damages).div(pellets, axis=0)
+    @functools.cached_property
     def theoretical_ttdok(self, hp : int):
         """"""
         pellets_rpms = {name : w.pellets * w.rpms for name, w in self.weapons.items()}
         return (hp / self._damages).div(pellets_rpms, axis=0)
 
-    @functools.cache
+    @functools.cached_property
     def btk(self, hp : int):
         """bullets to kill"""
         return self.btdok(hp + 20)
-    @functools.cache
+    @functools.cached_property
     def stk(self, hp : int):
         """shots to kill"""
         return self.stdok(hp + 20)
-    @functools.cache
+    @functools.cached_property
     def ttk(self, hp : int):
         """time to kill"""
         return self.ttdok(hp + 20)
@@ -387,11 +395,13 @@ class Weapons:
                 targets.append(target.loc[filter])
         params_len = len(params)
         if params_len == 1:
-            return targets[0], sources
-        dfs = [pd.DataFrame(np.nan, index=targets[0].index, columns=targets[0].columns)] + targets
-        interleaved_rows = [row for pair in zip(*(df.iterrows() for df in dfs)) for row in pair]
-        target = pd.DataFrame([row[1] for row in interleaved_rows])
-        target.index = [(i if i%(params_len+1)!=0 else s) for i, s in enumerate(target.index)]
+            target = targets[0]
+        else:
+            dfs = [pd.DataFrame(np.nan, index=targets[0].index, columns=targets[0].columns)] + targets
+            interleaved_rows = [row for pair in zip(*(df.iterrows() for df in dfs)) for row in pair]
+            target = pd.DataFrame([row[1] for row in interleaved_rows])
+            target.index = [(i if i%(params_len+1)!=0 else s) for i, s in enumerate(target.index)]
+        target.rename_axis
         return target, sources
 
     # illustrations
@@ -676,6 +686,28 @@ class Operator(_Operator):
 
 @dataclass
 class Stat:
+    short_name : str
+    name : str
+    link : InitVar[str]
+    target : pd.DataFrame
+    source : tuple[pd.DataFrame,...]
+    additional_parameters : tuple[typing.Any,...] = None,
+    additional_parameters_short_description : tuple[str,...] = ""
+    additional_parameters_description : tuple[str,...] = "",
+
+    def __post_init__(self, link : str):
+        self.link = f"https://github.com/hanslhansl/Rainbow-Six-Siege-Weapon-Statistics/#{link}"
+
+    @property
+    def display_name(self):
+        if self.short_name != self.name:
+            return self.short_name + " - " + self.name
+        return self.name
+    
+Stat()
+
+@dataclass
+class Stat2:
     _link : str
     stat_method : typing.Callable[[Weapons, typing.Any], pd.DataFrame]
     is_tdok : bool
