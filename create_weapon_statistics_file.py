@@ -1,20 +1,3 @@
-import pandas as pd, sys
-
-
-"""df = pd.DataFrame({'A': range(20)})
-df.index = [f"junk_{i}" for i in range(len(df))]
-print(df)
-
-df.index = [(i-i % 7 if i%7 != 0 else s) for i, s in enumerate(df.index)]
-print(df)
-
-i = df.index
-
-print(df.reset_index(drop=True))
-
-print(i)
-
-sys.exit()"""
 
 ###################################################
 # settings
@@ -75,7 +58,7 @@ from openpyxl.cell.text import InlineFont
 from openpyxl.cell.rich_text import TextBlock, CellRichText
 from openpyxl.styles import PatternFill, Border, Alignment, NamedStyle, Side, Font
 from openpyxl.utils import get_column_letter
-from dataclasses import dataclass, field, InitVar
+from dataclasses import dataclass, field, InitVar, replace
 
 def warning(s = "Warning"):
     return f"\x1b[38;2;255;255;0m{s}\033[0m"
@@ -277,7 +260,7 @@ class Weapons:
                 w = self.weapons[df.index[x.name//len_plus*len_plus]]
                 return [callback(w, i, pi) for i in df.columns]
         return df.style.apply(cb, axis=1)
-    def apply_background_color(self, df : pd.DataFrame, callback : typing.Callable[["Weapon", int, int], RGBA], params : tuple):
+    def apply_background_color(self, stat : "Stat", callback : typing.Callable[["Weapon", int, int], RGBA]):
         convert_color = RGBA.to_rgb_hex if __name__ == "__main__" else RGBA.to_css
         def format_value(val):
             if pd.isna(val):
@@ -288,68 +271,111 @@ class Weapons:
         def format_index(val):
             if isinstance(val, str):
                 return val
-            return params[val%(len(params)+1) - 1][1]
+            return stat.additional_parameters_short_description[val%(len(stat.additional_parameters)+1) - 1]
 
-        return (self.apply_style(df, lambda *args: f"background-color: {convert_color(callback(*args))}", len(params))
+        return (self.apply_style(stat.target, lambda *args: f"background-color: {convert_color(callback(*args))}", len(stat.additional_parameters))
                 .format(format_value)
-                .relabel_index([format_index(x) for x in df.index], axis=0) # not working
+                .relabel_index([format_index(x) for x in stat.target.index], axis=0) # not working
                 )
 
     # stats helper
     def is_in_damage_drop_off(self, w : "Weapon", index : int):
         return is_index_in_intervals(index, w.damage_drop_off_intervals) is None
     
-    def extended_barrel_difference(self, stat_method : typing.Callable[["Weapons", typing.Any], pd.DataFrame]):
-        def _extended_barrel_difference(self : Weapons, param : typing.Any):
-            df = stat_method(self, param)
-            has_or_is_eb = self.filter(df, lambda w: w.is_extended_barrel or w.extended_barrel_weapon != None)
-            prim = self.filter(has_or_is_eb, lambda w: w.extended_barrel_weapon != None)
-            sec = self.filter(has_or_is_eb, lambda w: w.is_extended_barrel)
+    def extended_barrel_difference(self, stat : "Stat"):
+        """this has to loop over all params, maybe change vectorize_and_interleave to differentiate between 1 param and >1 params"""
+        df = stat.target
+        has_or_is_eb = self.filter(df, lambda w: w.is_extended_barrel or w.extended_barrel_weapon != None)
+        prim = self.filter(has_or_is_eb, lambda w: w.extended_barrel_weapon != None)
+        sec = self.filter(has_or_is_eb, lambda w: w.is_extended_barrel)
 
-            pd.options.mode.chained_assignment, old = None, pd.options.mode.chained_assignment
-            has_or_is_eb.loc[prim.index] -= prim.values
-            has_or_is_eb.loc[sec.index] -= prim.values
-            pd.options.mode.chained_assignment = old
+        pd.options.mode.chained_assignment, old = None, pd.options.mode.chained_assignment
+        has_or_is_eb.loc[prim.index] -= prim.values
+        has_or_is_eb.loc[sec.index] -= prim.values
+        pd.options.mode.chained_assignment = old
 
-            target = (prim - sec.values).abs()
-            source = has_or_is_eb
+        target = (prim - sec.values).abs()
+        source = has_or_is_eb
 
-            return target, source
+        return replace(stat, target=target, source=source)
         
-        return _extended_barrel_difference
 
-    # return Stat("", "", "", self._damages, (self._damages,), tdok_hp_levels, tdok_levels_descriptions_short, tdok_levels_descriptions)
+    # illustrations helper
+    def vectorize_and_interleave(self, func : typing.Callable[["Weapons", typing.Any], pd.DataFrame], params : tuple):
+        sources : list[pd.DataFrame] = []
+        targets : list[pd.DataFrame] = []
+        for p in params:
+            x = func(p)
+            target, source = (x, x) if isinstance(x, pd.DataFrame) else x
+            sources.append(source)
+            targets.append(target)
+        dfs = [pd.DataFrame(np.nan, index=targets[0].index, columns=targets[0].columns)] + targets
+        interleaved_rows = [row for pair in zip(*(df.iterrows() for df in dfs)) for row in pair]
+        target = pd.DataFrame([row[1] for row in interleaved_rows])
+        target.index = [(i if i%(len(params)+1)!=0 else s) for i, s in enumerate(target.index)]
+        return target, tuple(sources), params
+
+    """
+        return Stat(
+            "",
+            "",
+            "",
+            *self.vectorize_and_interleave(lambda p: , tdok_hp_levels),
+            tdok_levels_descriptions_short,
+            tdok_levels_descriptions
+            )
+    """
 
     # primary stats
-    @functools.cached_property
+    @functools.cache
     def damage_per_bullet(self):
         return Stat("damage per bullet", "damage per bullet", "damage-per-bullet", self._damages, (self._damages,))
-    @functools.cached_property
+    @functools.cache
     def damage_per_shot(self):
         pellets = {name : w.pellets for name, w in self.weapons.items()}
         res = self._damages.mul(pellets, axis=0)
         return Stat("damage per shot", "damage per shot", "damage-per-shot", res, (res,))
-    @functools.cached_property
+    @functools.cache
     def dps(self):
         """damage per second"""
         bullets_per_second = {name : w.pellets * w.rps for name, w in self.weapons.items()}
         res = self._damages.mul(bullets_per_second, axis=0)
         return Stat("dps", "damage per second", "damage-per-second---dps", res, (res,))
     
-    @functools.cached_property
-    def btdok(self, hp : int):
-        """bullets to down or kill"""
-        return np.ceil(hp / self._damages)
-    @functools.cached_property
-    def stdok(self, hp : int):
-        """shots to down or kill"""
+    @functools.cache
+    def btdok(self):
+        return Stat(
+            "btdok",
+            "bullets to down or kill",
+            "bullets-to-down-or-kill---btdok",
+            *self.vectorize_and_interleave(lambda hp: np.ceil(hp / self._damages), tdok_hp_levels),
+            tdok_levels_descriptions_short,
+            tdok_levels_descriptions
+            )
+    @functools.cache
+    def stdok(self):
         pellets = {name : w.pellets for name, w in self.weapons.items()}
+        return Stat(
+            "stdok",
+            "shots to down or kill",
+            "shots-to-down-or-kill---stdok",
+            *self.vectorize_and_interleave(lambda hp: np.ceil((hp / self._damages).div(pellets, axis=0)), tdok_hp_levels),
+            tdok_levels_descriptions_short,
+            tdok_levels_descriptions
+            )
         return np.ceil((hp / self._damages).div(pellets, axis=0))
-    @functools.cached_property
-    def ttdok(self, hp : int):
-        """time to down or kill"""
+    @functools.cache
+    def ttdok(self):
+        pellets = {name : w.pellets for name, w in self.weapons.items()}
         rpms = {name : w.rpms for name, w in self.weapons.items()}
-        return (self.stdok(hp) - 1).div(rpms, axis=0).round()
+        return Stat(
+            "ttdok",
+            "time to down or kill",
+            "time-to-down-or-kill---ttdok",
+            *self.vectorize_and_interleave(lambda hp: (np.ceil((hp / self._damages).div(pellets, axis=0)) - 1).div(rpms, axis=0).round(), tdok_hp_levels),
+            tdok_levels_descriptions_short,
+            tdok_levels_descriptions
+            )
     
     @functools.cached_property
     def theoretical_btdok(self, hp : int):
@@ -381,7 +407,7 @@ class Weapons:
     
     # illustrations helper
     @functools.cache
-    def vectorize_and_interleave(self, func : typing.Callable[["Weapons", typing.Any], pd.DataFrame], params : tuple, filter : tuple[str] = None):
+    def vectorize_and_interleave1(self, func : typing.Callable[["Weapons", typing.Any], pd.DataFrame], params : tuple, filter : tuple[str] = None):
         sources : list[pd.DataFrame] = []
         targets : list[pd.DataFrame] = []
         if filter is not None: filter = list(filter)
@@ -405,13 +431,11 @@ class Weapons:
         return target, sources
 
     # illustrations
-    def damage_drop_off_coloring(self, data : tuple[pd.DataFrame, list[pd.DataFrame]], params : tuple):
+    def damage_drop_off_coloring(self, stat : "Stat"):
         """the colored areas represent steady damage, the colorless areas represent decreasing damage"""
-        target, dfs = data
         return self.apply_background_color(
-            target,
+            stat,
             lambda w, i, pi: w.color if self.is_in_damage_drop_off(w, i) else w.empty_color,
-            params
             )
     
     def stat_to_base_stat_gradient_coloring(self, data : tuple[pd.DataFrame, list[pd.DataFrame]], params : tuple):
@@ -703,8 +727,6 @@ class Stat:
         if self.short_name != self.name:
             return self.short_name + " - " + self.name
         return self.name
-    
-Stat()
 
 @dataclass
 class Stat2:
@@ -733,7 +755,15 @@ class Stat2:
 
 
 stats = (
-    Stat("damage-per-bullet", Weapons.damage_per_bullet, False),
+    Weapons.damage_per_bullet,
+    Weapons.damage_per_shot,
+    Weapons.dps,
+    
+    Weapons.btdok,
+    Weapons.stdok,
+    Weapons.ttdok,
+)
+"""Stat("damage-per-bullet", Weapons.damage_per_bullet, False),
     Stat("damage-per-shot", Weapons.damage_per_shot, False),
     Stat("damage-per-second---dps", Weapons.dps, False),
 
@@ -747,8 +777,7 @@ stats = (
 
     Stat("bullets-to-down-or-kill---btdok", Weapons.theoretical_btdok, True),
     Stat("shots-to-down-or-kill---stdok", Weapons.theoretical_stdok, True),
-    Stat("time-to-down-or-kill---ttdok", Weapons.theoretical_ttdok, True),
-)
+    Stat("time-to-down-or-kill---ttdok", Weapons.theoretical_ttdok, True),"""
 stat_illustrations = (
     Weapons.damage_drop_off_coloring,
     #Weapons.stat_to_base_stat_gradient_coloring,
@@ -869,6 +898,7 @@ def add_extended_barrel_overview(worksheet : typing.Any, ws : Weapons, row : int
     selected_stats = [stats[x] for x in (4, 5)]
     # loop over stats, stdok and ttdok
     for i, stat in enumerate(selected_stats):
+        stat = stat(ws)
         row = original_row
 
         # stat name
@@ -879,7 +909,7 @@ def add_extended_barrel_overview(worksheet : typing.Any, ws : Weapons, row : int
         row += 1
 
         # loop over health ratings
-        for j, (param, d, sd) in enumerate(stat.additional_parameters):
+        for j, (param, sd) in enumerate(zip(stat.additional_parameters, stat.additional_parameters_short_description)):
             row = original_row
 
             # secondary weapon stats header
@@ -896,7 +926,7 @@ def add_extended_barrel_overview(worksheet : typing.Any, ws : Weapons, row : int
             worksheet.column_dimensions[get_column_letter(col)].width = 9
 
             # loop over weapons
-            target, _ = ws.extended_barrel_difference(stat.stat_method)(ws, param)
+            target = ws.extended_barrel_difference(stat).target
             for name, row_data in target.iterrows():
                 w = ws.base_weapons[name]
 
@@ -1009,11 +1039,11 @@ def modify_stats_worksheet(worksheet : typing.Any, ws : Weapons, stat : Stat, il
             add_secondary_weapon_stats(worksheet, weapon, row, col)
 
         if not is_1d_stat: row += 1
-        for additional_parameter in stat.additional_parameters:
+        for param_desc in stat.additional_parameters_description:
             if not is_1d_stat:
                 # parameter description cell
                 c = worksheet.cell(row=row, column=1)
-                c.value = additional_parameter[1]
+                c.value = param_desc
                 c.style = "Normal"
                 c.border = weapon.ex_border
 
@@ -1033,23 +1063,24 @@ def save_to_xlsx_file(ws : Weapons):
 
     stat_indices = (0, 1, 2, 4, 5)
     illustration_indices = (0, 1, 2, 4, 3)
+    illustration_indices = (0, 0, 0, 0, 0)
 
     excel_buffer = io.BytesIO()
     with pd.ExcelWriter(excel_buffer) as writer:
         print("pandas to excel engine:", writer.engine)
 
         for i_stat, i_illustration in zip(stat_indices, illustration_indices):
-            stat = stats[i_stat]
+            stat = stats[i_stat](ws)
             illustration = stat_illustrations[i_illustration]
 
-            data = ws.vectorize_and_interleave(stat.stat_method, stat.additional_parameters)
-            styler = illustration(ws, data, stat.additional_parameters)
+            data = stat.target #ws.vectorize_and_interleave(stat.stat_method, stat.additional_parameters)
+            styler = illustration(ws, stat)
             styler.to_excel(writer, sheet_name=stat.short_name, header=False, startrow=8)
 
     workbook = openpyxl.load_workbook(excel_buffer)
 
     for i_stat, i_illustration in zip(stat_indices, illustration_indices):
-        stat = stats[i_stat]
+        stat = stats[i_stat](ws)
         illustration = stat_illustrations[i_illustration]
         worksheet = workbook[stat.short_name]
 
@@ -1070,17 +1101,17 @@ if __name__ == "__main__":
 
     # verify
     # group weapons by class and by base damage
-    weapons_sorted = sorted((w for w in ws.weapons.values() if not w.is_extended_barrel), key=lambda w: (w.class_, ws.damage_per_bullet()[0][w.name]))
-    grouped = [list(group) for key, group in itertools.groupby(weapons_sorted, key=lambda w: (w.class_, ws.damage_per_bullet()[0][w.name]))]
+    weapons_sorted = sorted((w for w in ws.weapons.values() if not w.is_extended_barrel), key=lambda w: (w.class_, ws.damage_per_bullet().target[0][w.name]))
+    grouped = [list(group) for key, group in itertools.groupby(weapons_sorted, key=lambda w: (w.class_, ws.damage_per_bullet().target[0][w.name]))]
     # find all weapons with the same base damage but different damage drop-off
     failed = False
     for group in grouped:
         if len(group) > 1:
             for i, distance in enumerate(Weapon.distances):
-                if len(set(ws.damage_per_bullet()[i][weapon.name] for weapon in group)) > 1:
-                    print(f"{warning()}: These {group[0].class_}s have the {warning('same base damage')} ({ws.damage_per_bullet()[0][group[0].name]}) but {warning('different damages')} at {distance}m:")
+                if len(set(ws.damage_per_bullet().target[i][weapon.name] for weapon in group)) > 1:
+                    print(f"{warning()}: These {group[0].class_}s have the {warning('same base damage')} ({ws.damage_per_bullet().target[0][group[0].name]}) but {warning('different damages')} at {distance}m:")
                     for weapon in group:
-                        print(f"{weapon.name}: {ws.damage_per_bullet()[i][weapon.name]}")
+                        print(f"{weapon.name}: {ws.damage_per_bullet().target[i][weapon.name]}")
                     failed = True
     if failed: raise Exception(f"{error()}: See above warnings.")
 
