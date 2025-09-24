@@ -1,5 +1,39 @@
 import create_weapon_statistics_file as cwsf, streamlit as st, pandas as pd, altair as alt, sys, time
 
+
+
+import pandas as pd
+import numpy as np
+
+# Create arrays for multiindex
+arrays = [
+    ["A", "A", "B", "B"],
+    ["one", "two", "one", "two"]
+]
+
+# Create MultiIndex
+index = pd.MultiIndex.from_arrays(arrays, names=("letter", "number"))
+
+# Create DataFrame
+df = pd.DataFrame(
+    np.random.randn(4, 2),
+    index=index,
+    columns=["value1", "value2"]
+)
+
+print("DataFrame with MultiIndex:\n")
+df
+
+# You can also access a slice
+print("\nSelecting all rows under 'A':\n")
+df.loc["A"]
+
+s = df.style
+
+st.table(s)
+
+st.stop()
+
 @st.cache_resource
 def get_weapons():
     return cwsf.Weapons()
