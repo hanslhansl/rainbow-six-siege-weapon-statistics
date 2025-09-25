@@ -188,7 +188,6 @@ left_alignment = Alignment("left", wrapText=True)
 
 attachment_overview_json = deserialize_json(attachment_overview_file_name)
 
-
 class Weapons:
     def __init__(self):
         attachment_categories = deserialize_json(attachment_overview_file_name)
@@ -239,28 +238,18 @@ class Weapons:
 
     def filter(self, df : pd.DataFrame, filter_func : typing.Callable[["Weapon"], bool]) -> pd.DataFrame:
         return df[df.apply(lambda row: filter_func(self.weapons[row.name]), axis=1)]
-    def apply(self, df : pd.DataFrame, callback : typing.Callable[["Weapon", int], typing.Any]):
+    def apply(self, df : pd.DataFrame | pd.io.formats.style.Styler, callback : typing.Callable[["Weapon", typing.Any, int, typing.Any], typing.Any]):
         def cb(x):
-            w = self.weapons[x.name]
-            return pd.Series(callback(w, i) for i, v in x.items())
+            name, pi = (x.name, None) if df.index.nlevels == 1 else x.name
+            if pi == None:
+                return [None] * len(x)
+            w = self.weapons[name]
+            return [callback(w, pi, i, v) for i, v in x.items()]
+        
         return df.apply(cb, axis=1)
-    def apply_style(self, df : pd.DataFrame, callback : typing.Callable[["Weapon", int, typing.Any], str], params_len : int):
-        if params_len == 1:
-            def cb(x):
-                w = self.weapons[x.name]
-                return pd.Series(callback(w, i, 0) for i in df.columns)
-        else:
-            def cb(x):
-                if isinstance(x.name, str):
-                    # empty row
-                    return [None] * len(x)
-                # data row
-                len_plus = params_len + 1
-                pi = x.name % len_plus - 1
-                w = self.weapons[df.index[x.name//len_plus*len_plus]]
-                return [callback(w, i, pi) for i in df.columns]
-        return df.style.apply(cb, axis=1)
-    def apply_background_color(self, stat : "Stat", callback : typing.Callable[["Weapon", int, int], RGBA]):
+    def apply_style(self, df : pd.DataFrame, callback : typing.Callable[["Weapon", typing.Any, int, typing.Any], str]):
+        return self.apply(df.style, callback)
+    def apply_background_color(self, stat : "Stat", callback : typing.Callable[["Weapon", typing.Any, int, typing.Any], RGBA]):
         convert_color = RGBA.to_rgb_hex if __name__ == "__main__" else RGBA.to_css
         def format_value(val):
             if pd.isna(val):
@@ -273,7 +262,7 @@ class Weapons:
                 return val
             return stat.additional_parameters_short_description[val%(len(stat.additional_parameters)+1) - 1]
 
-        return (self.apply_style(stat.data, lambda *args: f"background-color: {convert_color(callback(*args))}", len(stat.additional_parameters))
+        return (self.apply_style(stat.data, lambda *args: f"background-color: {convert_color(callback(*args))}")
                 .format(format_value)
                 #.relabel_index([format_index(x) for x in stat.target.index], axis=0) # not working
                 )
@@ -323,7 +312,11 @@ class Weapons:
         return target, tuple(sources), params
 
     def nest(self, func : typing.Callable[[typing.Any], pd.DataFrame], params : tuple, pname : str):
-        return pd.concat([func(p) for p in params], keys=params, names=[pname]), params
+        names = tuple(range(len(params)))
+        res = pd.concat([func(p) for p in params], keys=params, names=[pname])
+        res.index = pd.MultiIndex.from_product([self.weapons, names], names=["weapons", pname])
+        index = pd.MultiIndex.from_product([self.weapons, ("",) + names], names=["weapons", pname])
+        return res.reindex(index), params
 
     """
         return Stat(
@@ -1093,9 +1086,9 @@ def save_to_xlsx_file(ws : Weapons):
         illustration = stat_illustrations[i_illustration]
         worksheet = workbook[stat.short_name]
 
-        modify_stats_worksheet(worksheet, ws, stat, illustration)
+        #modify_stats_worksheet(worksheet, ws, stat, illustration)
 
-    add_attachment_overview(workbook, ws)
+    #add_attachment_overview(workbook, ws)
 
     # save to file
     workbook.save(xlsx_output_file_name)
@@ -1109,7 +1102,7 @@ if __name__ == "__main__":
 
     # verify
     # group weapons by class and by base damage
-    weapons_sorted = sorted((w for w in ws.weapons.values() if not w.is_extended_barrel), key=lambda w: (w.class_, ws.damage_per_bullet().data[0][w.name]))
+    """weapons_sorted = sorted((w for w in ws.weapons.values() if not w.is_extended_barrel), key=lambda w: (w.class_, ws.damage_per_bullet().data[0][w.name]))
     grouped = [list(group) for key, group in itertools.groupby(weapons_sorted, key=lambda w: (w.class_, ws.damage_per_bullet().data[0][w.name]))]
     # find all weapons with the same base damage but different damage drop-off
     failed = False
@@ -1121,7 +1114,7 @@ if __name__ == "__main__":
                     for weapon in group:
                         print(f"{weapon.name}: {ws.damage_per_bullet().data[i][weapon.name]}")
                     failed = True
-    if failed: raise Exception(f"{error()}: See above warnings.")
+    if failed: raise Exception(f"{error()}: See above warnings.")"""
 
 
     # save to excel file

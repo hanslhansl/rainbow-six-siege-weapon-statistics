@@ -7,8 +7,8 @@ import numpy as np
 
 # Create arrays for multiindex
 arrays = [
-    ["A", "A", "B", "B"],
-    ["one", "two", "one", "two"]
+    ["A", "A", "A", "B", "B", "B"],
+    ["", "one", "two", "", "one", "two"]
 ]
 
 # Create MultiIndex
@@ -16,21 +16,17 @@ index = pd.MultiIndex.from_arrays(arrays, names=("letter", "number"))
 
 # Create DataFrame
 df = pd.DataFrame(
-    np.random.randn(4, 2),
+    np.random.randn(6, 2),
     index=index,
     columns=["value1", "value2"]
 )
 
 print("DataFrame with MultiIndex:\n")
-df
+st.table(df)
 
-# You can also access a slice
-print("\nSelecting all rows under 'A':\n")
-df.loc["A"]
+s = df.style.apply(lambda x: print(x, "###"), axis=1)
 
-s = df.style
-
-st.table(s)
+s
 
 st.stop()
 
