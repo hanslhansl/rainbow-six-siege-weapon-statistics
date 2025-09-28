@@ -39,12 +39,27 @@ if False:
     """,
     unsafe_allow_html=True
 )
-st.markdown(
+    st.markdown(
     """
     <style>
     /* In the second column (td:nth-child(2)), hide every second data row */
     tbody tr:nth-child(3n) th:nth-child(1) {
         visibility: hidden;   /*hides content but keeps cell width */
+    }
+    </style>
+    """,
+    unsafe_allow_html=True
+)
+st.markdown(
+    """
+    <style>
+    /* Hide all cells in second column by default in tbody */
+    tbody td:nth-child(2) {
+        visibility: hidden;
+    }
+    /* Keep every third row visible: 1st, 4th, 7th, ... */
+    tbody tr:nth-child(3n - 2) td:nth-child(2) {
+        visibility: visible;
     }
     </style>
     """,
