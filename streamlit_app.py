@@ -42,7 +42,7 @@ if False:
 st.markdown(
     """
     <style>
-    /* In the second column (td:nth-child(2)), hide every second data row */
+    /* In the second column (td:nth-child(1)), hide every second data row */
     table tr:nth-child(odd) td:nth-child(2) {
         visibility: hidden;  /* hides content but keeps cell width */
     }
