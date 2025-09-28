@@ -71,6 +71,8 @@ if False:
 print("DataFrame with MultiIndex:\n")
 st.table(df)
 
+st.table(df.div(2))
+
 #s = df.style.apply(lambda x: print(x, "###"), axis=1)
 #s
 
