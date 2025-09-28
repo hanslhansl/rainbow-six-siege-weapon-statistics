@@ -21,6 +21,27 @@ df = pd.DataFrame(
     columns=["value1", "value2"]
 )
 
+
+
+st.markdown(
+    """
+    <style>
+    /* Target Streamlit tables */
+    table {
+        width: 100%;
+    }
+
+    /* Target the second column (nth-child(2)) */
+    table td:nth-child(2), table th:nth-child(2) {
+        width: 0px;
+    }
+    </style>
+    """,
+    unsafe_allow_html=True
+)
+
+
+
 print("DataFrame with MultiIndex:\n")
 st.table(df)
 
