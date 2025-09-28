@@ -58,7 +58,7 @@ st.markdown(
         /*visibility: hidden;*/
     }
     /* Keep every third row visible: 1st, 4th, 7th, ... */
-    tbody tr:nth-child(3n - 2) th:nth-child(2) {
+    tbody tr:nth-child(3n - 2) th:nth-child(1) {
         visibility: hidden;
     }
     </style>
