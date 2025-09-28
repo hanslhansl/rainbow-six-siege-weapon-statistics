@@ -24,7 +24,7 @@ df = pd.DataFrame(
 print("DataFrame with MultiIndex:\n")
 st.table(df)
 
-s = df.style.apply(lambda x: print(x, "###"), axis=1)
+#s = df.style.apply(lambda x: print(x, "###"), axis=1)
 
 s
 
