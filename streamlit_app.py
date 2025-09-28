@@ -73,6 +73,8 @@ st.table(df)
 
 st.table(df.div([2, 3, 1, 1, 1, 1], axis=0))
 
+st.table(df.div({"A" : 2, "B" : 1}, axis=0, level="lettr"))
+
 #s = df.style.apply(lambda x: print(x, "###"), axis=1)
 #s
 
