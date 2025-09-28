@@ -55,7 +55,7 @@ st.markdown(
     <style>
     /* Keep every third row visible: 1st, 4th, 7th, ... */
     tbody tr:nth-child(3n - 1) th:nth-child(1) {
-        //color: transparent;
+        color: transparent;
     }
     /* Keep every third row visible: 1st, 4th, 7th, ... */
     tbody tr:nth-child(3n - 3) th:nth-child(1) {
