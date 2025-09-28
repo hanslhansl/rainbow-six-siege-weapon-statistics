@@ -51,7 +51,7 @@ weapon_colors_ = {"AR":"#1f77b4",
 ###################################################
 
 #imports
-import os, json, typing, copy, sys, itertools, colorama, sys, colorsys, pandas as pd, numpy as np, io, marshmallow.exceptions
+import os, json, typing, copy, sys, itertools, colorama, sys, colorsys, pandas as pd, pandas.io.formats.style, numpy as np, io, marshmallow.exceptions
 import openpyxl, dataclasses_json, warnings, googleapiclient.http, openpyxl.workbook.workbook, googleapiclient.discovery, functools
 import google.oauth2.service_account
 from openpyxl.cell.text import InlineFont
@@ -68,7 +68,7 @@ def error(s = "Error"):
     return f"\x1b[38;2;255;0;0m{s}\033[0m"
 
 colorama.just_fix_windows_console()
-patch_version = sys.argv[1] if len(sys.argv) > 1 else "y_s_"
+patch_version = sys.argv[1] if len(sys.argv) > 1 else "<insert patch>"
 
 operators_file_name += ".json"
 attachment_overview_file_name += ".json"
@@ -80,9 +80,9 @@ google_drive_link = "https://docs.google.com/spreadsheets/d/e/2PACX-1vQ1KitQsZks
 
 tdok_hp_levels = (100, 110, 125, 120, 130, 145)
 tdok_with_rook = (False, False, False, True, True, True)
-tdok_levels_descriptions = tuple(f"{int(i%3)+1} armor {'+ Rook ' if with_rook else ''}({hp} hp)"
+tdok_levels_descriptions = tuple(f"{int(i%3)+1} armor {'+ rook ' if with_rook else ''}({hp} hp)"
                                  for i, (hp, with_rook) in enumerate(zip(tdok_hp_levels, tdok_with_rook)))
-tdok_levels_descriptions_short = tuple(f"{int(i%3)+1}{'R' if with_rook else ''} ({hp})"
+tdok_levels_descriptions_short = tuple(f"{int(i%3)+1}{'r' if with_rook else ''} ({hp})"
                                  for i, (hp, with_rook) in enumerate(zip(tdok_hp_levels, tdok_with_rook)))
 
 # check if the settings are correct
@@ -183,6 +183,7 @@ def safe_division(a : float, b : float):
     return a / b
 
 border_style = "thin"
+top_alignment = Alignment(vertical="top", wrapText=True)
 center_alignment = Alignment("center", wrapText=True)
 left_alignment = Alignment("left", wrapText=True)
 
@@ -238,16 +239,18 @@ class Weapons:
 
     def filter(self, df : pd.DataFrame, filter_func : typing.Callable[["Weapon"], bool]) -> pd.DataFrame:
         return df[df.apply(lambda row: filter_func(self.weapons[row.name]), axis=1)]
-    def apply(self, df : pd.DataFrame | pd.io.formats.style.Styler, callback : typing.Callable[["Weapon", typing.Any, int, typing.Any], typing.Any]):
+    def apply(self, df : pd.DataFrame | pd.io.formats.style.Styler, callback : typing.Callable[["Weapon", typing.Any, int, typing.Any], typing.Any]) -> pd.DataFrame | pd.io.formats.style.Styler:
         def cb(x):
-            name, pi = (x.name, None) if df.index.nlevels == 1 else x.name
-            if pi == None:
-                return [None] * len(x)
-            w = self.weapons[name]
+            if df.index.nlevels == 1:
+                w_name, pi = x.name, None
+            else:
+                w_name, pi = x.name
+                if pi in (None, ""): return [None] * len(x)
+            w = self.weapons[w_name]
             return [callback(w, pi, i, v) for i, v in x.items()]
         
         return df.apply(cb, axis=1)
-    def apply_style(self, df : pd.DataFrame, callback : typing.Callable[["Weapon", typing.Any, int, typing.Any], str]):
+    def apply_style(self, df : pd.DataFrame, callback : typing.Callable[["Weapon", typing.Any, int, typing.Any], str]) -> pd.io.formats.style.Styler:
         return self.apply(df.style, callback)
     def apply_background_color(self, stat : "Stat", callback : typing.Callable[["Weapon", typing.Any, int, typing.Any], RGBA]):
         convert_color = RGBA.to_rgb_hex if __name__ == "__main__" else RGBA.to_css
@@ -257,16 +260,9 @@ class Weapons:
             elif isinstance(val, float):
                 return f"{val:.2f}".rstrip('0').rstrip('.')
             return val
-        def format_index(val):
-            if isinstance(val, str):
-                return val
-            return stat.additional_parameters_short_description[val%(len(stat.additional_parameters)+1) - 1]
 
-        return (self.apply_style(stat.data, lambda *args: f"background-color: {convert_color(callback(*args))}")
-                .format(format_value)
-                #.relabel_index([format_index(x) for x in stat.target.index], axis=0) # not working
-                )
-
+        return self.apply_style(stat.data, lambda *args: f"background-color: {convert_color(callback(*args))}").format(format_value)
+            
     # stats helper
     def is_in_damage_drop_off(self, w : "Weapon", index : int):
         return is_index_in_intervals(index, w.damage_drop_off_intervals) is None
@@ -438,64 +434,62 @@ class Weapons:
         """the colored areas represent steady damage, the colorless areas represent decreasing damage"""
         return self.apply_background_color(
             stat,
-            lambda w, i, pi: w.color if self.is_in_damage_drop_off(w, i) else w.empty_color,
+            lambda w, pi, i, v: w.color if self.is_in_damage_drop_off(w, i) else w.empty_color,
             )
     
-    def stat_to_base_stat_gradient_coloring(self, data : tuple[pd.DataFrame, list[pd.DataFrame]], params : tuple):
+    def stat_to_base_stat_gradient_coloring(self, stat : "Stat"):
         """the color gradient illustrates the {stat} compared to the weapon's base {stat} (i.e. at 0 m)"""
-        target, dfs = data
+        raise NotImplementedError
         return self.apply_background_color(
-            target,
-            lambda w, i, pi: w.color.with_alpha(safe_division(dfs[pi].loc[w.name][i], dfs[pi].loc[w.name][0])),
-            params
+            stat,
+            lambda w, pi, i, v: w.color.with_alpha(safe_division(v, stat.data.loc[(w.name, pi), 0]))
             )
-    def stat_to_stat_max_gradient_coloring(self, data : tuple[pd.DataFrame, list[pd.DataFrame]], params : tuple):
+    def stat_to_stat_max_gradient_coloring(self, stat : "Stat"):
         """the color gradient illustrates the {stat} compared to the weapon's maximum {stat}"""
-        target, dfs = data
         return self.apply_background_color(
-            target,
-            lambda w, i, pi: w.color.with_alpha(safe_division(dfs[pi].loc[w.name][i], dfs[pi].loc[w.name].max())),
-            params
+            stat,
+            lambda w, pi, i, v: w.color.with_alpha(safe_division(v, stat.data.loc[(w.name, pi)].max()))
             )
 
-    def stat_to_class_stat_gradient_coloring(self, data : tuple[pd.DataFrame, list[pd.DataFrame]], params : tuple):
+    def stat_to_class_stat_gradient_coloring(self, stat : "Stat"):
         """the color gradient illustrates the {stat} compared to the weapon class' maximum {stat} at the same distance"""
         target, dfs = data
         class_max = [{class_ : group_df.max(axis=0) for class_, group_df in df.groupby(lambda name: self.weapons[name].class_)} for pi, df in enumerate(dfs)]
         return self.apply_background_color(
-            target,
-            lambda w, i, pi: w.color.with_alpha(safe_division(dfs[pi].loc[w.name][i], class_max[pi][w.class_][i])),
-            params
+            stat,
+            lambda w, pi, i, v: w.color.with_alpha(safe_division(dfs[pi].loc[w.name][i], class_max[pi][w.class_][i]))
             )
 
-    def stat_to_class_base_stat_gradient_coloring(self, data : tuple[pd.DataFrame, list[pd.DataFrame]], params : tuple):
+    def stat_to_class_base_stat_gradient_coloring(self, stat : "Stat"):
         """the color gradient illustrates the {stat} compared to the weapon's class' maximum base {stat} (i.e. at 0 m)"""
+        raise NotImplementedError
         target, dfs = data
         class_base_max = [{class_ : group_df.iloc[:, 0].max() for class_, group_df in df.groupby(lambda name: self.weapons[name].class_)} for pi, df in enumerate(dfs)]
         return self.apply_background_color(
-            target,
-            lambda w, i, pi: w.color.with_alpha(safe_division(dfs[pi].loc[w.name][i], class_base_max[pi][w.class_])),
-            params
+            stat,
+            lambda w, pi, i, v: w.color.with_alpha(safe_division(dfs[pi].loc[w.name][i], class_base_max[pi][w.class_]))
             )
-    def stat_to_class_stat_max_gradient_coloring(self, data : tuple[pd.DataFrame, list[pd.DataFrame]], params : tuple):
+    def stat_to_class_stat_max_gradient_coloring(self, stat : "Stat"):
         """the color gradient illustrates the {stat} compared to the weapon's class' maximum {stat}"""
         target, dfs = data
         class_max = [{class_ : group_df.to_numpy().max() for class_, group_df in df.groupby(lambda name: self.weapons[name].class_)} for pi, df in enumerate(dfs)]
         return self.apply_background_color(
-            target,
-            lambda w, i, pi: w.color.with_alpha(safe_division(dfs[pi].loc[w.name][i], class_max[pi][w.class_])),
-            params
+            stat,
+            lambda w, pi, i, v: w.color.with_alpha(safe_division(dfs[pi].loc[w.name][i], class_max[pi][w.class_]))
             )
     
-    def extended_barrel_effect_coloring(self, data : tuple[pd.DataFrame, list[pd.DataFrame]], params : tuple):
+    def extended_barrel_effect_coloring(self, stat : "Stat"):
         """the colored areas show where the extended barrel attachment actually affects the {stat}"""
-        target, dfs = data
-        pred = (lambda w, i, pi: (w.is_extended_barrel and dfs[pi].loc[w.name][i] != dfs[pi].loc[w.base_name][i])
-                or (w.extended_barrel_weapon and dfs[pi].loc[w.name][i] != dfs[pi].loc[w.extended_barrel_weapon.name][i]))
+
+        def pred(w, pi, i, v):
+            if ((w.is_extended_barrel and dfs[pi].loc[w.name][i] != dfs[pi].loc[w.base_name][i])
+                    or (w.extended_barrel_weapon and dfs[pi].loc[w.name][i] != dfs[pi].loc[w.extended_barrel_weapon.name][i])):
+                return w.color
+            return w.empty_color
+        
         return self.apply_background_color(
-            target,
-            lambda w, i, pi: w.color if pred(w, i, pi) else w.empty_color,
-            params
+            stat,
+            pred
             )
 
 
@@ -715,14 +709,14 @@ class Operator(_Operator):
 class Stat:
     short_name : str
     name : str
-    link : InitVar[str]
+    link : str
     data : pd.DataFrame
     additional_parameters : tuple[typing.Any,...] = None,
     additional_parameters_short_description : tuple[str,...] = "",
     additional_parameters_description : tuple[str,...] = "",
 
-    def __post_init__(self, link : str):
-        self.link = f"https://github.com/hanslhansl/Rainbow-Six-Siege-Weapon-Statistics/#{link}"
+    def __post_init__(self):
+        self.link = f"https://github.com/hanslhansl/Rainbow-Six-Siege-Weapon-Statistics/#{self.link}"
 
     @property
     def display_name(self):
@@ -782,46 +776,45 @@ stats = (
     Stat("time-to-down-or-kill---ttdok", Weapons.theoretical_ttdok, True),"""
 stat_illustrations = (
     Weapons.damage_drop_off_coloring,
-    #Weapons.stat_to_base_stat_gradient_coloring,
+    Weapons.stat_to_base_stat_gradient_coloring,
     Weapons.stat_to_stat_max_gradient_coloring,
     Weapons.stat_to_class_stat_gradient_coloring,
-    #Weapons.stat_to_class_base_stat_gradient_coloring,
+    Weapons.stat_to_class_base_stat_gradient_coloring,
     Weapons.stat_to_class_stat_max_gradient_coloring,
     Weapons.extended_barrel_effect_coloring,
     )
 
-def add_worksheet_header(worksheet : typing.Any, stat : Stat | str, description : str, row : int, cols_inbetween : int):
+def add_worksheet_header(worksheet : typing.Any, stat : Stat | str, description : str, row : int, col : int, cols_inbetween : int):
     
     worksheet.column_dimensions[get_column_letter(1)].width = 22
     
-    def add_header_entry(row, start_column, end_column, value, font = None):
-        worksheet.merge_cells(start_row=row, end_row=row, start_column=start_column, end_column=end_column)
-        c = worksheet.cell(row=row, column=start_column)
+    def add_header_entry(row, col, end_column, value, font = None):
+        worksheet.merge_cells(start_row=row, end_row=row, start_column=col, end_column=end_column)
+        c = worksheet.cell(row=row, column=col)
         c.value = value
         if font is not None:
             c.font = font
 
-    add_header_entry(row, 2, 1 + cols_inbetween,
+    add_header_entry(row, col, 1 + cols_inbetween,
      f"created by hanslhansl, updated for {patch_version}", Font(bold=True))
     row += 1
 
-    add_header_entry(row, 2, 6, f'=HYPERLINK("{github_link}", "detailed explanation")', Font(color = "FF0000FF"))
+    add_header_entry(row, col, 6, f'=HYPERLINK("{github_link}", "detailed explanation")', Font(color = "FF0000FF"))
 
-    add_header_entry(row, 8, 14, f'=HYPERLINK("{google_sheets_link}", "spreadsheet on google sheets")', Font(color = "FF0000FF"))
+    add_header_entry(row, col+6, 14, f'=HYPERLINK("{google_sheets_link}", "spreadsheet on google sheets")', Font(color = "FF0000FF"))
 
-    add_header_entry(row, 16, 1 + cols_inbetween,
+    add_header_entry(row, col+14, 1 + cols_inbetween,
                   f'=HYPERLINK("{google_drive_link}", "spreadsheet on google drive")', Font(color = "FF0000FF"))
     row += 2
 
     if isinstance(stat, str):
-        add_header_entry(row, 2, 1 + cols_inbetween, stat, Font(color = "FF0000FF", bold=True))
+        add_header_entry(row, col, 1 + cols_inbetween, stat, Font(color = "FF0000FF", bold=True))
     else:
-        add_header_entry(row, 2, 1 + cols_inbetween,
+        add_header_entry(row, col, 1 + cols_inbetween,
                          f'=HYPERLINK("{github_link}#{stat.link}", "{stat.display_name}")', Font(color = "FF0000FF", bold=True))
     row += 1
 
-    add_header_entry(row, 2, 1 + cols_inbetween, description)
-    row += 1
+    add_header_entry(row, col, 1 + cols_inbetween, description)
 
     return row
 
@@ -861,7 +854,7 @@ def add_secondary_weapon_stats_header(worksheet : typing.Any, row : int, col : i
 
     worksheet.merge_cells(start_row=row, end_row=row, start_column=col-4, end_column=col-4+1)
 
-    return row, col
+    return
 
 def add_secondary_weapon_stats(worksheet : typing.Any, weapon : Weapon, row : int, col : int):
     values = [weapon.class_, weapon.rpm, weapon.capacity, weapon.extra_ammo, weapon.pellets if weapon.pellets != 1 else None,
@@ -1004,46 +997,54 @@ def add_attachment_overview(workbook : typing.Any, ws : Weapons):
 
 def modify_stats_worksheet(worksheet : typing.Any, ws : Weapons, stat : Stat, illustration):
     row = 1
+    col = 1
+    is_1d_stat = len(stat.additional_parameters) == 1
 
-    c = worksheet.cell(row=row, column=1)
+    c = worksheet.cell(row=row, column=col)
     c.value = "weapon"
-    worksheet.column_dimensions[get_column_letter(1)].width = 22
+    worksheet.column_dimensions[get_column_letter(col)].width = 22
 
-    col = 2
+    if not is_1d_stat:
+        worksheet.delete_cols(col+1)
+
+    # distance cells
+    secondary_stats_col = col + 1
     for d in Weapon.distances:
-        c = worksheet.cell(row=row, column=col)
+        c = worksheet.cell(row=row, column=secondary_stats_col)
         c.value = d
         c.alignment = center_alignment
-        worksheet.column_dimensions[get_column_letter(col)].width = 4.8
-        col += 1
+        worksheet.column_dimensions[get_column_letter(secondary_stats_col)].width = 4.8
+        secondary_stats_col += 1
 
-    row, _ = add_secondary_weapon_stats_header(worksheet, row, col)
-    border = Border(bottom=Side(style="thick"))
-    for c in range(1, col):
-        worksheet.cell(row=row, column=c).border = border
-    worksheet.freeze_panes = worksheet.cell(row=row+1, column=2)
-    row += 2
-
-    row = add_worksheet_header(worksheet, stat, illustration.__doc__.format(stat=stat.short_name), row, len(Weapon.distances))
+    add_secondary_weapon_stats_header(worksheet, row, secondary_stats_col)
     row += 1
 
-    is_1d_stat = len(stat.additional_parameters) == 1
-    for weapon in ws.weapons.values():
-        # weapon name cell
-        c = worksheet.cell(row=row, column=1)
-        c.value = weapon.display_name
-        c.style = "Normal"
-        c.fill = weapon.name_color.to_ex_fill()
-        c.border = weapon.ex_border
+    worksheet.freeze_panes = worksheet.cell(row=row, column=col+1)
+    row += 2
 
-        # secondary weapn stats
+    row = add_worksheet_header(worksheet, stat, illustration.__doc__.format(stat=stat.short_name), row, col+1, len(Weapon.distances))
+    row += 1
+
+    for weapon in ws.weapons.values():
+
+        # weapon name cell
+        if not is_1d_stat: worksheet.unmerge_cells(start_row=row, start_column=1, end_row=row+len(stat.additional_parameters), end_column=1)
+        c = worksheet.cell(row=row, column=1)
+        c.style = "Normal"
+        c.alignment = top_alignment
+        c.border = weapon.ex_border
+        c.fill = weapon.name_color.to_ex_fill()
+        c.value = weapon.display_name
+
+        # secondary weapon stats
         if not weapon.is_extended_barrel:
-            add_secondary_weapon_stats(worksheet, weapon, row, col)
+            add_secondary_weapon_stats(worksheet, weapon, row, secondary_stats_col)
 
         if not is_1d_stat: row += 1
         for param_desc in stat.additional_parameters_description:
+            
+            # parameter description cell
             if not is_1d_stat:
-                # parameter description cell
                 c = worksheet.cell(row=row, column=1)
                 c.value = param_desc
                 c.style = "Normal"
@@ -1051,7 +1052,7 @@ def modify_stats_worksheet(worksheet : typing.Any, ws : Weapons, stat : Stat, il
 
             # stat cells
             for i in range(len(Weapon.distances)):
-                c = worksheet.cell(row=row, column=i+2)
+                c = worksheet.cell(row=row, column=col+i+1)
                 c.alignment = center_alignment
                 c.border = weapon.ex_border
 
@@ -1064,8 +1065,8 @@ def save_to_xlsx_file(ws : Weapons):
     """ https://openpyxl.readthedocs.io/en/stable/ """
 
     stat_indices = (0, 1, 2, 4, 5)
-    illustration_indices = (0, 1, 2, 4, 3)
-    illustration_indices = (0, 0, 0, 0, 0)
+    illustration_indices = (0, 2, 3, 6, 5)
+    illustration_indices = (0, 2, 0, 0, 0)
 
     excel_buffer = io.BytesIO()
     with pd.ExcelWriter(excel_buffer) as writer:
@@ -1075,7 +1076,6 @@ def save_to_xlsx_file(ws : Weapons):
             stat = stats[i_stat](ws)
             illustration = stat_illustrations[i_illustration]
 
-            data = stat.data #ws.vectorize_and_interleave(stat.stat_method, stat.additional_parameters)
             styler = illustration(ws, stat)
             styler.to_excel(writer, sheet_name=stat.short_name, header=False, startrow=8)
 
@@ -1086,7 +1086,7 @@ def save_to_xlsx_file(ws : Weapons):
         illustration = stat_illustrations[i_illustration]
         worksheet = workbook[stat.short_name]
 
-        #modify_stats_worksheet(worksheet, ws, stat, illustration)
+        modify_stats_worksheet(worksheet, ws, stat, illustration)
 
     #add_attachment_overview(workbook, ws)
 
