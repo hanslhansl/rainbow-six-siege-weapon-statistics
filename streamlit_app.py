@@ -44,8 +44,7 @@ st.markdown(
     <style>
     /* In the second column (td:nth-child(2)), hide every second data row */
     tbody tr:nth-child(2n) th:nth-child(1) {
-        /*visibility: hidden;   hides content but keeps cell width */
-        display: none;
+        visibility: hidden;   /*hides content but keeps cell width */
     }
     </style>
     """,
