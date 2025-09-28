@@ -22,8 +22,8 @@ df = pd.DataFrame(
 )
 
 
-
-st.markdown(
+if False:
+    st.markdown(
     """
     <style>
     /* Target Streamlit tables */
@@ -34,6 +34,17 @@ st.markdown(
     /* Target the second column (nth-child(2)) */
     table td:nth-child(2), table th:nth-child(2) {
         display: none;
+    }
+    </style>
+    """,
+    unsafe_allow_html=True
+)
+st.markdown(
+    """
+    <style>
+    /* In the second column (td:nth-child(2)), hide every second data row */
+    table tr:nth-child(odd) td:nth-child(2) {
+        visibility: hidden;  /* hides content but keeps cell width */
     }
     </style>
     """,
