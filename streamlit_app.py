@@ -43,7 +43,7 @@ st.markdown(
     """
     <style>
     /* In the second column (td:nth-child(2)), hide every second data row */
-    table tr:nth-child(odd) th:nth-child(1) {
+    tbody tr:nth-child(odd) th:nth-child(1) {
         visibility: hidden;  /* hides content but keeps cell width */
     }
     </style>
