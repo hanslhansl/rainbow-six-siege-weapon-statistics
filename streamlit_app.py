@@ -53,9 +53,10 @@ if False:
 st.markdown(
     """
     <style>
-    /* Hide all cells in second column by default in tbody */
-    tbody th:nth-child(1) {
-        visibility: hidden;
+    /* Keep every third row visible: 1st, 4th, 7th, ... */
+    tbody tr:nth-child(3n - 1) th:nth-child(1) {
+        //visibility: visible;
+        color: transparent;
     }
     /* Keep every third row visible: 1st, 4th, 7th, ... */
     tbody tr:nth-child(3n - 2) th:nth-child(1) {
