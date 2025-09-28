@@ -50,7 +50,7 @@ if False:
     """,
     unsafe_allow_html=True
 )
-st.markdown(
+    st.markdown(
     """
     <style>
     /* Keep every third row visible: 1st, 4th, 7th, ... */

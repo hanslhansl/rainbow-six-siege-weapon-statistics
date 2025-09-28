@@ -189,7 +189,26 @@ left_alignment = Alignment("left", wrapText=True)
 
 attachment_overview_json = deserialize_json(attachment_overview_file_name)
 
+_convert_color = RGBA.to_rgb_hex if __name__ == "__main__" else RGBA.to_css
+def convert_color(func : typing.Callable[..., RGBA]):
+    return lambda *args: _convert_color(func(*args))
+
+def illustration_method(func):
+    def format_value(val):
+        if pd.isna(val):
+            return ""
+        elif isinstance(val, float):
+            return f"{val:.2f}".rstrip('0').rstrip('.')
+        return val
+    
+    @functools.wraps(func)
+    def wrapper(self : "Weapons", stat : "Stat", *args, **kwargs):
+        return self.apply_background_color(stat, func(self, stat, *args, **kwargs)).format(format_value)
+    
+    return wrapper
+
 class Weapons:
+
     def __init__(self):
         attachment_categories = deserialize_json(attachment_overview_file_name)
         Weapon.extended_barrel_damage_multiplier = 1.0 + attachment_categories["Barrels"]["Extended barrel"]["damage bonus"]
@@ -250,18 +269,16 @@ class Weapons:
             return [callback(w, pi, i, v) for i, v in x.items()]
         
         return df.apply(cb, axis=1)
-    def apply_style(self, df : pd.DataFrame, callback : typing.Callable[["Weapon", typing.Any, int, typing.Any], str]) -> pd.io.formats.style.Styler:
-        return self.apply(df.style, callback)
+    def apply_style(self,
+                    df : pd.DataFrame,
+                    **callbacks : typing.Callable[["Weapon", typing.Any, int, typing.Any], str]
+                    ) -> pd.io.formats.style.Styler:
+        cbs = [(name.replace("_", "-"), cb) for name, cb in callbacks.items()]
+        def cb(*args):
+            return "".join(f"{s}:{cb(*args)};" for s, cb in cbs)
+        return self.apply(df.style, cb) 
     def apply_background_color(self, stat : "Stat", callback : typing.Callable[["Weapon", typing.Any, int, typing.Any], RGBA]):
-        convert_color = RGBA.to_rgb_hex if __name__ == "__main__" else RGBA.to_css
-        def format_value(val):
-            if pd.isna(val):
-                return ""
-            elif isinstance(val, float):
-                return f"{val:.2f}".rstrip('0').rstrip('.')
-            return val
-
-        return self.apply_style(stat.data, lambda *args: f"background-color: {convert_color(callback(*args))}").format(format_value)
+        return self.apply_style(stat.data, background_color=convert_color(callback))
             
     # stats helper
     def is_in_damage_drop_off(self, w : "Weapon", index : int):
@@ -289,57 +306,42 @@ class Weapons:
         return replace(stat, target=target, source=source)
         
 
-    # illustrations helper
-    def vectorize_and_interleave(self, func : typing.Callable[[typing.Any], pd.DataFrame], params : tuple):
-        sources : list[pd.DataFrame] = []
-        targets : list[pd.DataFrame] = []
-        for p in params:
-            x = func(p)
-            target, source = (x, x) if isinstance(x, pd.DataFrame) else x
-            sources.append(source)
-            targets.append(target)
-        if len(params) == 1:
-            target = targets[0]
-        else:
-            dfs = [pd.DataFrame(np.nan, index=targets[0].index, columns=targets[0].columns)] + targets
-            interleaved_rows = [row for pair in zip(*(df.iterrows() for df in dfs)) for row in pair]
-            target = pd.DataFrame([row[1] for row in interleaved_rows])
-            target.index = [(i if i%(len(params)+1)!=0 else s) for i, s in enumerate(target.index)]
-        return target, tuple(sources), params
-
-    def nest(self, func : typing.Callable[[typing.Any], pd.DataFrame], params : tuple, pname : str):
+    def nest(self, func : typing.Callable[[typing.Any], pd.DataFrame], params : tuple = (None,), pname : str = ""):
         names = tuple(range(len(params)))
         res = pd.concat([func(p) for p in params], keys=params, names=[pname])
         res.index = pd.MultiIndex.from_product([self.weapons, names], names=["weapons", pname])
-        index = pd.MultiIndex.from_product([self.weapons, ("",) + names], names=["weapons", pname])
-        return res.reindex(index), params
-
-    """
-        return Stat(
-            "",
-            "",
-            "",
-            *self.nest(lambda p: , tdok_hp_levels, hp),
-            tdok_levels_descriptions_short,
-            tdok_levels_descriptions
-            )
-    """
+        if len(params) != 1:
+            res = res.reindex(pd.MultiIndex.from_product([self.weapons, ("",) + names], names=["weapons", pname]))
+        return res, params
 
     # primary stats
     @functools.cache
     def damage_per_bullet(self):
-        return Stat("damage per bullet", "damage per bullet", "damage-per-bullet", self._damages)
+        return Stat(
+            "damage per bullet",
+            "damage per bullet",
+            "damage-per-bullet",
+            *self.nest(lambda x: self._damages),
+            )
     @functools.cache
     def damage_per_shot(self):
         pellets = {name : w.pellets for name, w in self.weapons.items()}
-        res = self._damages.mul(pellets, axis=0)
-        return Stat("damage per shot", "damage per shot", "damage-per-shot", res)
+        return Stat(
+            "damage per shot",
+            "damage per shot",
+            "damage-per-shot",
+            *self.nest(lambda x: self._damages.mul(pellets, axis=0)),
+            )
     @functools.cache
     def dps(self):
         """damage per second"""
         bullets_per_second = {name : w.pellets * w.rps for name, w in self.weapons.items()}
-        res = self._damages.mul(bullets_per_second, axis=0)
-        return Stat("dps", "damage per second", "damage-per-second---dps", res)
+        return Stat(
+            "dps",
+            "damage per second",
+            "damage-per-second---dps",
+            *self.nest(lambda x: self._damages.mul(bullets_per_second, axis=0)),
+            )
     
     @functools.cache
     def btdok(self):
@@ -358,11 +360,10 @@ class Weapons:
             "stdok",
             "shots to down or kill",
             "shots-to-down-or-kill---stdok",
-            *self.nest(lambda hp: np.ceil((hp / self._damages).div(pellets, axis=0)), tdok_hp_levels, "hp"),
+            *self.nest(lambda hp: np.ceil((hp / self._damages).div(pellets, axis=0, level="weapons")), tdok_hp_levels, "hp"),
             tdok_levels_descriptions_short,
             tdok_levels_descriptions
             )
-        return np.ceil((hp / self._damages).div(pellets, axis=0))
     @functools.cache
     def ttdok(self):
         pellets = {name : w.pellets for name, w in self.weapons.items()}
@@ -376,121 +377,128 @@ class Weapons:
             tdok_levels_descriptions
             )
     
-    @functools.cached_property
-    def theoretical_btdok(self, hp : int):
-        """"""
-        return hp / self._damages
-    @functools.cached_property
-    def theoretical_stdok(self, hp : int):
-        """"""
+    @functools.cache
+    def theoretical_btdok(self):
+        return Stat(
+            "theoretical btdok",
+            "",
+            "bullets-to-down-or-kill---btdok",
+            *self.nest(lambda hp: hp / self._damages, tdok_hp_levels, "hp"),
+            tdok_levels_descriptions_short,
+            tdok_levels_descriptions
+            )
+    @functools.cache
+    def theoretical_stdok(self):
         pellets = {name : w.pellets for name, w in self.weapons.items()}
-        return (hp / self._damages).div(pellets, axis=0)
-    @functools.cached_property
-    def theoretical_ttdok(self, hp : int):
-        """"""
+        return Stat(
+            "theoretical stdok",
+            "",
+            "shots-to-down-or-kill---stdok",
+            *self.nest(lambda hp: (hp / self._damages).div(pellets, axis=0), tdok_hp_levels, "hp"),
+            tdok_levels_descriptions_short,
+            tdok_levels_descriptions
+            )
+    @functools.cache
+    def theoretical_ttdok(self):
         pellets_rpms = {name : w.pellets * w.rpms for name, w in self.weapons.items()}
-        return (hp / self._damages).div(pellets_rpms, axis=0)
+        return Stat(
+            "theoretical ttdok",
+            "",
+            "time-to-down-or-kill---ttdok",
+            *self.nest(lambda hp: (hp / self._damages).div(pellets_rpms, axis=0), tdok_hp_levels, "hp"),
+            tdok_levels_descriptions_short,
+            tdok_levels_descriptions
+            )
 
-    @functools.cached_property
-    def btk(self, hp : int):
-        """bullets to kill"""
-        return self.btdok(hp + 20)
-    @functools.cached_property
-    def stk(self, hp : int):
-        """shots to kill"""
-        return self.stdok(hp + 20)
-    @functools.cached_property
-    def ttk(self, hp : int):
-        """time to kill"""
-        return self.ttdok(hp + 20)
+    @functools.cache
+    def btk(self):
+        return Stat(
+            "btk",
+            "bullets or kill",
+            "bullets-to-down-or-kill---btdok",
+            *self.nest(lambda hp: np.ceil((hp + 20) / self._damages), tdok_hp_levels, "hp"),
+            tdok_levels_descriptions_short,
+            tdok_levels_descriptions
+            )
+    @functools.cache
+    def stk(self):
+        pellets = {name : w.pellets for name, w in self.weapons.items()}
+        return Stat(
+            "stk",
+            "shots or kill",
+            "shots-to-down-or-kill---stdok",
+            *self.nest(lambda hp: np.ceil(((hp + 20) / self._damages).div(pellets, axis=0)), tdok_hp_levels, "hp"),
+            tdok_levels_descriptions_short,
+            tdok_levels_descriptions
+            )
+    @functools.cache
+    def ttk(self):
+        pellets = {name : w.pellets for name, w in self.weapons.items()}
+        rpms = {name : w.rpms for name, w in self.weapons.items()}
+        return Stat(
+            "ttk",
+            "time or kill",
+            "time-to-down-or-kill---ttdok",
+            *self.nest(lambda hp: (np.ceil(((hp + 20) / self._damages).div(pellets, axis=0)) - 1).div(rpms, axis=0).round(), tdok_hp_levels, "hp"),
+            tdok_levels_descriptions_short,
+            tdok_levels_descriptions
+            )
     
     # illustrations helper
-    @functools.cache
-    def vectorize_and_interleave1(self, func : typing.Callable[["Weapons", typing.Any], pd.DataFrame], params : tuple, filter : tuple[str] = None):
-        sources : list[pd.DataFrame] = []
-        targets : list[pd.DataFrame] = []
-        if filter is not None: filter = list(filter)
-        for p, d, sd in params:
-            x = func(self, p)
-            target, source = (x, x) if isinstance(x, pd.DataFrame) else x
-            sources.append(source)
-            if filter is None:
-                targets.append(target)
-            else:
-                targets.append(target.loc[filter])
-        params_len = len(params)
-        if params_len == 1:
-            target = targets[0]
-        else:
-            dfs = [pd.DataFrame(np.nan, index=targets[0].index, columns=targets[0].columns)] + targets
-            interleaved_rows = [row for pair in zip(*(df.iterrows() for df in dfs)) for row in pair]
-            target = pd.DataFrame([row[1] for row in interleaved_rows])
-            target.index = [(i if i%(params_len+1)!=0 else s) for i, s in enumerate(target.index)]
-        target.rename_axis
-        return target, sources
 
     # illustrations
+    @illustration_method
     def damage_drop_off_coloring(self, stat : "Stat"):
         """the colored areas represent steady damage, the colorless areas represent decreasing damage"""
-        return self.apply_background_color(
-            stat,
-            lambda w, pi, i, v: w.color if self.is_in_damage_drop_off(w, i) else w.empty_color,
-            )
+        return lambda w, pi, d, v: w.color if self.is_in_damage_drop_off(w, d) else w.empty_color
     
-    def stat_to_base_stat_gradient_coloring(self, stat : "Stat"):
+    @illustration_method
+    def relative_to_weapon_base_gradient_coloring(self, stat : "Stat"):
         """the color gradient illustrates the {stat} compared to the weapon's base {stat} (i.e. at 0 m)"""
         raise NotImplementedError
-        return self.apply_background_color(
-            stat,
-            lambda w, pi, i, v: w.color.with_alpha(safe_division(v, stat.data.loc[(w.name, pi), 0]))
-            )
-    def stat_to_stat_max_gradient_coloring(self, stat : "Stat"):
+        return lambda w, pi, d, v: w.color.with_alpha(safe_division(v, stat.data.loc[(w.name, pi), 0]))   
+    @illustration_method
+    def relative_to_weapon_max_gradient_coloring(self, stat : "Stat"):
         """the color gradient illustrates the {stat} compared to the weapon's maximum {stat}"""
-        return self.apply_background_color(
-            stat,
-            lambda w, pi, i, v: w.color.with_alpha(safe_division(v, stat.data.loc[(w.name, pi)].max()))
-            )
+        max = stat.data.max(axis=1)
+        return lambda w, pi, d, v: w.color.with_alpha(safe_division(v, max.loc[(w.name, pi)]))
 
-    def stat_to_class_stat_gradient_coloring(self, stat : "Stat"):
-        """the color gradient illustrates the {stat} compared to the weapon class' maximum {stat} at the same distance"""
-        target, dfs = data
-        class_max = [{class_ : group_df.max(axis=0) for class_, group_df in df.groupby(lambda name: self.weapons[name].class_)} for pi, df in enumerate(dfs)]
-        return self.apply_background_color(
-            stat,
-            lambda w, pi, i, v: w.color.with_alpha(safe_division(dfs[pi].loc[w.name][i], class_max[pi][w.class_][i]))
-            )
+    @illustration_method
+    def relative_to_same_distance_class_max_gradient_coloring(self, stat : "Stat"):
+        """the color gradient illustrates the {stat} compared to the weapon's class' maximum {stat} at the same distance"""
+        pred = lambda wname, pi: (self.weapons[wname].class_, pi)
+        class_max = stat.data.groupby(lambda x: pred(*x), as_index=True).max()
 
-    def stat_to_class_base_stat_gradient_coloring(self, stat : "Stat"):
+        return lambda w, pi, d, v: w.color.with_alpha(safe_division(v, class_max[d][(w.class_, pi)]))
+
+    @illustration_method
+    def relative_to_class_base_gradient_coloring(self, stat : "Stat"):
         """the color gradient illustrates the {stat} compared to the weapon's class' maximum base {stat} (i.e. at 0 m)"""
-        raise NotImplementedError
-        target, dfs = data
-        class_base_max = [{class_ : group_df.iloc[:, 0].max() for class_, group_df in df.groupby(lambda name: self.weapons[name].class_)} for pi, df in enumerate(dfs)]
-        return self.apply_background_color(
-            stat,
-            lambda w, pi, i, v: w.color.with_alpha(safe_division(dfs[pi].loc[w.name][i], class_base_max[pi][w.class_]))
-            )
-    def stat_to_class_stat_max_gradient_coloring(self, stat : "Stat"):
-        """the color gradient illustrates the {stat} compared to the weapon's class' maximum {stat}"""
-        target, dfs = data
-        class_max = [{class_ : group_df.to_numpy().max() for class_, group_df in df.groupby(lambda name: self.weapons[name].class_)} for pi, df in enumerate(dfs)]
-        return self.apply_background_color(
-            stat,
-            lambda w, pi, i, v: w.color.with_alpha(safe_division(dfs[pi].loc[w.name][i], class_max[pi][w.class_]))
-            )
+        #raise NotImplementedError
+        #class_base_max = [{class_ : group_df.iloc[:, 0].max() for class_, group_df in df.groupby(lambda name: self.weapons[name].class_)} for pi, df in enumerate(dfs)]
+        #return lambda w, pi, d, v: w.color.with_alpha(safe_division(dfs[pi].loc[w.name][i], class_base_max[pi][w.class_]))
     
+        pred = lambda wname, pi: (self.weapons[wname].class_, pi)
+        class_base = stat.data[0].groupby(lambda x: pred(*x), as_index=True).max()
+        return lambda w, pi, d, v: w.color.with_alpha(safe_division(v, class_base[(w.class_, pi)]))
+    @illustration_method
+    def relative_to_class_max_gradient_coloring(self, stat : "Stat"):
+        """the color gradient illustrates the {stat} compared to the weapon's class' maximum {stat}"""
+        pred = lambda wname, pi: (self.weapons[wname].class_, pi)
+        class_max = stat.data.max(axis=1).groupby(lambda x: pred(*x), as_index=True).max()
+        return lambda w, pi, d, v: w.color.with_alpha(safe_division(v, class_max[(w.class_, pi)]))
+
+    @illustration_method
     def extended_barrel_effect_coloring(self, stat : "Stat"):
         """the colored areas show where the extended barrel attachment actually affects the {stat}"""
-
-        def pred(w, pi, i, v):
-            if ((w.is_extended_barrel and dfs[pi].loc[w.name][i] != dfs[pi].loc[w.base_name][i])
-                    or (w.extended_barrel_weapon and dfs[pi].loc[w.name][i] != dfs[pi].loc[w.extended_barrel_weapon.name][i])):
+        def pred (w, pi, d, v):
+            if ((w.is_extended_barrel and v != stat.data.loc[(w.base_name, pi), d])
+                    or (w.extended_barrel_weapon and v != stat.data.loc[(w.extended_barrel_weapon.name, pi), d])):
                 return w.color
             return w.empty_color
+        return pred
         
-        return self.apply_background_color(
-            stat,
-            pred
-            )
+
 
 
 @dataclasses_json.dataclass_json
@@ -724,31 +732,6 @@ class Stat:
             return self.short_name + " - " + self.name
         return self.name
 
-@dataclass
-class Stat2:
-    _link : str
-    stat_method : typing.Callable[[Weapons, typing.Any], pd.DataFrame]
-    is_tdok : bool
-
-    def __post_init__(self):
-        self.link = f"https://github.com/hanslhansl/Rainbow-Six-Siege-Weapon-Statistics/#{self._link}"
-
-        self.short_name = self.stat_method.__name__.replace("_", " ")
-        self.name = self.short_name if self.stat_method.__doc__ is None else self.stat_method.__doc__
-
-        if self.is_tdok:
-            self.additional_parameter_name = "hp"
-            self.additional_parameters = tuple(zip(tdok_hp_levels, tdok_levels_descriptions, tdok_levels_descriptions_short))
-        else:
-            self.additional_parameter_name = ""
-            self.additional_parameters = (None, "", ""),
-
-    @property
-    def display_name(self):
-        if self.short_name != self.name:
-            return self.short_name + " - " + self.name
-        return self.name
-
 
 stats = (
     Weapons.damage_per_bullet,
@@ -758,31 +741,25 @@ stats = (
     Weapons.btdok,
     Weapons.stdok,
     Weapons.ttdok,
+    
+    Weapons.theoretical_btdok,
+    Weapons.theoretical_stdok,
+    Weapons.theoretical_ttdok,
+    
+    Weapons.btk,
+    Weapons.stk,
+    Weapons.ttk,
 )
-"""Stat("damage-per-bullet", Weapons.damage_per_bullet, False),
-    Stat("damage-per-shot", Weapons.damage_per_shot, False),
-    Stat("damage-per-second---dps", Weapons.dps, False),
-
-    Stat("bullets-to-down-or-kill---btdok", Weapons.btdok, True),
-    Stat("shots-to-down-or-kill---stdok", Weapons.stdok, True),
-    Stat("time-to-down-or-kill---ttdok", Weapons.ttdok, True),
-
-    Stat("bullets-to-down-or-kill---btdok", Weapons.btk, True),
-    Stat("shots-to-down-or-kill---stdok", Weapons.stk, True),
-    Stat("time-to-down-or-kill---ttdok", Weapons.ttk, True),
-
-    Stat("bullets-to-down-or-kill---btdok", Weapons.theoretical_btdok, True),
-    Stat("shots-to-down-or-kill---stdok", Weapons.theoretical_stdok, True),
-    Stat("time-to-down-or-kill---ttdok", Weapons.theoretical_ttdok, True),"""
 stat_illustrations = (
     Weapons.damage_drop_off_coloring,
-    Weapons.stat_to_base_stat_gradient_coloring,
-    Weapons.stat_to_stat_max_gradient_coloring,
-    Weapons.stat_to_class_stat_gradient_coloring,
-    Weapons.stat_to_class_base_stat_gradient_coloring,
-    Weapons.stat_to_class_stat_max_gradient_coloring,
+    Weapons.relative_to_weapon_base_gradient_coloring,
+    Weapons.relative_to_weapon_max_gradient_coloring,
+    Weapons.relative_to_same_distance_class_max_gradient_coloring,
+    Weapons.relative_to_class_base_gradient_coloring,
+    Weapons.relative_to_class_max_gradient_coloring,
     Weapons.extended_barrel_effect_coloring,
     )
+
 
 def add_worksheet_header(worksheet : typing.Any, stat : Stat | str, description : str, row : int, col : int, cols_inbetween : int):
     
@@ -1003,12 +980,13 @@ def modify_stats_worksheet(worksheet : typing.Any, ws : Weapons, stat : Stat, il
     c = worksheet.cell(row=row, column=col)
     c.value = "weapon"
     worksheet.column_dimensions[get_column_letter(col)].width = 22
+    col += 1
 
-    if not is_1d_stat:
-        worksheet.delete_cols(col+1)
+    # delete pandas multiindex column
+    worksheet.delete_cols(col)
 
     # distance cells
-    secondary_stats_col = col + 1
+    secondary_stats_col = col
     for d in Weapon.distances:
         c = worksheet.cell(row=row, column=secondary_stats_col)
         c.value = d
@@ -1019,11 +997,11 @@ def modify_stats_worksheet(worksheet : typing.Any, ws : Weapons, stat : Stat, il
     add_secondary_weapon_stats_header(worksheet, row, secondary_stats_col)
     row += 1
 
-    worksheet.freeze_panes = worksheet.cell(row=row, column=col+1)
+    worksheet.freeze_panes = worksheet.cell(row=row, column=col)
     row += 2
 
-    row = add_worksheet_header(worksheet, stat, illustration.__doc__.format(stat=stat.short_name), row, col+1, len(Weapon.distances))
-    row += 1
+    row = add_worksheet_header(worksheet, stat, illustration.__doc__.format(stat=stat.short_name), row, col, len(Weapon.distances))
+    row += 2
 
     for weapon in ws.weapons.values():
 
@@ -1052,7 +1030,7 @@ def modify_stats_worksheet(worksheet : typing.Any, ws : Weapons, stat : Stat, il
 
             # stat cells
             for i in range(len(Weapon.distances)):
-                c = worksheet.cell(row=row, column=col+i+1)
+                c = worksheet.cell(row=row, column=col+i)
                 c.alignment = center_alignment
                 c.border = weapon.ex_border
 
@@ -1064,9 +1042,8 @@ def modify_stats_worksheet(worksheet : typing.Any, ws : Weapons, stat : Stat, il
 def save_to_xlsx_file(ws : Weapons):
     """ https://openpyxl.readthedocs.io/en/stable/ """
 
-    stat_indices = (0, 1, 2, 4, 5)
-    illustration_indices = (0, 2, 3, 6, 5)
-    illustration_indices = (0, 2, 0, 0, 0)
+    stat_indices = (0, 1, 2, 4, 5, 8)
+    illustration_indices = (0, 2, 3, 6, 5, 0)
 
     excel_buffer = io.BytesIO()
     with pd.ExcelWriter(excel_buffer) as writer:
@@ -1077,7 +1054,7 @@ def save_to_xlsx_file(ws : Weapons):
             illustration = stat_illustrations[i_illustration]
 
             styler = illustration(ws, stat)
-            styler.to_excel(writer, sheet_name=stat.short_name, header=False, startrow=8)
+            styler.to_excel(writer, sheet_name=stat.short_name, header=False, startrow=9)
 
     workbook = openpyxl.load_workbook(excel_buffer)
 
