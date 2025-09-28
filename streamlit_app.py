@@ -54,11 +54,11 @@ st.markdown(
     """
     <style>
     /* Hide all cells in second column by default in tbody */
-    tbody td:nth-child(2) {
+    tbody th:nth-child(1) {
         visibility: hidden;
     }
     /* Keep every third row visible: 1st, 4th, 7th, ... */
-    tbody tr:nth-child(3n - 2) td:nth-child(2) {
+    tbody tr:nth-child(3n - 2) th:nth-child(2) {
         visibility: visible;
     }
     </style>
