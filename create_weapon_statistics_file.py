@@ -42,7 +42,7 @@ weapon_colors = {"AR":"#5083EA",
 #imports
 import os, json, typing, copy, sys, itertools, colorama, sys, colorsys, pandas as pd, pandas.io.formats.style, numpy as np, io
 import openpyxl, dataclasses_json, warnings, googleapiclient.http, openpyxl.workbook.workbook, googleapiclient.discovery, functools
-import google.oauth2.service_account, marshmallow.exceptions
+import google.oauth2.service_account, marshmallow.exceptions, time
 from openpyxl.cell.text import InlineFont
 from openpyxl.cell.rich_text import TextBlock, CellRichText
 from openpyxl.styles import PatternFill, Border, Alignment, NamedStyle, Side, Font
@@ -185,7 +185,7 @@ def illustration_method(func):
     
     @functools.wraps(func)
     def wrapper(self : "Weapons", stat : "Stat", *args, **kwargs):
-        return self.apply_background_color(stat.target, func(self, stat, *args, **kwargs)).format(format_value)
+        return self.apply_background_color(stat.data, func(self, stat, *args, **kwargs)).format(format_value)
     
     return wrapper
 
@@ -269,7 +269,7 @@ class Weapons:
     def extended_barrel_difference(self, stat : "Stat"):
         """this has to loop over all params, maybe change vectorize_and_interleave to differentiate between 1 param and >1 params"""
 
-        has_or_is_eb = self.filter(stat.source, lambda w: w.is_extended_barrel or w.extended_barrel_weapon != None)
+        has_or_is_eb = self.filter(stat.data, lambda w: w.is_extended_barrel or w.extended_barrel_weapon != None)
         prim = self.filter(has_or_is_eb, lambda w: w.extended_barrel_weapon != None)
         sec = self.filter(has_or_is_eb, lambda w: w.is_extended_barrel)
 
@@ -298,8 +298,8 @@ class Weapons:
             return target, source
         #target, source, _ = self.vectorize_and_interleave(impl, stat.additional_parameters)
 
-        res = replace(stat, target=target)
-        res.source = source
+        res = replace(stat, data=target)
+        res.style_data = source
         return res
         
     def nest(self, func : typing.Callable[[typing.Any], pd.DataFrame], params : tuple = (None,), pname : str = ""):
@@ -340,7 +340,7 @@ class Weapons:
             "damage per second",
             "damage-per-second---dps",
             True,
-            *self.nest(lambda x: self._damages.mul(bullets_per_second, axis=0)),
+            *self.nest(lambda x: self._damages.mul(bullets_per_second, axis=0).round()),
             )
     
     @functools.cache
@@ -464,29 +464,29 @@ class Weapons:
     @illustration_method
     def relative_to_weapon_gradient_coloring(self, stat : "Stat"):
         """the color gradient illustrates the {stat} compared to the weapon's minimum/maximum {stat}"""
-        max = stat.source.max(axis=1)
-        min = stat.source.min(axis=1)
+        max = stat.style_data.max(axis=1)
+        min = stat.style_data.min(axis=1)
         return lambda w, pi, d, v: w.color.with_alpha(normalize(v, min.loc[(w.name, pi)], max.loc[(w.name, pi)], stat.higher_is_better))
     @illustration_method
     def relative_to_same_distance_class_gradient_coloring(self, stat : "Stat"):
         """the color gradient illustrates the {stat} compared to the weapon's class' minimum/maximum {stat} at the same distance"""
         pred = lambda wname, pi: (self.weapons[wname].class_, pi)
-        class_max = stat.source.groupby(lambda x: pred(*x), as_index=True).max()
-        class_min = stat.source.groupby(lambda x: pred(*x), as_index=True).min()
+        class_max = stat.style_data.groupby(lambda x: pred(*x), as_index=True).max()
+        class_min = stat.style_data.groupby(lambda x: pred(*x), as_index=True).min()
         return lambda w, pi, d, v: w.color.with_alpha(normalize(v, class_min[d][(w.class_, pi)], class_max[d][(w.class_, pi)], stat.higher_is_better))
     @illustration_method
     def relative_to_class_gradient_coloring(self, stat : "Stat"):
         """the color gradient illustrates the {stat} compared to the weapon's class' minimum/maximum {stat}"""
         pred = lambda wname, pi: (self.weapons[wname].class_, pi)
-        class_max = stat.source.max(axis=1).groupby(lambda x: pred(*x), as_index=True).max()
-        class_min = stat.source.min(axis=1).groupby(lambda x: pred(*x), as_index=True).min()
+        class_max = stat.style_data.max(axis=1).groupby(lambda x: pred(*x), as_index=True).max()
+        class_min = stat.style_data.min(axis=1).groupby(lambda x: pred(*x), as_index=True).min()
         return lambda w, pi, d, v: w.color.with_alpha(normalize(v, class_min[(w.class_, pi)], class_max[(w.class_, pi)], stat.higher_is_better))
     @illustration_method
     def extended_barrel_effect_coloring(self, stat : "Stat"):
         """the colored areas show where the extended barrel attachment actually affects the {stat}"""
         def pred (w, pi, d, v):
-            if ((w.is_extended_barrel and v != stat.source.loc[(w.base_name, pi), d])
-                    or (w.extended_barrel_weapon and v != stat.source.loc[(w.extended_barrel_weapon.name, pi), d])):
+            if ((w.is_extended_barrel and v != stat.style_data.loc[(w.base_name, pi), d])
+                    or (w.extended_barrel_weapon and v != stat.style_data.loc[(w.extended_barrel_weapon.name, pi), d])):
                 return w.color
             return w.empty_color
         return pred
@@ -704,21 +704,19 @@ class Stat:
     name : str
     link : str
     higher_is_better : bool
-    target : pd.DataFrame
     "True: higher values are better, False: lower values are better"
+    data : pd.DataFrame
     additional_parameters : tuple[typing.Any,...] = None,
     additional_parameters_short_description : tuple[str,...] = "",
     additional_parameters_description : tuple[str,...] = "",
 
     def __post_init__(self):
         self.link = f"https://github.com/hanslhansl/Rainbow-Six-Siege-Weapon-Statistics/#{self.link}"
-        self.source =self.target
+        self.style_data = self.data #data is styled based on style_data, usually they are the same datafram though
 
-    @property
-    def display_name(self):
+        self.display_name = self.short_name
         if self.short_name != self.name:
-            return self.short_name + " - " + self.name
-        return self.name
+            self.display_name += " - " + self.name
 
 
 stats = (
@@ -899,7 +897,7 @@ def add_extended_barrel_overview(worksheet : typing.Any, ws : Weapons, row : int
         row = original_row
         original_col = col
 
-        data = ws.extended_barrel_difference(stat).target
+        data = ws.extended_barrel_difference(stat).data
         for (wname, pi), wdata in data.iterrows():
             if pi in ("", None):
                 continue
@@ -1031,6 +1029,7 @@ def modify_stats_worksheet(worksheet : typing.Any, ws : Weapons, stat : Stat, il
 
     return
 
+start = time.time()
 
 def save_to_xlsx_file(ws : Weapons):
     """ https://openpyxl.readthedocs.io/en/stable/ """
@@ -1038,16 +1037,34 @@ def save_to_xlsx_file(ws : Weapons):
     stat_indices = (0, 1, 2, 4, 5)
     illustration_indices = (0, 1, 2, 4, 3)
 
+    global start
+    end = time.time()  # end time
+    print(f"get data: {end - start:.4f} seconds")
+    start = time.time()
+
     excel_buffer = io.BytesIO()
     with pd.ExcelWriter(excel_buffer) as writer:
         print("pandas to excel engine:", writer.engine)
 
+        end = time.time()  # end time
+        print(f"enter context manager: {end - start:.4f} seconds")
+        start = time.time()
+
         for i_stat, i_illustration in zip(stat_indices, illustration_indices):
             stat = stats[i_stat](ws)
-            illustration = stat_illustrations[i_illustration]
+            end = time.time()  # end time
+            print(f"pandas data {stat.name}: {end - start:.4f} seconds")
+            start = time.time()
 
-            styler = illustration(ws, stat)
-            styler.to_excel(writer, sheet_name=stat.short_name, header=False, startrow=8)
+            stat_illustrations[i_illustration](ws, stat).to_excel(writer, sheet_name=stat.short_name, header=False, startrow=8)
+
+            end = time.time()  # end time
+            print(f"pandas style {stat.name}: {end - start:.4f} seconds")
+            start = time.time()
+
+    end = time.time()  # end time
+    print(f"pandas write: {end - start:.4f} seconds")
+    start = time.time()
 
     workbook = openpyxl.load_workbook(excel_buffer)
 
@@ -1058,10 +1075,22 @@ def save_to_xlsx_file(ws : Weapons):
 
         modify_stats_worksheet(worksheet, ws, stat, illustration)
 
+    end = time.time()  # end time
+    print(f"openpyxl: {end - start:.4f} seconds")
+    start = time.time()
+
     add_attachment_overview(workbook, ws)
+
+    end = time.time()  # end time
+    print(f"openpyxl attach: {end - start:.4f} seconds")
+    start = time.time()
 
     # save to file
     workbook.save(xlsx_output_file_name)
+
+    end = time.time()  # end time
+    print(f"openpyxl write: {end - start:.4f} seconds")
+    start = time.time()
     
     return xlsx_output_file_name
 
@@ -1072,19 +1101,19 @@ if __name__ == "__main__":
 
     # verify
     # group weapons by class and by base damage
-    """weapons_sorted = sorted((w for w in ws.weapons.values() if not w.is_extended_barrel), key=lambda w: (w.class_, ws.damage_per_bullet().data[0][w.name]))
-    grouped = [list(group) for key, group in itertools.groupby(weapons_sorted, key=lambda w: (w.class_, ws.damage_per_bullet().data[0][w.name]))]
+    weapons_sorted = sorted((w for w in ws.base_weapons.values()), key=lambda w: (w.class_, ws._damages[0][w.name]))
+    grouped = [list(group) for key, group in itertools.groupby(weapons_sorted, key=lambda w: (w.class_, ws._damages[0][w.name]))]
     # find all weapons with the same base damage but different damage drop-off
     failed = False
     for group in grouped:
         if len(group) > 1:
             for i, distance in enumerate(Weapon.distances):
-                if len(set(ws.damage_per_bullet().data[i][weapon.name] for weapon in group)) > 1:
-                    print(f"{warning()}: These {group[0].class_}s have the {warning('same base damage')} ({ws.damage_per_bullet().data[0][group[0].name]}) but {warning('different damages')} at {distance}m:")
+                if len(set(ws._damages[i][weapon.name] for weapon in group)) > 1:
+                    print(f"{warning()}: These {group[0].class_}s have the {warning('same base damage')} ({ws._damages[0][group[0].name]}) but {warning('different damages')} at {distance}m:")
                     for weapon in group:
-                        print(f"{weapon.name}: {ws.damage_per_bullet().data[i][weapon.name]}")
+                        print(f"{weapon.name}: {ws._damages[i][weapon.name]}")
                     failed = True
-    if failed: raise Exception(f"{error()}: See above warnings.")"""
+    if failed: raise Exception(f"{error()}: See above warnings.")
 
 
     # save to excel file
