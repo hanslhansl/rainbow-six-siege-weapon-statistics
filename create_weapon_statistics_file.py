@@ -71,13 +71,13 @@ tdok_hp_levels = (100, 110, 125, 120, 130, 145)
 tdok_with_rook = (False, False, False, True, True, True)
 tdok_levels_descriptions = tuple(f"{int(i%3)+1} armor {'+ rook ' if with_rook else ''}({hp} hp)"
                                  for i, (hp, with_rook) in enumerate(zip(tdok_hp_levels, tdok_with_rook)))
-tdok_levels_descriptions_short = tuple(f"{int(i%3)+1}A{'+R' if with_rook else ''}({hp})"
+tdok_levels_descriptions_short = tuple(f"{int(i%3)+1}A{'+R' if with_rook else ''} ({hp})"
                                  for i, (hp, with_rook) in enumerate(zip(tdok_hp_levels, tdok_with_rook)))
 
 top_alignment = Alignment(vertical="top", wrapText=True)
 center_alignment = Alignment("center", wrapText=True)
 left_alignment = Alignment("left", wrapText=True)
-black_border = Border(*(Side(border_style="thick", color="000000") for i in range(4)))
+black_border = Border(*(Side(border_style="medium", color="000000") for i in range(4)))
 
 # check if the settings are correct
 if not os.path.isfile(operators_file_name):
