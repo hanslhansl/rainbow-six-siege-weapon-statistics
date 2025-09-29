@@ -40,9 +40,9 @@ weapon_colors = {"AR":"#5083EA",
 ###################################################
 
 #imports
-import os, json, typing, copy, sys, itertools, colorama, sys, colorsys, pandas as pd, pandas.io.formats.style, numpy as np, io, marshmallow.exceptions
+import os, json, typing, copy, sys, itertools, colorama, sys, colorsys, pandas as pd, pandas.io.formats.style, numpy as np, io
 import openpyxl, dataclasses_json, warnings, googleapiclient.http, openpyxl.workbook.workbook, googleapiclient.discovery, functools
-import google.oauth2.service_account
+import google.oauth2.service_account, marshmallow.exceptions
 from openpyxl.cell.text import InlineFont
 from openpyxl.cell.rich_text import TextBlock, CellRichText
 from openpyxl.styles import PatternFill, Border, Alignment, NamedStyle, Side, Font
