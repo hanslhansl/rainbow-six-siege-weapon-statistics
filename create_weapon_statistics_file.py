@@ -881,7 +881,7 @@ def add_extended_barrel_overview(worksheet : typing.Any, ws : Weapons, row : int
             c.alignment = center_alignment
             c.border = black_border
             c.value = sd
-            worksheet.column_dimensions[get_column_letter(col)].width = 10
+            worksheet.column_dimensions[get_column_letter(col)].width = 11
             col += 1
         col += 1
 
