@@ -71,8 +71,13 @@ tdok_hp_levels = (100, 110, 125, 120, 130, 145)
 tdok_with_rook = (False, False, False, True, True, True)
 tdok_levels_descriptions = tuple(f"{int(i%3)+1} armor {'+ rook ' if with_rook else ''}({hp} hp)"
                                  for i, (hp, with_rook) in enumerate(zip(tdok_hp_levels, tdok_with_rook)))
-tdok_levels_descriptions_short = tuple(f"{int(i%3)+1}{'r' if with_rook else ''} ({hp})"
+tdok_levels_descriptions_short = tuple(f"{int(i%3)+1}A{'+R' if with_rook else ''}({hp})"
                                  for i, (hp, with_rook) in enumerate(zip(tdok_hp_levels, tdok_with_rook)))
+
+top_alignment = Alignment(vertical="top", wrapText=True)
+center_alignment = Alignment("center", wrapText=True)
+left_alignment = Alignment("left", wrapText=True)
+black_border = Border(*(Side(border_style="thick", color="000000") for i in range(4)))
 
 # check if the settings are correct
 if not os.path.isfile(operators_file_name):
@@ -138,13 +143,6 @@ class RGBA:
         return RGBA(int(r_new*255), int(g_new*255), int(b_new*255), 1.)
 
 def normalize(value, min_val, max_val, higher_is_better : bool):
-    t = (float, int, np.int64)
-    assert isinstance(value, t), type(value)
-    assert isinstance(min_val, t), type(min_val)
-    assert isinstance(max_val, t), type(max_val)
-    assert isinstance(higher_is_better, bool), type(higher_is_better)
-    #min_val, max_val = min(a1, a2), max(a1, a2)
-    # Clamp value within range
     value = max(min_val, min(max_val, value))
     
     # Normalize to [0, 1]
@@ -173,14 +171,6 @@ def is_index_in_intervals(index : int, intervals : tuple[tuple[int, int],...]):
             return start, end
     return None
 
-
-border_style = "thin"
-top_alignment = Alignment(vertical="top", wrapText=True)
-center_alignment = Alignment("center", wrapText=True)
-left_alignment = Alignment("left", wrapText=True)
-
-attachment_overview_json = deserialize_json(attachment_overview_file_name)
-
 _convert_color = RGBA.to_rgb_hex if __name__ == "__main__" else RGBA.to_css
 def convert_color(func : typing.Callable[..., RGBA]):
     return lambda *args: _convert_color(func(*args))
@@ -195,7 +185,7 @@ def illustration_method(func):
     
     @functools.wraps(func)
     def wrapper(self : "Weapons", stat : "Stat", *args, **kwargs):
-        return self.apply_background_color(stat, func(self, stat, *args, **kwargs)).format(format_value)
+        return self.apply_background_color(stat.target, func(self, stat, *args, **kwargs)).format(format_value)
     
     return wrapper
 
@@ -249,7 +239,7 @@ class Weapons:
         return
 
     def filter(self, df : pd.DataFrame, filter_func : typing.Callable[["Weapon"], bool]) -> pd.DataFrame:
-        return df[df.apply(lambda row: filter_func(self.weapons[row.name]), axis=1)]
+        return df[df.apply(lambda row: filter_func(self.weapons[row.name[0]]), axis=1)]
     def apply(self, df : pd.DataFrame | pd.io.formats.style.Styler, callback : typing.Callable[["Weapon", typing.Any, int, typing.Any], typing.Any]) -> pd.DataFrame | pd.io.formats.style.Styler:
         def cb(x):
             if df.index.nlevels == 1:
@@ -269,8 +259,8 @@ class Weapons:
         def cb(*args):
             return "".join(f"{s}:{cb(*args)};" for s, cb in cbs)
         return self.apply(df.style, cb) 
-    def apply_background_color(self, stat : "Stat", callback : typing.Callable[["Weapon", typing.Any, int, typing.Any], RGBA]):
-        return self.apply_style(stat.data, background_color=convert_color(callback))
+    def apply_background_color(self, df : pd.DataFrame, callback : typing.Callable[["Weapon", typing.Any, int, typing.Any], RGBA]):
+        return self.apply_style(df, background_color=convert_color(callback))
             
     # stats helper
     def is_in_damage_drop_off(self, w : "Weapon", index : int):
@@ -279,7 +269,7 @@ class Weapons:
     def extended_barrel_difference(self, stat : "Stat"):
         """this has to loop over all params, maybe change vectorize_and_interleave to differentiate between 1 param and >1 params"""
 
-        has_or_is_eb = self.filter(stat.data, lambda w: w.is_extended_barrel or w.extended_barrel_weapon != None)
+        has_or_is_eb = self.filter(stat.source, lambda w: w.is_extended_barrel or w.extended_barrel_weapon != None)
         prim = self.filter(has_or_is_eb, lambda w: w.extended_barrel_weapon != None)
         sec = self.filter(has_or_is_eb, lambda w: w.is_extended_barrel)
 
@@ -287,6 +277,9 @@ class Weapons:
         has_or_is_eb.loc[prim.index] -= prim.values
         has_or_is_eb.loc[sec.index] -= prim.values
         pd.options.mode.chained_assignment = old
+
+        target = (prim - sec.values).abs()
+        source = has_or_is_eb
 
         def impl(p):
             df = stat.source[stat.additional_parameters.index(p)]
@@ -303,9 +296,11 @@ class Weapons:
             source = has_or_is_eb
 
             return target, source
-        
-        target, source, _ = self.vectorize_and_interleave(impl, stat.additional_parameters)
-        return replace(stat, target=target, source=source)
+        #target, source, _ = self.vectorize_and_interleave(impl, stat.additional_parameters)
+
+        res = replace(stat, target=target)
+        res.source = source
+        return res
         
     def nest(self, func : typing.Callable[[typing.Any], pd.DataFrame], params : tuple = (None,), pname : str = ""):
         names = list(range(len(params)))
@@ -469,29 +464,29 @@ class Weapons:
     @illustration_method
     def relative_to_weapon_gradient_coloring(self, stat : "Stat"):
         """the color gradient illustrates the {stat} compared to the weapon's minimum/maximum {stat}"""
-        max = stat.data.max(axis=1)
-        min = stat.data.min(axis=1)
+        max = stat.source.max(axis=1)
+        min = stat.source.min(axis=1)
         return lambda w, pi, d, v: w.color.with_alpha(normalize(v, min.loc[(w.name, pi)], max.loc[(w.name, pi)], stat.higher_is_better))
     @illustration_method
     def relative_to_same_distance_class_gradient_coloring(self, stat : "Stat"):
         """the color gradient illustrates the {stat} compared to the weapon's class' minimum/maximum {stat} at the same distance"""
         pred = lambda wname, pi: (self.weapons[wname].class_, pi)
-        class_max = stat.data.groupby(lambda x: pred(*x), as_index=True).max()
-        class_min = stat.data.groupby(lambda x: pred(*x), as_index=True).min()
+        class_max = stat.source.groupby(lambda x: pred(*x), as_index=True).max()
+        class_min = stat.source.groupby(lambda x: pred(*x), as_index=True).min()
         return lambda w, pi, d, v: w.color.with_alpha(normalize(v, class_min[d][(w.class_, pi)], class_max[d][(w.class_, pi)], stat.higher_is_better))
     @illustration_method
     def relative_to_class_gradient_coloring(self, stat : "Stat"):
         """the color gradient illustrates the {stat} compared to the weapon's class' minimum/maximum {stat}"""
         pred = lambda wname, pi: (self.weapons[wname].class_, pi)
-        class_max = stat.data.max(axis=1).groupby(lambda x: pred(*x), as_index=True).max()
-        class_min = stat.data.min(axis=1).groupby(lambda x: pred(*x), as_index=True).min()
+        class_max = stat.source.max(axis=1).groupby(lambda x: pred(*x), as_index=True).max()
+        class_min = stat.source.min(axis=1).groupby(lambda x: pred(*x), as_index=True).min()
         return lambda w, pi, d, v: w.color.with_alpha(normalize(v, class_min[(w.class_, pi)], class_max[(w.class_, pi)], stat.higher_is_better))
     @illustration_method
     def extended_barrel_effect_coloring(self, stat : "Stat"):
         """the colored areas show where the extended barrel attachment actually affects the {stat}"""
         def pred (w, pi, d, v):
-            if ((w.is_extended_barrel and v != stat.data.loc[(w.base_name, pi), d])
-                    or (w.extended_barrel_weapon and v != stat.data.loc[(w.extended_barrel_weapon.name, pi), d])):
+            if ((w.is_extended_barrel and v != stat.source.loc[(w.base_name, pi), d])
+                    or (w.extended_barrel_weapon and v != stat.source.loc[(w.extended_barrel_weapon.name, pi), d])):
                 return w.color
             return w.empty_color
         return pred
@@ -519,13 +514,7 @@ class Weapon(_Weapon):
     distances = list(range(first_distance, last_distance+1))
 
     # excel stuff
-    ex_borders = {class_ : Border(
-                left=  Side(border_style=border_style, color=color.to_border_color().to_rgb_hex(False)),
-                right= Side(border_style=border_style, color=color.to_border_color().to_rgb_hex(False)),
-                top=   Side(border_style=border_style, color=color.to_border_color().to_rgb_hex(False)),
-                bottom=Side(border_style=border_style, color=color.to_border_color().to_rgb_hex(False))
-                ) for class_, color in colors.items()}
-    ex_borders = {class_ : Border(*(Side(border_style=border_style, color=color.to_border_color().to_rgb_hex(False)) for i in range(4)))
+    ex_borders = {class_ : Border(*(Side(border_style="thin", color=color.to_border_color().to_rgb_hex(False)) for i in range(4)))
                   for class_, color in colors.items()}
 
     extended_barrel_damage_multiplier = 0.0
@@ -715,7 +704,7 @@ class Stat:
     name : str
     link : str
     higher_is_better : bool
-    data : pd.DataFrame
+    target : pd.DataFrame
     "True: higher values are better, False: lower values are better"
     additional_parameters : tuple[typing.Any,...] = None,
     additional_parameters_short_description : tuple[str,...] = "",
@@ -723,6 +712,7 @@ class Stat:
 
     def __post_init__(self):
         self.link = f"https://github.com/hanslhansl/Rainbow-Six-Siege-Weapon-Statistics/#{self.link}"
+        self.source =self.target
 
     @property
     def display_name(self):
@@ -758,9 +748,6 @@ stat_illustrations = (
 
 
 def add_worksheet_header(worksheet : typing.Any, stat : Stat | str, description : str, row : int, col : int, cols_inbetween : int):
-    
-    worksheet.column_dimensions[get_column_letter(1)].width = 22
-    
     def add_header_entry(row, col, end_column, value, font = None):
         worksheet.merge_cells(start_row=row, end_row=row, start_column=col, end_column=end_column)
         c = worksheet.cell(row=row, column=col)
@@ -791,11 +778,16 @@ def add_worksheet_header(worksheet : typing.Any, stat : Stat | str, description 
 
     return row
 
-def add_secondary_weapon_stats_header(worksheet : typing.Any, row : int, col : int):
+def add_secondary_weapon_stats_header(worksheet : typing.Any, row : int, col : int, cols_inbetween : int):
     
+    c = worksheet.cell(row=row, column=col)
+    c.border = black_border
+    c.value = "weapon"
+    worksheet.column_dimensions[get_column_letter(col)].width = 22
+    col += cols_inbetween
+
     empty = (None, 3)
     values_widths = (
-        empty,
         ("class", 10),
         empty,
         ("rpm", 6),
@@ -817,8 +809,9 @@ def add_secondary_weapon_stats_header(worksheet : typing.Any, row : int, col : i
     for value, width in values_widths:
         if value != None:
             c = worksheet.cell(row=row, column=col)
-            c.value = value
             c.alignment = center_alignment
+            c.border = black_border
+            c.value = value
         worksheet.column_dimensions[get_column_letter(col)].width = width
 
         col += 1
@@ -829,13 +822,26 @@ def add_secondary_weapon_stats_header(worksheet : typing.Any, row : int, col : i
 
     return
 
-def add_secondary_weapon_stats(worksheet : typing.Any, weapon : Weapon, row : int, col : int):
+def add_secondary_weapon_stats(worksheet : typing.Any, weapon : Weapon, row : int, col : int, cols_inbetween : int):
+
+    # weapon name cell
+    c = worksheet.cell(row=row, column=col)
+    c.style = "Normal"
+    c.alignment = top_alignment
+    c.border = weapon.ex_border
+    c.fill = weapon.name_color.to_ex_fill()
+    c.value = weapon.display_name
+    col += cols_inbetween
+
+    # no secondary stats if extended barrel
+    if weapon.is_extended_barrel:
+        return
+
     values = [weapon.class_, weapon.rpm, weapon.capacity, weapon.extra_ammo, weapon.pellets if weapon.pellets != 1 else None,
            weapon.ads_time, weapon.ads_time_with_laser,
            #Weapon.getReload, Weapon.getReloadTimesWithAngledGrip
           ]
     skips = [2, 1, 1, 1, 2, 1, 7]
-    col += 1
 
     for value, skip in zip(values, skips):
         c = worksheet.cell(row=row, column=col)
@@ -843,10 +849,10 @@ def add_secondary_weapon_stats(worksheet : typing.Any, weapon : Weapon, row : in
         if value != None:
             if type(value) == float:
                 value = round(value, 3)
+            c.alignment = center_alignment
+            c.border = weapon.ex_border
             c.value = value
             c.fill = weapon.color.to_ex_fill()
-            c.border = weapon.ex_border
-            c.alignment = center_alignment
             weapon.ex_border
         col += skip
 
@@ -855,70 +861,69 @@ def add_secondary_weapon_stats(worksheet : typing.Any, weapon : Weapon, row : in
 
     return
 
-def add_extended_barrel_overview(worksheet : typing.Any, ws : Weapons, row : int, col : int, with_secondary_weapon_stats : bool):
-    original_row = row
+def add_extended_barrel_overview(worksheet : typing.Any, ws : Weapons, row : int, col : int):
+    selected_stats = [stats[x](ws) for x in (4, 5)]
 
-    c = worksheet.cell(row=row, column=col)
-    c.value = "weapon"
-    worksheet.column_dimensions[get_column_letter(col)].width = 22
-
-    col += 1
-    selected_stats = [stats[x] for x in (4, 5)]
-    # loop over stats, stdok and ttdok
+    # stat name (stdok and ttdok)
+    original_col = col = col + 1
     for i, stat in enumerate(selected_stats):
-        stat = stat(ws)
-        row = original_row
-
-        # stat name
         worksheet.merge_cells(start_row=row, end_row=row, start_column=col, end_column=col+len(stat.additional_parameters)-1)
         c = worksheet.cell(row=row, column=col)
-        c.value = stat.short_name
         c.alignment = center_alignment
-        row += 1
+        c.value = stat.short_name
 
-        # loop over health ratings
-        for j, (param, sd) in enumerate(zip(stat.additional_parameters, stat.additional_parameters_short_description)):
-            row = original_row
-
-            # secondary weapon stats header
-            secondary_column_offset = len(selected_stats)*(len(stat.additional_parameters)+1) - 1
-            if i == 0 and j == 0 and with_secondary_weapon_stats:
-                add_secondary_weapon_stats_header(worksheet, row, col + secondary_column_offset)
-
-            row += 1
-
-            # health rating
+        # parameter (health rating)
+        for sd in stat.additional_parameters_short_description:
             c = worksheet.cell(row=row, column=col)
-            c.value = sd
+            c.border = black_border
+
+            c = worksheet.cell(row=row+1, column=col)
             c.alignment = center_alignment
-            worksheet.column_dimensions[get_column_letter(col)].width = 9
-
-            # loop over weapons
-            target = ws.extended_barrel_difference(stat).target
-            for name, row_data in target.iterrows():
-                w = ws.base_weapons[name]
-
-                # weapon name cell
-                if i == 0 and j == 0:
-                    c = worksheet.cell(row=row, column=col-1)
-                    c.value = name
-                    c.fill = w.name_color.to_ex_fill()
-                    c.border = w.ex_border
-
-                    # secondary weapon stats
-                    if with_secondary_weapon_stats:
-                        add_secondary_weapon_stats(worksheet, w, row, col+secondary_column_offset)
-
-                # data cell
-                c = worksheet.cell(row=row, column=col)
-                c.value = row_data[0]
-                c.fill = (w.color if row_data[0] != 0 else w.empty_color).to_ex_fill()
-                c.alignment = center_alignment
-                c.border = w.ex_border
-
-                row += 1
+            c.border = black_border
+            c.value = sd
+            worksheet.column_dimensions[get_column_letter(col)].width = 10
             col += 1
-            worksheet.column_dimensions[get_column_letter(col)].width = 3
+        col += 1
+
+    col = original_col
+    row += 1
+
+    # secondary weapon stats header
+    cols_inbetween = sum(len(s.additional_parameters) + 1 for s in selected_stats) + 1
+    add_secondary_weapon_stats_header(worksheet, row, col-1, cols_inbetween)
+    row += 1
+
+    # loop over stats, stdok and ttdok
+    original_row = row
+    for i, stat in enumerate(selected_stats):
+        row = original_row
+        original_col = col
+
+        data = ws.extended_barrel_difference(stat).target
+        for (wname, pi), wdata in data.iterrows():
+            if pi in ("", None):
+                continue
+            elif pi == 0:
+                col = original_col
+
+            w = ws.base_weapons[wname]
+                
+            # secondary weapon stats
+            if i == 0 and pi == 0:
+                add_secondary_weapon_stats(worksheet, w, row, col-1, cols_inbetween)
+
+            # data cell
+            c = worksheet.cell(row=row, column=col)
+            c.alignment = center_alignment
+            c.border = w.ex_border
+            c.fill = (w.color if wdata[0] != 0 else w.empty_color).to_ex_fill()
+            c.value = wdata[0]
+            col += 1
+
+            if pi == len(stat.additional_parameters) - 1:
+                row += 1
+
+        worksheet.column_dimensions[get_column_letter(col)].width = 3
         col += 1
 
     return row
@@ -931,7 +936,9 @@ def add_attachment_overview(workbook : typing.Any, ws : Weapons):
     attachment_categories : dict[str, typing.Any] = json_content
 
     worksheet = workbook.create_sheet("attachments")
-    row = add_worksheet_header(worksheet, "attachment overview", "a short overview over all available attachments.", 1, 19)
+    row = add_worksheet_header(worksheet, "attachment overview", "a short overview over all available attachments.", 1, 2, 19)
+
+    worksheet.column_dimensions[get_column_letter(1)].width = 22
     #worksheet.freeze_panes = worksheet.cell(row=row, column=2)
 
     for attachment_category, attachment_dict in attachment_categories.items():
@@ -962,7 +969,7 @@ def add_attachment_overview(workbook : typing.Any, ws : Weapons):
                 
             if "damage bonus" in attachment:
                 row += 1
-                row = add_extended_barrel_overview(worksheet, ws, row, 2, True)
+                row = add_extended_barrel_overview(worksheet, ws, row, 2)
                 
             row += 1
             
@@ -973,60 +980,50 @@ def modify_stats_worksheet(worksheet : typing.Any, ws : Weapons, stat : Stat, il
     col = 1
     is_1d_stat = len(stat.additional_parameters) == 1
 
-    c = worksheet.cell(row=row, column=col)
-    c.value = "weapon"
-    worksheet.column_dimensions[get_column_letter(col)].width = 22
-    col += 1
-
     # delete pandas multiindex column
-    worksheet.delete_cols(col)
+    worksheet.delete_cols(col+1)
 
+    # secondary stats header
+    add_secondary_weapon_stats_header(worksheet, row, col, len(Weapon.distances)+2)
+    
     # distance cells
-    secondary_stats_col = col
+    secondary_stats_col = col + 1
     for d in Weapon.distances:
         c = worksheet.cell(row=row, column=secondary_stats_col)
-        c.value = d
         c.alignment = center_alignment
+        c.border = black_border
+        c.value = d
         worksheet.column_dimensions[get_column_letter(secondary_stats_col)].width = 4.8
         secondary_stats_col += 1
-
-    add_secondary_weapon_stats_header(worksheet, row, secondary_stats_col)
+    worksheet.column_dimensions[get_column_letter(secondary_stats_col)].width = 3
     row += 1
 
-    worksheet.freeze_panes = worksheet.cell(row=row, column=col)
-    row += 2
+    worksheet.freeze_panes = worksheet.cell(row=row, column=col+1)
+    row += 1
 
-    row = add_worksheet_header(worksheet, stat, illustration.__doc__.format(stat=stat.short_name), row, col, len(Weapon.distances))
+    row = add_worksheet_header(worksheet, stat, illustration.__doc__.format(stat=stat.short_name), row, col+1, len(Weapon.distances))
     row += 2
 
     for weapon in ws.weapons.values():
-
-        # weapon name cell
-        if not is_1d_stat: worksheet.unmerge_cells(start_row=row, start_column=1, end_row=row+len(stat.additional_parameters), end_column=1)
-        c = worksheet.cell(row=row, column=1)
-        c.style = "Normal"
-        c.alignment = top_alignment
-        c.border = weapon.ex_border
-        c.fill = weapon.name_color.to_ex_fill()
-        c.value = weapon.display_name
+        if not is_1d_stat:
+            worksheet.unmerge_cells(start_row=row, start_column=col, end_row=row+len(stat.additional_parameters), end_column=col)
 
         # secondary weapon stats
-        if not weapon.is_extended_barrel:
-            add_secondary_weapon_stats(worksheet, weapon, row, secondary_stats_col)
+        add_secondary_weapon_stats(worksheet, weapon, row, col, secondary_stats_col)
 
         if not is_1d_stat: row += 1
         for param_desc in stat.additional_parameters_description:
             
             # parameter description cell
             if not is_1d_stat:
-                c = worksheet.cell(row=row, column=1)
+                c = worksheet.cell(row=row, column=col)
                 c.style = "Normal"
                 c.border = weapon.ex_border
                 c.value = param_desc
 
             # stat cells
             for i in range(len(Weapon.distances)):
-                c = worksheet.cell(row=row, column=col+i)
+                c = worksheet.cell(row=row, column=col+i+1)
                 c.alignment = center_alignment
                 c.border = weapon.ex_border
 
@@ -1050,7 +1047,7 @@ def save_to_xlsx_file(ws : Weapons):
             illustration = stat_illustrations[i_illustration]
 
             styler = illustration(ws, stat)
-            styler.to_excel(writer, sheet_name=stat.short_name, header=False, startrow=9)
+            styler.to_excel(writer, sheet_name=stat.short_name, header=False, startrow=8)
 
     workbook = openpyxl.load_workbook(excel_buffer)
 
@@ -1061,7 +1058,7 @@ def save_to_xlsx_file(ws : Weapons):
 
         modify_stats_worksheet(worksheet, ws, stat, illustration)
 
-    #add_attachment_overview(workbook, ws)
+    add_attachment_overview(workbook, ws)
 
     # save to file
     workbook.save(xlsx_output_file_name)
