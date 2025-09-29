@@ -33,17 +33,6 @@ weapon_colors = {"AR":"#5083EA",
                  "Revolver":"#F48020",
                  "Hand Canon":"#948A54"}
 
-weapon_colors_ = {"AR":"#1f77b4",
-                 "SMG":"#e377c2",
-                 "MP":"#1abc9c",
-                 "LMG":"#9467bd",
-                 "DMR":"#2ca02c",
-                 "SR":"#d62728",
-                 "SG":"#17becf",
-                 "Slug SG":"#8c564b",
-                 "Handgun":"#7f7f7f",
-                 "Revolver":"#ff7f0e",
-                 "Hand Canon":"#bcbd22"}
 
 ###################################################
 # settings end
@@ -105,6 +94,7 @@ def deserialize_json(file_name : str):
 
 class RGBA:
     def __init__(self, r : int, g : int, b : int, a : float):
+        assert 0 <= a <= 1
         self.r = r
         self.g = g
         self.b = b
@@ -147,7 +137,13 @@ class RGBA:
         
         return RGBA(int(r_new*255), int(g_new*255), int(b_new*255), 1.)
 
-def normalize(min_val, max_val, value):
+def normalize(value, min_val, max_val, higher_is_better : bool):
+    t = (float, int, np.int64)
+    assert isinstance(value, t), type(value)
+    assert isinstance(min_val, t), type(min_val)
+    assert isinstance(max_val, t), type(max_val)
+    assert isinstance(higher_is_better, bool), type(higher_is_better)
+    #min_val, max_val = min(a1, a2), max(a1, a2)
     # Clamp value within range
     value = max(min_val, min(max_val, value))
     
@@ -155,8 +151,8 @@ def normalize(min_val, max_val, value):
     top = value - min_val
     bottom = max_val - min_val
     if top == bottom:
-        return 1.
-    return top / bottom
+        return 1. - (not higher_is_better)
+    return abs(top / bottom - (not higher_is_better))
 def get_non_stagnant_intervals(data) -> tuple[tuple[int, int],...]:
     intervals = []
     start = None
@@ -177,10 +173,6 @@ def is_index_in_intervals(index : int, intervals : tuple[tuple[int, int],...]):
             return start, end
     return None
 
-def safe_division(a : float, b : float):
-    if a == b:
-        return 1.
-    return a / b
 
 border_style = "thin"
 top_alignment = Alignment(vertical="top", wrapText=True)
@@ -266,9 +258,9 @@ class Weapons:
                 w_name, pi = x.name
                 if pi in (None, ""): return [None] * len(x)
             w = self.weapons[w_name]
-            return [callback(w, pi, i, v) for i, v in x.items()]
+            return pd.Series(callback(w, pi, i, v) for i, v in x.items())
         
-        return df.apply(cb, axis=1)
+        return df.apply(cb, axis=1, result_type="expand")
     def apply_style(self,
                     df : pd.DataFrame,
                     **callbacks : typing.Callable[["Weapon", typing.Any, int, typing.Any], str]
@@ -286,6 +278,16 @@ class Weapons:
     
     def extended_barrel_difference(self, stat : "Stat"):
         """this has to loop over all params, maybe change vectorize_and_interleave to differentiate between 1 param and >1 params"""
+
+        has_or_is_eb = self.filter(stat.data, lambda w: w.is_extended_barrel or w.extended_barrel_weapon != None)
+        prim = self.filter(has_or_is_eb, lambda w: w.extended_barrel_weapon != None)
+        sec = self.filter(has_or_is_eb, lambda w: w.is_extended_barrel)
+
+        pd.options.mode.chained_assignment, old = None, pd.options.mode.chained_assignment
+        has_or_is_eb.loc[prim.index] -= prim.values
+        has_or_is_eb.loc[sec.index] -= prim.values
+        pd.options.mode.chained_assignment = old
+
         def impl(p):
             df = stat.source[stat.additional_parameters.index(p)]
             has_or_is_eb = self.filter(df, lambda w: w.is_extended_barrel or w.extended_barrel_weapon != None)
@@ -305,13 +307,13 @@ class Weapons:
         target, source, _ = self.vectorize_and_interleave(impl, stat.additional_parameters)
         return replace(stat, target=target, source=source)
         
-
     def nest(self, func : typing.Callable[[typing.Any], pd.DataFrame], params : tuple = (None,), pname : str = ""):
-        names = tuple(range(len(params)))
-        res = pd.concat([func(p) for p in params], keys=params, names=[pname])
-        res.index = pd.MultiIndex.from_product([self.weapons, names], names=["weapons", pname])
+        names = list(range(len(params)))
+        res = pd.concat([func(p) for p in params], keys=names, names=[pname]).swaplevel()
+        #res = res.reindex(pd.MultiIndex.from_product([self.weapons, names], names=["weapons", pname]))
         if len(params) != 1:
-            res = res.reindex(pd.MultiIndex.from_product([self.weapons, ("",) + names], names=["weapons", pname]))
+            names.insert(0, "")
+        res = res.reindex(pd.MultiIndex.from_product([self.weapons, names], names=["weapons", pname]))
         return res, params
 
     # primary stats
@@ -321,6 +323,7 @@ class Weapons:
             "damage per bullet",
             "damage per bullet",
             "damage-per-bullet",
+            True,
             *self.nest(lambda x: self._damages),
             )
     @functools.cache
@@ -330,6 +333,7 @@ class Weapons:
             "damage per shot",
             "damage per shot",
             "damage-per-shot",
+            True,
             *self.nest(lambda x: self._damages.mul(pellets, axis=0)),
             )
     @functools.cache
@@ -340,6 +344,7 @@ class Weapons:
             "dps",
             "damage per second",
             "damage-per-second---dps",
+            True,
             *self.nest(lambda x: self._damages.mul(bullets_per_second, axis=0)),
             )
     
@@ -349,6 +354,7 @@ class Weapons:
             "btdok",
             "bullets to down or kill",
             "bullets-to-down-or-kill---btdok",
+            False,
             *self.nest(lambda hp: np.ceil(hp / self._damages), tdok_hp_levels, "hp"),
             tdok_levels_descriptions_short,
             tdok_levels_descriptions
@@ -356,11 +362,13 @@ class Weapons:
     @functools.cache
     def stdok(self):
         pellets = {name : w.pellets for name, w in self.weapons.items()}
+        pellets = [w.pellets for name, w in self.weapons.items()]
         return Stat(
             "stdok",
             "shots to down or kill",
             "shots-to-down-or-kill---stdok",
-            *self.nest(lambda hp: np.ceil((hp / self._damages).div(pellets, axis=0, level="weapons")), tdok_hp_levels, "hp"),
+            False,
+            *self.nest(lambda hp: np.ceil((hp / self._damages).div(pellets, axis=0)), tdok_hp_levels, "hp"),
             tdok_levels_descriptions_short,
             tdok_levels_descriptions
             )
@@ -372,6 +380,7 @@ class Weapons:
             "ttdok",
             "time to down or kill",
             "time-to-down-or-kill---ttdok",
+            False,
             *self.nest(lambda hp: (np.ceil((hp / self._damages).div(pellets, axis=0)) - 1).div(rpms, axis=0).round(), tdok_hp_levels, "hp"),
             tdok_levels_descriptions_short,
             tdok_levels_descriptions
@@ -383,6 +392,7 @@ class Weapons:
             "theoretical btdok",
             "",
             "bullets-to-down-or-kill---btdok",
+            False,
             *self.nest(lambda hp: hp / self._damages, tdok_hp_levels, "hp"),
             tdok_levels_descriptions_short,
             tdok_levels_descriptions
@@ -394,6 +404,7 @@ class Weapons:
             "theoretical stdok",
             "",
             "shots-to-down-or-kill---stdok",
+            False,
             *self.nest(lambda hp: (hp / self._damages).div(pellets, axis=0), tdok_hp_levels, "hp"),
             tdok_levels_descriptions_short,
             tdok_levels_descriptions
@@ -405,6 +416,7 @@ class Weapons:
             "theoretical ttdok",
             "",
             "time-to-down-or-kill---ttdok",
+            False,
             *self.nest(lambda hp: (hp / self._damages).div(pellets_rpms, axis=0), tdok_hp_levels, "hp"),
             tdok_levels_descriptions_short,
             tdok_levels_descriptions
@@ -416,6 +428,7 @@ class Weapons:
             "btk",
             "bullets or kill",
             "bullets-to-down-or-kill---btdok",
+            False,
             *self.nest(lambda hp: np.ceil((hp + 20) / self._damages), tdok_hp_levels, "hp"),
             tdok_levels_descriptions_short,
             tdok_levels_descriptions
@@ -427,6 +440,7 @@ class Weapons:
             "stk",
             "shots or kill",
             "shots-to-down-or-kill---stdok",
+            False,
             *self.nest(lambda hp: np.ceil(((hp + 20) / self._damages).div(pellets, axis=0)), tdok_hp_levels, "hp"),
             tdok_levels_descriptions_short,
             tdok_levels_descriptions
@@ -439,6 +453,7 @@ class Weapons:
             "ttk",
             "time or kill",
             "time-to-down-or-kill---ttdok",
+            False,
             *self.nest(lambda hp: (np.ceil(((hp + 20) / self._damages).div(pellets, axis=0)) - 1).div(rpms, axis=0).round(), tdok_hp_levels, "hp"),
             tdok_levels_descriptions_short,
             tdok_levels_descriptions
@@ -451,43 +466,26 @@ class Weapons:
     def damage_drop_off_coloring(self, stat : "Stat"):
         """the colored areas represent steady damage, the colorless areas represent decreasing damage"""
         return lambda w, pi, d, v: w.color if self.is_in_damage_drop_off(w, d) else w.empty_color
-    
     @illustration_method
-    def relative_to_weapon_base_gradient_coloring(self, stat : "Stat"):
-        """the color gradient illustrates the {stat} compared to the weapon's base {stat} (i.e. at 0 m)"""
-        raise NotImplementedError
-        return lambda w, pi, d, v: w.color.with_alpha(safe_division(v, stat.data.loc[(w.name, pi), 0]))   
-    @illustration_method
-    def relative_to_weapon_max_gradient_coloring(self, stat : "Stat"):
-        """the color gradient illustrates the {stat} compared to the weapon's maximum {stat}"""
+    def relative_to_weapon_gradient_coloring(self, stat : "Stat"):
+        """the color gradient illustrates the {stat} compared to the weapon's minimum/maximum {stat}"""
         max = stat.data.max(axis=1)
-        return lambda w, pi, d, v: w.color.with_alpha(safe_division(v, max.loc[(w.name, pi)]))
-
+        min = stat.data.min(axis=1)
+        return lambda w, pi, d, v: w.color.with_alpha(normalize(v, min.loc[(w.name, pi)], max.loc[(w.name, pi)], stat.higher_is_better))
     @illustration_method
-    def relative_to_same_distance_class_max_gradient_coloring(self, stat : "Stat"):
-        """the color gradient illustrates the {stat} compared to the weapon's class' maximum {stat} at the same distance"""
+    def relative_to_same_distance_class_gradient_coloring(self, stat : "Stat"):
+        """the color gradient illustrates the {stat} compared to the weapon's class' minimum/maximum {stat} at the same distance"""
         pred = lambda wname, pi: (self.weapons[wname].class_, pi)
         class_max = stat.data.groupby(lambda x: pred(*x), as_index=True).max()
-
-        return lambda w, pi, d, v: w.color.with_alpha(safe_division(v, class_max[d][(w.class_, pi)]))
-
+        class_min = stat.data.groupby(lambda x: pred(*x), as_index=True).min()
+        return lambda w, pi, d, v: w.color.with_alpha(normalize(v, class_min[d][(w.class_, pi)], class_max[d][(w.class_, pi)], stat.higher_is_better))
     @illustration_method
-    def relative_to_class_base_gradient_coloring(self, stat : "Stat"):
-        """the color gradient illustrates the {stat} compared to the weapon's class' maximum base {stat} (i.e. at 0 m)"""
-        #raise NotImplementedError
-        #class_base_max = [{class_ : group_df.iloc[:, 0].max() for class_, group_df in df.groupby(lambda name: self.weapons[name].class_)} for pi, df in enumerate(dfs)]
-        #return lambda w, pi, d, v: w.color.with_alpha(safe_division(dfs[pi].loc[w.name][i], class_base_max[pi][w.class_]))
-    
-        pred = lambda wname, pi: (self.weapons[wname].class_, pi)
-        class_base = stat.data[0].groupby(lambda x: pred(*x), as_index=True).max()
-        return lambda w, pi, d, v: w.color.with_alpha(safe_division(v, class_base[(w.class_, pi)]))
-    @illustration_method
-    def relative_to_class_max_gradient_coloring(self, stat : "Stat"):
-        """the color gradient illustrates the {stat} compared to the weapon's class' maximum {stat}"""
+    def relative_to_class_gradient_coloring(self, stat : "Stat"):
+        """the color gradient illustrates the {stat} compared to the weapon's class' minimum/maximum {stat}"""
         pred = lambda wname, pi: (self.weapons[wname].class_, pi)
         class_max = stat.data.max(axis=1).groupby(lambda x: pred(*x), as_index=True).max()
-        return lambda w, pi, d, v: w.color.with_alpha(safe_division(v, class_max[(w.class_, pi)]))
-
+        class_min = stat.data.min(axis=1).groupby(lambda x: pred(*x), as_index=True).min()
+        return lambda w, pi, d, v: w.color.with_alpha(normalize(v, class_min[(w.class_, pi)], class_max[(w.class_, pi)], stat.higher_is_better))
     @illustration_method
     def extended_barrel_effect_coloring(self, stat : "Stat"):
         """the colored areas show where the extended barrel attachment actually affects the {stat}"""
@@ -498,8 +496,6 @@ class Weapons:
             return w.empty_color
         return pred
         
-
-
 
 @dataclasses_json.dataclass_json
 @dataclass
@@ -718,7 +714,9 @@ class Stat:
     short_name : str
     name : str
     link : str
+    higher_is_better : bool
     data : pd.DataFrame
+    "True: higher values are better, False: lower values are better"
     additional_parameters : tuple[typing.Any,...] = None,
     additional_parameters_short_description : tuple[str,...] = "",
     additional_parameters_description : tuple[str,...] = "",
@@ -752,11 +750,9 @@ stats = (
 )
 stat_illustrations = (
     Weapons.damage_drop_off_coloring,
-    Weapons.relative_to_weapon_base_gradient_coloring,
-    Weapons.relative_to_weapon_max_gradient_coloring,
-    Weapons.relative_to_same_distance_class_max_gradient_coloring,
-    Weapons.relative_to_class_base_gradient_coloring,
-    Weapons.relative_to_class_max_gradient_coloring,
+    Weapons.relative_to_weapon_gradient_coloring,
+    Weapons.relative_to_same_distance_class_gradient_coloring,
+    Weapons.relative_to_class_gradient_coloring,
     Weapons.extended_barrel_effect_coloring,
     )
 
@@ -1024,9 +1020,9 @@ def modify_stats_worksheet(worksheet : typing.Any, ws : Weapons, stat : Stat, il
             # parameter description cell
             if not is_1d_stat:
                 c = worksheet.cell(row=row, column=1)
-                c.value = param_desc
                 c.style = "Normal"
                 c.border = weapon.ex_border
+                c.value = param_desc
 
             # stat cells
             for i in range(len(Weapon.distances)):
@@ -1042,8 +1038,8 @@ def modify_stats_worksheet(worksheet : typing.Any, ws : Weapons, stat : Stat, il
 def save_to_xlsx_file(ws : Weapons):
     """ https://openpyxl.readthedocs.io/en/stable/ """
 
-    stat_indices = (0, 1, 2, 4, 5, 8)
-    illustration_indices = (0, 2, 3, 6, 5, 0)
+    stat_indices = (0, 1, 2, 4, 5)
+    illustration_indices = (0, 1, 2, 4, 3)
 
     excel_buffer = io.BytesIO()
     with pd.ExcelWriter(excel_buffer) as writer:

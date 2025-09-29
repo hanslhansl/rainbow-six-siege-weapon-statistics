@@ -6,10 +6,18 @@ import pandas as pd
 import numpy as np
 
 # Create arrays for multiindex
-arrays = [
-    ["A", "A", "A", "B", "B", "B"],
-    ["", "one", "two", "", "one", "two"]
-]
+df = pd.DataFrame({"A":[1, 2], "B":[3, 4], "C":[5, 6]}).T
+st.table(df)
+
+params = [5, 20]
+dfs = [df * p for p in params]
+df = pd.concat(dfs, keys=params, names=["param"])
+df.index = pd.MultiIndex.from_product([("A", "B", "C"), (0, 1)], names=["letters", "param"])
+st.table(df)
+
+st.table(df.div([2, 3, 1], axis=0, level=0))
+
+st.stop()
 
 # Create MultiIndex
 index = pd.MultiIndex.from_arrays(arrays, names=("letter", "number"))
@@ -20,7 +28,6 @@ df = pd.DataFrame(
     index=index,
     columns=["value1", "value2"]
 )
-
 
 if False:
     st.markdown(
