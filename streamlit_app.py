@@ -1,91 +1,92 @@
 import create_weapon_statistics_file as cwsf, streamlit as st, pandas as pd, altair as alt, sys, time
 
-
-
-import pandas as pd
-import numpy as np
-
-# Create arrays for multiindex
-df = pd.DataFrame({"A":[1, 2], "B":[3, 4], "C":[5, 6]}).T
-st.table(df)
-
-params = [5, 20]
-dfs = [df * p for p in params]
-df = pd.concat(dfs, keys=params, names=["param"])
-df.index = pd.MultiIndex.from_product([("A", "B", "C"), (0, 1)], names=["letters", "param"])
-st.table(df)
-
-st.table(df.div([2, 3, 1], axis=0, level=0))
-
-st.stop()
-
-# Create MultiIndex
-index = pd.MultiIndex.from_arrays(arrays, names=("letter", "number"))
-
-# Create DataFrame
-df = pd.DataFrame(
-    np.random.randn(6, 2),
-    index=index,
-    columns=["value1", "value2"]
-)
-
 if False:
-    st.markdown(
-    """
-    <style>
-    /* Target Streamlit tables */
-    table {
-        width: 100%;
-    }
 
-    /* Target the second column (nth-child(2)) */
-    table td:nth-child(2), table th:nth-child(2) {
-        display: none;
-    }
-    </style>
-    """,
-    unsafe_allow_html=True
-)
-    st.markdown(
-    """
-    <style>
-    /* In the second column (td:nth-child(2)), hide every second data row */
-    tbody tr:nth-child(3n) th:nth-child(1) {
-        visibility: hidden;   /*hides content but keeps cell width */
-    }
-    </style>
-    """,
-    unsafe_allow_html=True
-)
-    st.markdown(
-    """
-    <style>
-    /* Keep every third row visible: 1st, 4th, 7th, ... */
-    tbody tr:nth-child(3n - 1) th:nth-child(1) {
-        color: transparent;
-    }
-    /* Keep every third row visible: 1st, 4th, 7th, ... */
-    tbody tr:nth-child(3n - 3) th:nth-child(1) {
-        color: transparent;
-    }
-    </style>
-    """,
-    unsafe_allow_html=True
-)
+    import pandas as pd
+    import numpy as np
+
+    # Create arrays for multiindex
+    df = pd.DataFrame({"A":[1, 2], "B":[3, 4], "C":[5, 6]}).T
+    st.table(df)
+
+    params = [5, 20]
+    dfs = [df * p for p in params]
+    df = pd.concat(dfs, keys=params, names=["param"])
+    df.index = pd.MultiIndex.from_product([("A", "B", "C"), (0, 1)], names=["letters", "param"])
+    st.table(df)
+
+    df = df.reindex(pd.MultiIndex.from_product([("A", "B", "C"), (None, 0, 1)], names=["letters", "param"]))
+    st.table(df)
+
+    st.stop()
+
+    # Create MultiIndex
+    index = pd.MultiIndex.from_arrays(arrays, names=("letter", "number"))
+
+    # Create DataFrame
+    df = pd.DataFrame(
+        np.random.randn(6, 2),
+        index=index,
+        columns=["value1", "value2"]
+    )
+
+    if False:
+        st.markdown(
+        """
+        <style>
+        /* Target Streamlit tables */
+        table {
+            width: 100%;
+        }
+
+        /* Target the second column (nth-child(2)) */
+        table td:nth-child(2), table th:nth-child(2) {
+            display: none;
+        }
+        </style>
+        """,
+        unsafe_allow_html=True
+    )
+        st.markdown(
+        """
+        <style>
+        /* In the second column (td:nth-child(2)), hide every second data row */
+        tbody tr:nth-child(3n) th:nth-child(1) {
+            visibility: hidden;   /*hides content but keeps cell width */
+        }
+        </style>
+        """,
+        unsafe_allow_html=True
+    )
+        st.markdown(
+        """
+        <style>
+        /* Keep every third row visible: 1st, 4th, 7th, ... */
+        tbody tr:nth-child(3n - 1) th:nth-child(1) {
+            color: transparent;
+        }
+        /* Keep every third row visible: 1st, 4th, 7th, ... */
+        tbody tr:nth-child(3n - 3) th:nth-child(1) {
+            color: transparent;
+        }
+        </style>
+        """,
+        unsafe_allow_html=True
+    )
 
 
 
-print("DataFrame with MultiIndex:\n")
-st.table(df)
+    print("DataFrame with MultiIndex:\n")
+    st.table(df)
 
-st.table(df.div([2, 3, 1, 1, 1, 1], axis=0))
+    st.table(df.div([2, 3, 1, 1, 1, 1], axis=0))
 
-st.table(df.div({"A" : 2, "B" : 1}, axis=0, level="letter"))
+    st.table(df.div({"A" : 2, "B" : 1}, axis=0, level="letter"))
 
-#s = df.style.apply(lambda x: print(x, "###"), axis=1)
-#s
+    #s = df.style.apply(lambda x: print(x, "###"), axis=1)
+    #s
 
-st.stop()
+    st.stop()
 
 @st.cache_resource
 def get_weapons():
@@ -110,8 +111,8 @@ with st.container(border=True):
     selected_stat = st.selectbox(
         "choose a stat:",
         cwsf.stats,
-        format_func=lambda stat: stat.display_name
-        )
+        format_func=lambda stat: stat(ws).display_name
+        )(ws)
 
     extended_barrel_difference = st.checkbox("calculate the difference between the weapon with and without extended barrel", False)
 
@@ -120,7 +121,7 @@ with st.container(border=True):
         options=range(len(selected_stat.additional_parameters)),
         selection_mode="multi",
         #default=0,
-        format_func=lambda x: selected_stat.additional_parameters[x][1],
+        format_func=lambda x: selected_stat.additional_parameters_description[x],
         disabled=len(selected_stat.additional_parameters)==1,
         label_visibility="collapsed",
         width="stretch"
@@ -236,17 +237,18 @@ st.write(selected_illustration.__doc__.format(stat=selected_stat.short_name))
 
 
 start_time = time.time()
-if extended_barrel_difference:
+"""if extended_barrel_difference:
     data = ws.vectorize_and_interleave(ws.extended_barrel_difference(selected_stat.stat_method), additional_parameter, selected_weapons)
 else:
-    data = ws.vectorize_and_interleave(selected_stat.stat_method, additional_parameter, selected_weapons)
+    data = ws.vectorize_and_interleave(selected_stat.stat_method, additional_parameter, selected_weapons)"""
 
 end_time = time.time()
 execution_time = end_time - start_time
 print(f"Execution time 1: {execution_time:.6f} seconds")
 start_time = time.time()
 
-styler = selected_illustration(ws, data, additional_parameter)
+print(selected_stat.data)
+styler = selected_illustration(ws, selected_stat)
 
 end_time = time.time()
 execution_time = end_time - start_time

@@ -246,7 +246,10 @@ class Weapons:
                 w_name, pi = x.name, None
             else:
                 w_name, pi = x.name
-                if pi in (None, ""): return [None] * len(x)
+                if pi in (None, ): return [None] * len(x)
+                if pi not in range(6):
+                    print(pi)
+                    print(type(pi))
             w = self.weapons[w_name]
             return pd.Series(callback(w, pi, i, v) for i, v in x.items())
         
@@ -305,11 +308,10 @@ class Weapons:
     def nest(self, func : typing.Callable[[typing.Any], pd.DataFrame], params : tuple = (None,), pname : str = ""):
         names = list(range(len(params)))
         res = pd.concat([func(p) for p in params], keys=names, names=[pname]).swaplevel()
-        #res = res.reindex(pd.MultiIndex.from_product([self.weapons, names], names=["weapons", pname]))
         if len(params) != 1:
-            names.insert(0, "")
+            names.insert(0, None)
         res = res.reindex(pd.MultiIndex.from_product([self.weapons, names], names=["weapons", pname]))
-        return res, params
+        return res, pname, params
 
     # primary stats
     @functools.cache
@@ -706,6 +708,7 @@ class Stat:
     higher_is_better : bool
     "True: higher values are better, False: lower values are better"
     data : pd.DataFrame
+    additional_parameter_name : str
     additional_parameters : tuple[typing.Any,...] = None,
     additional_parameters_short_description : tuple[str,...] = "",
     additional_parameters_description : tuple[str,...] = "",
