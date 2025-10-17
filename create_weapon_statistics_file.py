@@ -40,7 +40,7 @@ weapon_colors = {"AR":"#5083EA",
 ###################################################
 
 #imports
-import os, json, typing, copy, sys, itertools, colorama, sys, colorsys, pandas as pd, pandas.io.formats.style, numpy as np, io
+import os, json, typing, copy, sys, itertools, colorama, sys, colorsys, pandas as pd, pandas.io.formats.style, numpy as np, io, math
 import openpyxl, dataclasses_json, warnings, googleapiclient.http, openpyxl.workbook.workbook, googleapiclient.discovery, functools
 import google.oauth2.service_account, marshmallow.exceptions, time
 from openpyxl.cell.text import InlineFont
@@ -99,7 +99,7 @@ def deserialize_json(file_name : str):
 
 class RGBA:
     def __init__(self, r : int, g : int, b : int, a : float):
-        assert 0 <= a <= 1
+        assert 0 <= a <= 1, f"alpha value must be between 0 and 1, got {a}."
         self.r = r
         self.g = g
         self.b = b
@@ -246,10 +246,8 @@ class Weapons:
                 w_name, pi = x.name, None
             else:
                 w_name, pi = x.name
-                if pi in (None, ): return [None] * len(x)
-                if pi not in range(6):
-                    print(pi)
-                    print(type(pi))
+                if pi in (None, ) or math.isnan(pi):
+                    return [None] * len(x)
             w = self.weapons[w_name]
             return pd.Series(callback(w, pi, i, v) for i, v in x.items())
         
@@ -1036,7 +1034,7 @@ start = time.time()
 
 def save_to_xlsx_file(ws : Weapons):
     """ https://openpyxl.readthedocs.io/en/stable/ """
-
+    
     stat_indices = (0, 1, 2, 4, 5)
     illustration_indices = (0, 1, 2, 4, 3)
 
@@ -1056,7 +1054,7 @@ def save_to_xlsx_file(ws : Weapons):
         for i_stat, i_illustration in zip(stat_indices, illustration_indices):
             stat = stats[i_stat](ws)
             end = time.time()  # end time
-            print(f"pandas data {stat.name}: {end - start:.4f} seconds")
+            print(f"pandas calculate {stat.name}: {end - start:.4f} seconds")
             start = time.time()
 
             stat_illustrations[i_illustration](ws, stat).to_excel(writer, sheet_name=stat.short_name, header=False, startrow=8)
@@ -1079,13 +1077,13 @@ def save_to_xlsx_file(ws : Weapons):
         modify_stats_worksheet(worksheet, ws, stat, illustration)
 
     end = time.time()  # end time
-    print(f"openpyxl: {end - start:.4f} seconds")
+    print(f"openpyxl modify stat sheets: {end - start:.4f} seconds")
     start = time.time()
 
     add_attachment_overview(workbook, ws)
 
     end = time.time()  # end time
-    print(f"openpyxl attach: {end - start:.4f} seconds")
+    print(f"openpyxl attachment overview: {end - start:.4f} seconds")
     start = time.time()
 
     # save to file
