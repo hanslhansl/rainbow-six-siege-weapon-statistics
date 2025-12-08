@@ -50,7 +50,7 @@
     },
     "name": "Glaive-12",
     "pellets": 1,
-    "rpm": 480,
+    "rpm": 500,
     "ads_time": 0.52,
     "has_laser": true,
     "has_grip": true,

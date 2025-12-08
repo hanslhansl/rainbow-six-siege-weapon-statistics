@@ -3,6 +3,7 @@
     "weapons": [
       "M4",
       "M249",
+      "SR-25",
       "5.7 USG",
       "ITA12S"
     ],
@@ -12,6 +13,7 @@
     "weapons": [
       "M590A1",
       "L85A2",
+      "Reaper MK2",
       "P226 MK 25"
     ],
     "side": "A"
@@ -20,7 +22,9 @@
     "weapons": [
       "AR33",
       "L85A2",
-      "M590A1"
+      "PMR90A2",
+      "M590A1",
+      "P226 MK 25"
     ],
     "side": "A"
   },
@@ -29,16 +33,17 @@
       "G36C",
       "R4-C",
       "M45 MEUSOC",
-      "5.7 USG",
-      "M1014"
+      "5.7 USG"
     ],
     "side": "A"
   },
   "Thermite": {
     "weapons": [
       "556XI",
+      "M1014",
       "M45 MEUSOC",
-      "5.7 USG"
+      "5.7 USG",
+      "ITA12S"
     ],
     "side": "A"
   },
@@ -104,8 +109,7 @@
   "Blackbeard": {
     "weapons": [
       "MK17 CQB",
-      "SR-25",
-      "D-50"
+      "SR-25"
     ],
     "side": "A"
   },
@@ -113,6 +117,7 @@
     "weapons": [
       "PARA-308",
       "M249",
+      "PMR90A2",
       "PRB92",
       "GONNE-6"
     ],
@@ -122,6 +127,7 @@
     "weapons": [
       "TYPE-89",
       "SUPERNOVA",
+      "PMR90A2",
       "P229",
       "BEARING 9"
     ],
@@ -141,7 +147,8 @@
     "weapons": [
       "T-95 LSW",
       "SIX12",
-      "Q-929"
+      "Q-929",
+      "Reaper MK2"
     ],
     "side": "A"
   },
@@ -187,7 +194,8 @@
     "weapons": [
       "AR-15.50",
       "M4",
-      "1911 TACOPS"
+      "1911 TACOPS",
+      "Reaper MK2"
     ],
     "side": "A"
   },
@@ -213,6 +221,7 @@
     "weapons": [
       "FMG-9",
       "SIX12 SD",
+      "PMR90A2",
       "5.7 USG",
       "D-50"
     ],
@@ -325,7 +334,8 @@
     "weapons": [
       "417",
       "M249",
-      "Reaper MK2"
+      "Reaper MK2",
+      "GSH-18"
     ],
     "side": "A"
   },
@@ -333,6 +343,7 @@
     "weapons": [
       "COMMANDO 9",
       "M870",
+      "TCSG12",
       "C75 Auto",
       "SUPER SHORTY"
     ],
@@ -370,6 +381,7 @@
     "weapons": [
       "M1014",
       "UMP45",
+      "Reaper MK2",
       "M45 MEUSOC",
       "5.7 USG"
     ],
@@ -392,7 +404,8 @@
       "MP5",
       "SG-CQB",
       "LFP586",
-      "P9"
+      "P9",
+      "Reaper MK2"
     ],
     "side": "D"
   },
@@ -419,7 +432,8 @@
     "weapons": [
       "M870",
       "416-C CARBINE",
-      "P12"
+      "P12",
+      "P-10C"
     ],
     "side": "D"
   },
@@ -427,6 +441,7 @@
     "weapons": [
       "MP7",
       "M870",
+      "KERATOS .357",
       "P12"
     ],
     "side": "D"
@@ -564,7 +579,8 @@
       "AUG A2",
       "MP5K",
       "KERATOS .357",
-      "P12"
+      "P12",
+      "SUPER SHORTY"
     ],
     "side": "D"
   },
@@ -573,7 +589,8 @@
       "T-5 SMG",
       "SPAS-12",
       "Bailiff 410",
-      "USP40"
+      "USP40",
+      "Reaper MK2"
     ],
     "side": "D"
   },
@@ -633,7 +650,6 @@
     "weapons": [
       "MP7",
       "SASG-12",
-      "Bailiff 410",
       "5.7 USG"
     ],
     "side": "D"
