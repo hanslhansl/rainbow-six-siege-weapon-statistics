@@ -585,6 +585,8 @@ class Weapon(_Weapon):
         self.extended_barrel_parent : Weapon | None = None
         self.is_extended_barrel = False
         self.extended_barrel_weapon = None
+        if self._extended_barrel == True:
+            raise Exception(f"Weapon '{self.name}' has '_extended_barrel' set to True but it needs to be either False or a dict of distance-damage pairs.")
         if self._extended_barrel != False:
             self.extended_barrel_weapon = copy.copy(self)
             self.extended_barrel_weapon.name = self.name + " + EB"
