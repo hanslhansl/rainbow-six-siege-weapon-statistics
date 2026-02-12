@@ -40,7 +40,7 @@ weapon_colors = {"AR":"#5083EA",
 ###################################################
 
 #imports
-import os, json, typing, copy, sys, itertools, colorama, sys, colorsys, pandas as pd, pandas.io.formats.style, numpy as np, io, math
+import os, json, typing, copy, sys, itertools, colorama, sys, colorsys, pandas as pd, pandas.io.formats.style, numpy as np, io, math, colorlog, logging
 import openpyxl, dataclasses_json, warnings, googleapiclient.http, openpyxl.workbook.workbook, googleapiclient.discovery, functools
 import google.oauth2.service_account, marshmallow.exceptions, time
 from openpyxl.cell.text import InlineFont
@@ -49,14 +49,25 @@ from openpyxl.styles import PatternFill, Border, Alignment, NamedStyle, Side, Fo
 from openpyxl.utils import get_column_letter
 from dataclasses import dataclass, field, InitVar, replace
 
-def warning(s = "Warning"):
-    return f"\x1b[38;2;255;255;0m{s}\033[0m"
-def message(s = "Message"):
-    return f"\x1b[38;2;83;141;213m{s}\033[0m"
-def error(s = "Error"):
-    return f"\x1b[38;2;255;0;0m{s}\033[0m"
 
-colorama.just_fix_windows_console()
+handler = colorlog.StreamHandler()
+handler.setFormatter(colorlog.ColoredFormatter(
+    "%(log_color)s%(levelname)s%(reset)s: %(message)s",
+    log_colors={
+        'DEBUG': 'green',
+        'INFO': 'blue',
+        'WARNING': 'yellow',
+        'ERROR': 'red',
+        'CRITICAL': 'bold_red',
+    }
+))
+
+logger = logging.getLogger()
+logger.setLevel(logging.INFO)
+logger.addHandler(handler)
+
+
+# colorama.just_fix_windows_console()
 patch_version = sys.argv[1] if len(sys.argv) > 1 else "<insert patch>"
 
 operators_file_name += ".json"
@@ -81,20 +92,20 @@ black_border = Border(*(Side(border_style="medium", color="000000") for i in ran
 
 # check if the settings are correct
 if not os.path.isfile(operators_file_name):
-    raise Exception(f"{error()}: '{operators_file_name}' is not a valid file path.")
+    raise Exception(f"{operators_file_name!r} is not a valid file path.")
 if not os.path.isdir(weapon_data_dir):
-    raise Exception(f"{error()}: '{weapon_data_dir}' is not a valid directory.")
+    raise Exception(f"{weapon_data_dir!r} is not a valid directory.")
 if not 0 <= first_distance:
-    raise Exception(f"{error()}: 'first_distance' must be >=0 but is {first_distance}.")
+    raise Exception(f"'first_distance' must be >=0 but is {first_distance!r}.")
 if not first_distance <= last_distance:
-    raise Exception(f"{error()}: 'last_distance' must be >='first_distance'={first_distance} but is {last_distance}.")
+    raise Exception(f"'last_distance' must be >='first_distance'=={first_distance!r} but is {last_distance!r}.")
 
 def deserialize_json(file_name : str):
     with open(file_name, "r", encoding='utf-8') as file:
         try:
             content = json.load(file)
         except json.JSONDecodeError:
-            raise Exception(f"{error()}: The json deserialization of file '{file_name}' failed.")
+            raise Exception(f"The json deserialization of file '{file_name}' failed.")
     return content
 
 class RGBA:
@@ -130,7 +141,7 @@ class RGBA:
     def with_alpha(self, a : float):
         return RGBA(self.r, self.g, self.b, a)
 
-    def to_ex_fill(self):
+    def to_excel_fill(self):
         rgb = self.to_rgb_hex(False)
         return PatternFill(start_color=rgb, end_color=rgb, fill_type="solid")
 
@@ -199,7 +210,7 @@ class Weapons:
         # get operators
         json_content = deserialize_json(operators_file_name)
         if type(json_content) != dict:
-            raise Exception(f"{error()}: File '{operators_file_name}' doesn't deserialize to a dict of operators and weapons lists.")
+            raise Exception(f"File '{operators_file_name}' doesn't deserialize to a dict of operators and weapons lists.")
         self.operators = [Operator(js, op_name) for (op_name, js) in json_content.items()]
 
         # get weapons
@@ -211,7 +222,7 @@ class Weapons:
             if not extension == ".json":
                 continue
             if name.startswith("_"):
-                print(f"{message('Message: Excluding')} weapon '{message(file_name)}' because of _.")
+                logger.info(f"Excluding weapon '{file_name}' because of _.")
                 continue
         
             w = Weapon(file_path, self.operators)
@@ -221,7 +232,7 @@ class Weapons:
         for op in self.operators:
             for weapon_name in op._weapons:
                 if weapon_name not in op.weapons:
-                    print(f"{warning('Warning:')} Weapon '{warning(weapon_name)}' found on operator '{op.name}' is {warning('not an actual weapon')}.")
+                    logger.warning(f"Weapon '{weapon_name}' found on operator '{op.name}' is not an actual weapon.")
             del op._weapons
 
         # add eb weapons
@@ -421,7 +432,7 @@ class Weapons:
     def btk(self):
         return Stat(
             "btk",
-            "bullets or kill",
+            "bullets to kill",
             "bullets-to-down-or-kill---btdok",
             False,
             *self.nest(lambda hp: np.ceil((hp + 20) / self._damages), tdok_hp_levels, "hp"),
@@ -433,7 +444,7 @@ class Weapons:
         pellets = {name : w.pellets for name, w in self.weapons.items()}
         return Stat(
             "stk",
-            "shots or kill",
+            "shots to kill",
             "shots-to-down-or-kill---stdok",
             False,
             *self.nest(lambda hp: np.ceil(((hp + 20) / self._damages).div(pellets, axis=0)), tdok_hp_levels, "hp"),
@@ -446,7 +457,7 @@ class Weapons:
         rpms = {name : w.rpms for name, w in self.weapons.items()}
         return Stat(
             "ttk",
-            "time or kill",
+            "time to kill",
             "time-to-down-or-kill---ttdok",
             False,
             *self.nest(lambda hp: (np.ceil(((hp + 20) / self._damages).div(pellets, axis=0)) - 1).div(rpms, axis=0).round(), tdok_hp_levels, "hp"),
@@ -514,7 +525,7 @@ class Weapon(_Weapon):
     distances = list(range(first_distance, last_distance+1))
 
     # excel stuff
-    ex_borders = {class_ : Border(*(Side(border_style="thin", color=color.to_border_color().to_rgb_hex(False)) for i in range(4)))
+    excel_borders = {class_ : Border(*(Side(border_style="thin", color=color.to_border_color().to_rgb_hex(False)) for i in range(4)))
                   for class_, color in colors.items()}
 
     extended_barrel_damage_multiplier = 0.0
@@ -531,7 +542,7 @@ class Weapon(_Weapon):
                 warnings.simplefilter("ignore", category=UserWarning)
                 _w = _Weapon.schema().load(json_content)
         except marshmallow.exceptions.ValidationError as e:
-            raise Exception(f"{error()}: File '{file_path}' could not be deserialized: {str(e)}.")
+            raise Exception(f"File '{file_path}' could not be deserialized: {str(e)}.")
         super().__init__(**vars(_w))
 
         # get operators
@@ -543,14 +554,14 @@ class Weapon(_Weapon):
                 op._weapons.remove(self.name)
 
         # operators rich text
-        self.ex_operators_rich_text = CellRichText([elem for op in self.operators for elem in (op.rich_text_name, ", ")][:-1])
+        self.excel_operators_rich_text = CellRichText([elem for op in self.operators for elem in (op.rich_text_name, ", ")][:-1])
 
         # get weapon names
         
         
         # verify weapon class
         if self.class_ not in self.classes:
-            raise Exception(f"{error()}: Weapon '{self.name}' has an invalid weapon class '{json_content["class"]}'.")
+            raise Exception(f"Weapon '{self.name}' has an invalid weapon class '{json_content["class"]}'.")
         
         # derived fields
         self.base_name = self.name
@@ -564,7 +575,7 @@ class Weapon(_Weapon):
         #self.reload_times_with_angled_grip = tuple(x / self.angled_grip_reload_speed_multiplier for x in self.reload_times) if self.has_grip else None
 
          # excel fields
-        self.ex_border = self.ex_borders[self.class_]
+        self.excel_border = self.excel_borders[self.class_]
 
         # verify weapon damages
         setattr(self, "damages", self.validate_damages(self._damages))
@@ -576,7 +587,7 @@ class Weapon(_Weapon):
         self.extended_barrel_weapon = None
         if self._extended_barrel != False:
             self.extended_barrel_weapon = copy.copy(self)
-            self.extended_barrel_weapon.name = self.name + " + eb"
+            self.extended_barrel_weapon.name = self.name + " + EB"
             self.extended_barrel_weapon.display_name = "+ extended barrel"
             self.extended_barrel_weapon.name_color = self.empty_color
             setattr(
@@ -607,11 +618,11 @@ class Weapon(_Weapon):
         
         #if Weapon.distances != distances:
         if Weapon.distances != distances:
-            raise Exception(f"{error()}: Weapon '{self.name}' has incorrect distance values.")
+            raise Exception(f"Weapon '{self.name}' has incorrect distance values.")
 
         # make sure the last damage value is given. otherwise the extrapolation will be wrong
         if damages[-1] == 0:
-            raise Exception(f"{error()}: Weapon '{self.name}' is missing a damage value at {distances[-1]}m.")
+            raise Exception(f"Weapon '{self.name}' is missing a damage value at {distances[-1]}m.")
 
         # make sure damages only stagnate or decrease and zeros are surrounded by identical non-zero damages
         # interpolate gaps. damages will be continuous in [5;40]
@@ -624,9 +635,9 @@ class Weapon(_Weapon):
                 
             else:	# this damage value is given
                 if damages[i] > previous_real_damage and previous_real_damage != 0:
-                    raise Exception(f"{error()}: Weapon '{self.name}' has a damage increase from '{previous_real_damage}' to '{damages[i]}' at {Weapon.distances[i]}m.")
+                    raise Exception(f"Weapon '{self.name}' has a damage increase from '{previous_real_damage}' to '{damages[i]}' at {Weapon.distances[i]}m.")
                 if previous_real_damage != 0 and previous_was_interpolated == True and damages[i] != previous_real_damage:
-                    raise Exception(f"{error()}: Tried to interpolate between two unequal damage values '{previous_real_damage}' and '{damages[i]}' at {Weapon.distances[i]}m for weapon '{self.name}'.")
+                    raise Exception(f"Tried to interpolate between two unequal damage values '{previous_real_damage}' and '{damages[i]}' at {Weapon.distances[i]}m for weapon '{self.name}'.")
                 
                 previous_real_damage = damages[i]
                 previous_was_interpolated = False
@@ -635,26 +646,26 @@ class Weapon(_Weapon):
         first_nonzero_index = next((i for i, damage in enumerate(damages) if damage != 0), -1)
         
         if first_nonzero_index > 5:
-            raise Exception(f"{error()}: First non-zero damage value for weapon '{self.name}' is at {Weapon.distances[first_nonzero_index]}m. Should be at 5m or less.")
+            raise Exception(f"First non-zero damage value for weapon '{self.name}' is at {Weapon.distances[first_nonzero_index]}m. Should be at 5m or less.")
 
         # extrapolate first 5 meters. damages will be continuous in [0;40]
         if first_nonzero_index == 0:
             pass	# no extrapolation needed
         elif first_nonzero_index == -1:
-            raise Exception(f"{error()}: Weapon '{self.name}' has no damage values at all.")
+            raise Exception(f"Weapon '{self.name}' has no damage values at all.")
         else:
             if self.class_ == "SG" or self.name == "Glaive-12":	# special treatment for shotgunsand glaive-12
                 if first_nonzero_index <= 5:
                     for i in range(first_nonzero_index):
                         damages[i] = damages[first_nonzero_index]
                 else:
-                    raise Exception(f"{error()}: Can't extrapolate first {first_nonzero_index} meters for shotgun '{self.name}'.")
+                    raise Exception(f"Can't extrapolate first {first_nonzero_index} meters for shotgun '{self.name}'.")
             else:
                 if damages[first_nonzero_index] == damages[first_nonzero_index+1] == damages[first_nonzero_index+2]:
                     for i in range(first_nonzero_index):
                         damages[i] = damages[first_nonzero_index]
                 else:
-                    raise Exception(f"{error()}: Can't extrapolate first {first_nonzero_index} meters for weapon '{self.name}'.")
+                    raise Exception(f"Can't extrapolate first {first_nonzero_index} meters for weapon '{self.name}'.")
 
         # return the damage stats
         return tuple(damages)
@@ -663,7 +674,7 @@ class Weapon(_Weapon):
         intervals = get_non_stagnant_intervals(self.damages)
         if self.class_ == "SG":
             if len(intervals) != 2:
-                raise Exception(f"{error()}: A {self.class_} should have exactly 2 damage dropoff intervals but weapon '{self.name}' has {len(intervals)}.")
+                raise Exception(f"A {self.class_} should have exactly 2 damage dropoff intervals but weapon '{self.name}' has {len(intervals)}.")
             return intervals
         return (intervals[0][0], intervals[-1][-1]),
     
@@ -684,11 +695,11 @@ class Operator(_Operator):
         try:
             _w = _Operator.schema().load(json_content)
         except marshmallow.exceptions.ValidationError as e:
-            raise Exception(f"{error()}: Operator '{self.name}' could not be deserialized: {str(e)}.")
+            raise Exception(f"Operator '{self.name}' could not be deserialized: {str(e)}.")
         super().__init__(**vars(_w))
 
         if self._side not in ("A", "D"):
-            raise Exception(f"{error()}: Operator '{self.name}' has an invalid side value '{self._side}'.")
+            raise Exception(f"Operator '{self.name}' has an invalid side value '{self._side}'.")
         self.side = bool(self._side == "D")	# False: attack, True: defense
         
         self.weapons : list[Weapon] = []
@@ -782,7 +793,7 @@ def add_secondary_weapon_stats_header(worksheet : typing.Any, row : int, col : i
     c = worksheet.cell(row=row, column=col)
     c.border = black_border
     c.value = "weapon"
-    worksheet.column_dimensions[get_column_letter(col)].width = 22
+    worksheet.column_dimensions[get_column_letter(col)].width = 24
     col += cols_inbetween
 
     empty = (None, 3)
@@ -827,9 +838,10 @@ def add_secondary_weapon_stats(worksheet : typing.Any, weapon : Weapon, row : in
     c = worksheet.cell(row=row, column=col)
     c.style = "Normal"
     c.alignment = top_alignment
-    c.border = weapon.ex_border
-    c.fill = weapon.name_color.to_ex_fill()
-    c.value = weapon.display_name
+    c.border = weapon.excel_border
+    c.fill = weapon.name_color.to_excel_fill()
+    # c.value = weapon.display_name
+    c.value = weapon.name
     col += cols_inbetween
 
     # no secondary stats if extended barrel
@@ -849,14 +861,14 @@ def add_secondary_weapon_stats(worksheet : typing.Any, weapon : Weapon, row : in
             if type(value) == float:
                 value = round(value, 3)
             c.alignment = center_alignment
-            c.border = weapon.ex_border
+            c.border = weapon.excel_border
             c.value = value
-            c.fill = weapon.color.to_ex_fill()
-            weapon.ex_border
+            c.fill = weapon.color.to_excel_fill()
+            weapon.excel_border
         col += skip
 
     c1 = worksheet.cell(row=row, column=col)
-    c1.value = weapon.ex_operators_rich_text
+    c1.value = weapon.excel_operators_rich_text
 
     return
 
@@ -914,8 +926,8 @@ def add_extended_barrel_overview(worksheet : typing.Any, ws : Weapons, row : int
             # data cell
             c = worksheet.cell(row=row, column=col)
             c.alignment = center_alignment
-            c.border = w.ex_border
-            c.fill = (w.color if wdata[0] != 0 else w.empty_color).to_ex_fill()
+            c.border = w.excel_border
+            c.fill = (w.color if wdata[0] != 0 else w.empty_color).to_excel_fill()
             c.value = wdata[0]
             col += 1
 
@@ -931,7 +943,7 @@ def add_attachment_overview(workbook : typing.Any, ws : Weapons):
     json_content = deserialize_json(attachment_overview_file_name)
     
     if not isinstance(json_content, dict):
-        raise Exception(f"{error()}: File '{attachment_overview_file_name}' doesn't deserialize to a dictionary.")
+        raise Exception(f"File '{attachment_overview_file_name}' doesn't deserialize to a dictionary.")
     attachment_categories : dict[str, typing.Any] = json_content
 
     worksheet = workbook.create_sheet("attachments")
@@ -942,7 +954,7 @@ def add_attachment_overview(workbook : typing.Any, ws : Weapons):
 
     for attachment_category, attachment_dict in attachment_categories.items():
         if not isinstance(attachment_dict, dict):
-            raise Exception(f"{error()}: An attachment category in file '{attachment_overview_file_name}' doesn't deserialize to a dictionary but to '{type(attachment_dict)}'.")
+            raise Exception(f"An attachment category in file '{attachment_overview_file_name}' doesn't deserialize to a dictionary but to '{type(attachment_dict)}'.")
         attachment_dict : dict[str, typing.Any]
 
         c = worksheet.cell(row=row, column=1)
@@ -951,7 +963,7 @@ def add_attachment_overview(workbook : typing.Any, ws : Weapons):
         
         for attachment_name, attachment in attachment_dict.items():
             if not isinstance(attachment, dict):
-                raise Exception(f"{error()}: An attachment in file '{attachment_overview_file_name}' doesn't deserialize to a dictionary but to '{type(attachment)}'.")
+                raise Exception(f"An attachment in file '{attachment_overview_file_name}' doesn't deserialize to a dictionary but to '{type(attachment)}'.")
 
             worksheet.merge_cells(start_row=row, end_row=row, start_column=2, end_column=1 + 19)
             c = worksheet.cell(row=row, column=2)
@@ -1017,54 +1029,50 @@ def modify_stats_worksheet(worksheet : typing.Any, ws : Weapons, stat : Stat, il
             if not is_1d_stat:
                 c = worksheet.cell(row=row, column=col)
                 c.style = "Normal"
-                c.border = weapon.ex_border
+                c.border = weapon.excel_border
                 c.value = param_desc
 
             # stat cells
             for i in range(len(Weapon.distances)):
                 c = worksheet.cell(row=row, column=col+i+1)
                 c.alignment = center_alignment
-                c.border = weapon.ex_border
+                c.border = weapon.excel_border
 
             row += 1
 
     return
 
-start = time.time()
 
 def save_to_xlsx_file(ws : Weapons):
     """ https://openpyxl.readthedocs.io/en/stable/ """
-    
-    stat_indices = (0, 1, 2, 4, 5)
-    illustration_indices = (0, 1, 2, 4, 3)
 
-    global start
-    end = time.time()  # end time
-    print(f"get data: {end - start:.4f} seconds")
     start = time.time()
+    
+    stat_indices = (0, 1, 2, 4, 5, 10, 11)
+    illustration_indices = (0, 1, 2, 4, 3, 4, 3)
 
     excel_buffer = io.BytesIO()
     with pd.ExcelWriter(excel_buffer) as writer:
-        print("pandas to excel engine:", writer.engine)
+        logger.info(f"pandas to excel engine: {writer.engine}")
 
         end = time.time()  # end time
-        print(f"enter context manager: {end - start:.4f} seconds")
+        logger.info(f"enter context manager: {end - start:.4f} seconds")
         start = time.time()
 
         for i_stat, i_illustration in zip(stat_indices, illustration_indices):
             stat = stats[i_stat](ws)
             end = time.time()  # end time
-            print(f"pandas calculate {stat.name}: {end - start:.4f} seconds")
+            logger.info(f"pandas calculate {stat.name}: {end - start:.4f} seconds")
             start = time.time()
 
             stat_illustrations[i_illustration](ws, stat).to_excel(writer, sheet_name=stat.short_name, header=False, startrow=8)
 
             end = time.time()  # end time
-            print(f"pandas style {stat.name}: {end - start:.4f} seconds")
+            logger.info(f"pandas style {stat.name}: {end - start:.4f} seconds")
             start = time.time()
 
     end = time.time()  # end time
-    print(f"pandas write: {end - start:.4f} seconds")
+    logger.info(f"pandas write: {end - start:.4f} seconds")
     start = time.time()
 
     workbook = openpyxl.load_workbook(excel_buffer)
@@ -1077,25 +1085,27 @@ def save_to_xlsx_file(ws : Weapons):
         modify_stats_worksheet(worksheet, ws, stat, illustration)
 
     end = time.time()  # end time
-    print(f"openpyxl modify stat sheets: {end - start:.4f} seconds")
+    logger.info(f"openpyxl modify stat sheets: {end - start:.4f} seconds")
     start = time.time()
 
     add_attachment_overview(workbook, ws)
 
     end = time.time()  # end time
-    print(f"openpyxl attachment overview: {end - start:.4f} seconds")
+    logger.info(f"openpyxl attachment overview: {end - start:.4f} seconds")
     start = time.time()
 
     # save to file
     workbook.save(xlsx_output_file_name)
 
     end = time.time()  # end time
-    print(f"openpyxl write: {end - start:.4f} seconds")
+    logger.info(f"openpyxl write: {end - start:.4f} seconds")
     start = time.time()
     
     return xlsx_output_file_name
 
 if __name__ == "__main__":
+
+    start = time.time()
 
     # get all weapons from the files
     ws = Weapons()
@@ -1110,15 +1120,20 @@ if __name__ == "__main__":
         if len(group) > 1:
             for i, distance in enumerate(Weapon.distances):
                 if len(set(ws._damages[i][weapon.name] for weapon in group)) > 1:
-                    print(f"{warning()}: These {group[0].class_}s have the {warning('same base damage')} ({ws._damages[0][group[0].name]}) but {warning('different damages')} at {distance}m:")
-                    for weapon in group:
-                        print(f"{weapon.name}: {ws._damages[i][weapon.name]}")
+                    logger.error(f"These {group[0].class_}s have the a base damage of {ws._damages[0][group[0].name]} but different damages at {distance}m:\n%s",
+                                   "\n".join(f"  - {weapon.name}: {ws._damages[i][weapon.name]}" for weapon in group))
                     failed = True
-    if failed: raise Exception(f"{error()}: See above warnings.")
+    if failed: raise Exception(f"See above error messages.")
+
+    end = time.time()  # end time
+    logger.info(f"get data: {end - start:.4f} seconds")
 
 
     # save to excel file
     excel_file_name = save_to_xlsx_file(ws)
+
+    end = time.time()  # end time
+    logger.info(f"total: {end - start:.4f} seconds")
 
     if "GOOGLE_SERVICE_ACCOUNT_CREDENTIALS" in os.environ:
         # we are in the github action

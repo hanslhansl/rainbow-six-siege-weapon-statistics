@@ -1,4 +1,4 @@
-import create_weapon_statistics_file as cwsf, streamlit as st, pandas as pd, altair as alt, sys, time
+import generate_weapon_statistics_file as cwsf, streamlit as st, pandas as pd, altair as alt, sys, time
 
 if False:
 

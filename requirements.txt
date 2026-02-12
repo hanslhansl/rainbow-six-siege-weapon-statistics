@@ -5,3 +5,4 @@ dataclasses_json
 pandas
 google-api-python-client
 google-auth
+colorlog
