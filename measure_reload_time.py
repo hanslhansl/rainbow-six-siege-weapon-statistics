@@ -1,16 +1,9 @@
-import cv2, numpy as np, sys, typing, time, av
-from dataclasses import dataclass
-
-print(sys.argv)
-
-VIDEO_PATH = r"D:\clips\Tom Clancy's Rainbow Six Siege 2026\vigil crazy flick - border.mp4"
-
-
 # --- CONFIG ---
 rect_rel_x = 0.865
 rect_rel_y = 0.872
 rect_rel_w = 0.042
 rect_rel_h = 0.043
+secondary_rect_y_offset = 0.035
 
 # Blob filtering
 MIN_HEIGHT_RATIO = 0.8   # relative to crop height
@@ -21,9 +14,44 @@ MAX_ASPECT_RATIO_FOR_ONE = 19 / 44  # width / height
 # Progress bar
 BAR_WIDTH = 40
 
-# --- FUNCTIONS ---
+# relative to rect area
+MIN_NUMBER_PIXELS_RATIO = 0.08
 
-def extract_target_mask(img):
+# --- Video Processing ---
+import cv2, numpy as np, sys, typing, time, av, atexit, pathlib, scipy.optimize, scipy.special
+from dataclasses import dataclass
+
+def pause():
+    print()
+    input("Press Enter to exit...")
+atexit.register(pause)
+
+primary = False
+if len(sys.argv) == 3:
+    if "--primary" in sys.argv:
+        primary = True
+        sys.argv.remove("--primary")
+    elif "--secondary" in sys.argv:
+        primary = False
+        sys.argv.remove("--secondary")
+    else:
+        raise ValueError("Usage: python measure_reload_time.py <video_path> --primary|secondary")
+assert len(sys.argv) == 2, "Usage: python measure_reload_time.py <video_path> --primary|secondary"
+VIDEO_PATH = sys.argv[1]
+assert pathlib.Path(VIDEO_PATH).is_file(), f"Video file not found: {VIDEO_PATH}"
+
+@dataclass
+class Status:
+    type: typing.Literal["ONE", "NON_ONE", "NONE"]
+    start: float
+    end: float
+
+@dataclass
+class ReloadEvent:
+    statistical_duration: float
+    radius: float
+
+def extract_target_mask(img, min_number_pixels):
     # Strict but tolerant RGB mask: red/black with GB noise allowed
     B, G, R = cv2.split(img)
     mask = ((G < 50) & (B < 50)).astype(np.uint8) * 255
@@ -61,108 +89,127 @@ def is_one(norm):
     aspect = w / h
     return aspect < MAX_ASPECT_RATIO_FOR_ONE
 
-# --- MAIN PROCESS ---
-print("--- Video File ---")
-container = av.open(
-    VIDEO_PATH,
-    #options={"hwaccel": "d3d11va"}  # AMD / Windows hardware decode
-)
-print(f"path: {container.name}")
-stream = container.streams.video[0]
+def process_video(video_path, primary):
+    print("--- Video File ---")
 
-width = stream.width
-height = stream.height
-print(f"resolution: {width}x{height}")
-rect_x = int(rect_rel_x * width)
-rect_y = int(rect_rel_y * height)
-rect_w = int(rect_rel_w * width)
-rect_h = int(rect_rel_h * height)
-min_number_pixels = int(rect_w * rect_h * 0.08)
+    with av.open(video_path, options={"hwaccel": "d3d11va"}) as container:
+        print(f"path: {container.name}")
+        stream = container.streams.video[0]
 
-fps = float(stream.average_rate)
-print(f"fps: {fps}")
-total_duration = float(container.duration) / av.time_base
-print(f"duration: {total_duration} s")
+        width = stream.width
+        height = stream.height
+        print(f"resolution: {width}x{height}")
+        rect_x = int(rect_rel_x * width)
+        rect_y = int((rect_rel_y + (0 if primary else secondary_rect_y_offset)) * height)
+        rect_w = int(rect_rel_w * width)
+        rect_h = int(rect_rel_h * height)
+        min_number_pixels = int(rect_w * rect_h * MIN_NUMBER_PIXELS_RATIO)
 
-@dataclass
-class Status:
-    type: typing.Literal["ONE", "NON_ONE", "NONE"]
-    start: float
-    end: float
+        fps = float(stream.average_rate)
+        print(f"fps: {fps}")
+        total_duration = float(container.duration) / av.time_base
+        print(f"duration: {total_duration} s")
 
-@dataclass
-class ReloadEvent:
-    statistical_duration: float
-    radius: float
+        
+        print("\n--- Video Processing ---")
+        states : list[Status] = []
+        reload_events : list[ReloadEvent] = []
+        last_frame_time = 0
+        for frame in container.decode(video=0):
+            start_counter = time.perf_counter()
 
-print("\n--- Video Processing ---")
-states : list[Status] = []
-reload_events : list[ReloadEvent] = []
-last_frame_time = 0
-for frame in container.decode(video=0):
-    start_counter = time.perf_counter()
+            # current time in seconds
+            frame_time = frame.time
 
-    frame_time = frame.time # current time in seconds
+            # extract mask from frame
+            frame = frame.to_rgb().to_ndarray(format="bgr24")  # OpenCV-friendly
+            crop = frame[rect_y:rect_y+rect_h, rect_x:rect_x+rect_w]
+            mask = extract_target_mask(crop, min_number_pixels)
 
-    # extract mask from frame
-    frame = frame.to_rgb().to_ndarray(format="bgr24")  # OpenCV-friendly
-    crop = frame[rect_y:rect_y+rect_h, rect_x:rect_x+rect_w]
-    mask = extract_target_mask(crop)
+            # classify frame
+            status = "NONE"
+            if mask is None:
+                display_frame = np.zeros_like(crop)
+                display_frame[:] = (0, 255, 0)  # Green
+            else:
+                display_frame = mask
+                norm = normalize(mask)
+                if norm is not None:
+                    status = "ONE" if is_one(norm) else "NON_ONE"
 
-    # classify frame
-    status = "NONE"
-    if mask is None:
-        display_frame = np.zeros_like(crop)
-        display_frame[:] = (0, 255, 0)  # Green
-    else:
-        display_frame = mask
-        norm = normalize(mask)
-        if norm is not None:
-            status = "ONE" if is_one(norm) else "NON_ONE"
+            # display mask
+            # cv2.imshow("Video", crop)
+            # if cv2.waitKey(1) & 0xFF == ord('q'):
+            #     break
 
-    # display mask
-    # cv2.imshow("Video", display_frame)
-    # if cv2.waitKey(1) & 0xFF == ord('q'):
-    #     break
+            # update states
+            if len(states) == 0 or status != states[-1].type:
+                states.append(Status(type=status, start=frame_time, end=frame_time))
 
-    # update states
-    if len(states) == 0 or status != states[-1].type:
-        states.append(Status(type=status, start=frame_time, end=frame_time))
+                if len(states) > 2:
+                    e0, e1, e2 = states[-3:]
+                    if e0.type == "NON_ONE" and e1.type == "ONE" and e2.type == "NON_ONE":
+                        t0, t1 = e0.end, e1.start
+                        t2, t3 = e1.end, e2.start
+                        assert t0 < t1 < t2 < t3, f"Timestamps must be in order: {t0}, {t1}, {t2}, {t3}"
+                        S = (t0 + t1) / 2
+                        E = (t2 + t3) / 2
+                        D = E - S
+                        R = (-t0 + t3 - t2 + t1) / 2
+                        reload_events.append(ReloadEvent(statistical_duration=D, radius=R))
+                        sys.stdout.write(f"\r\033[Kreload at: {S:10.6f}s → {E:10.6f}s | statistical duration: {D:.6f} ± {R:.6f} s | min/max duration: {t2 - t1:.6f}/{t3 - t0:.6f} s\n")
+                        sys.stdout.flush()
+            else:
+                states[-1].end = frame_time
 
-        if len(states) > 2:
-            e0, e1, e2 = states[-3:]
-            if e0.type == "NON_ONE" and e1.type == "ONE" and e2.type == "NON_ONE":
-                t0, t1 = e0.end, e1.start
-                t2, t3 = e1.end, e2.start
-                assert t0 < t1 < t2 < t3, f"Timestamps must be in order: {t0}, {t1}, {t2}, {t3}"
-                S = (t0 + t1) / 2
-                E = (t2 + t3) / 2
-                D = E - S
-                R = (-t0 + t3 - t2 + t1) / 2
-                reload_events.append(ReloadEvent(statistical_duration=D, radius=R))
-                sys.stdout.write(f"\r\033[Kreload at: {S}s → {E}s | statistical duration: {D} ± {R} s | min/max duration: {t2 - t1}/{t3 - t0} s\n")
-                sys.stdout.flush()
-    else:
-        states[-1].end = frame_time
+            # update progress bar
+            processing_speed = (frame_time - last_frame_time) / (time.perf_counter() - start_counter)
+            last_frame_time = frame_time
+            filled_length = min(round(BAR_WIDTH * frame_time / total_duration), BAR_WIDTH)
+            bar = '█' * filled_length + '-' * (BAR_WIDTH - filled_length)
+            sys.stdout.write(f"\r\033[K|{bar}| {frame_time:.2f}/{total_duration:.2f} s | {frame_time / total_duration:.2%} | {processing_speed:.2f} s/s | classified as {status!r}")
+            sys.stdout.flush()
 
-    # update progress bar
-    processing_speed = (frame_time - last_frame_time) / (time.perf_counter() - start_counter)
-    last_frame_time = frame_time
-    filled_length = min(round(BAR_WIDTH * frame_time / total_duration), BAR_WIDTH)
-    bar = '█' * filled_length + '-' * (BAR_WIDTH - filled_length)
-    sys.stdout.write(f"\r\033[K|{bar}| {frame_time:.2f}/{total_duration:.2f} s | {frame_time / total_duration:.2%} | {processing_speed:.2f} s/s | classified as {status!r}")
-    sys.stdout.flush()
+    print()
+    return reload_events
 
-print("\n")
+reload_events = process_video(VIDEO_PATH, primary)
 
 
+
+# --- Analysis ---
 print("\n--- Analysis ---")
-lower = max(re.statistical_duration - re.radius for re in reload_events)
-upper = min(re.statistical_duration + re.radius for re in reload_events)
-D_star = 0.5 * (lower + upper)
-R_star = 0.5 * abs(upper - lower)
-if lower <= upper:
-    print(f"Statistical reload duration: {D_star} ± {R_star} s")
-else:
-    print(f"No consistent duration — intervals do not overlap exactly.")
-    print(f"Estimated reload duration: {D_star} ± {R_star} s")
+
+# cost function for M-estimator
+def interval_cost(D, measurements, sigma=0.0005, delta=1.5):
+    """
+    D: current duration estimate (scalar)
+    measurements: list of MeasuredInterval
+    sigma: small softening for minimal violations
+    delta: Huber parameter
+    """
+    total = 0.0
+    for m in measurements:
+        # compute interval violation
+        v = max(0.0, abs(D - m.statistical_duration) - m.radius)
+        # scale by sigma and apply Huber
+        total += scipy.special.huber(delta, v / sigma)
+    return total
+
+# Run optimization, initial guess: weighted average
+x0 = np.mean([m.statistical_duration for m in reload_events])
+
+res = scipy.optimize.minimize(
+    interval_cost,
+    x0=[x0],
+    args=(reload_events,),
+    method='Nelder-Mead',  # robust 1D optimizer
+    options={'xatol':1e-9, 'disp': True}
+)
+
+D_star = res.x[0]
+
+# Estimate effective radius (uncertainty), max violation after robust estimate
+R_star = max(max(0.0, abs(D_star - m.statistical_duration) - m.radius) for m in reload_events)
+
+print(f"Statistical reload duration: {D_star} ± {R_star} s")

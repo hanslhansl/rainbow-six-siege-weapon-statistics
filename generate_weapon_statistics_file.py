@@ -206,6 +206,7 @@ class Weapons:
         attachment_categories = deserialize_json(attachment_overview_file_name)
         Weapon.extended_barrel_damage_multiplier = 1.0 + attachment_categories["Barrels"]["Extended barrel"]["damage bonus"]
         Weapon.laser_ads_speed_multiplier = 1.0 + attachment_categories["Under Barrel"]["Laser"]["ads speed bonus"]
+        Weapon.angled_grip_reload_speed_multiplier = 1.0 + attachment_categories["Grips"]["Angled grip"]["weapon reload speed bonus"]
 
         # get operators
         json_content = deserialize_json(operators_file_name)
@@ -516,8 +517,8 @@ class _Weapon:
     _damages : dict[int, int] = field(metadata=dataclasses_json.config(field_name="damages"))
     has_laser : bool
     has_grip : bool
-    #reload_times : tuple[float, float]
     _extended_barrel : dict[str, int] | bool = field(metadata=dataclasses_json.config(field_name="extended_barrel"))
+    reload_times : tuple[float] | tuple[float, float] | None = None
 
 class Weapon(_Weapon):
     colors = {class_: RGBA.from_rgb_hex(color) for class_, color in weapon_colors.items()}
@@ -533,6 +534,8 @@ class Weapon(_Weapon):
     angled_grip_reload_speed_multiplier = 0.0
 
     empty_color = RGBA(0,0,0,0)
+
+    reload_times : tuple[float | None, float | None]
 
     def __init__(self, file_path, operators : list["Operator"]):
         json_content = deserialize_json(file_path)
@@ -555,14 +558,17 @@ class Weapon(_Weapon):
 
         # operators rich text
         self.excel_operators_rich_text = CellRichText([elem for op in self.operators for elem in (op.rich_text_name, ", ")][:-1])
-
-        # get weapon names
-        
         
         # verify weapon class
         if self.class_ not in self.classes:
             raise Exception(f"Weapon '{self.name}' has an invalid weapon class '{json_content["class"]}'.")
         
+        # correct reload times (for now)
+        if self.reload_times is None:
+            self.reload_times = (None, None)
+        elif len(self.reload_times) == 1:
+            self.reload_times = (self.reload_times[0], None)
+
         # derived fields
         self.base_name = self.name
         self.display_name = self.name
@@ -572,7 +578,8 @@ class Weapon(_Weapon):
         self.rpms = self.rpm / 60000.
         self.ads_time_with_laser = self.ads_time / self.laser_ads_speed_multiplier if self.has_laser else None
         self.capacity = str(self._capacity[0]) + "+" + str(self._capacity[1])
-        #self.reload_times_with_angled_grip = tuple(x / self.angled_grip_reload_speed_multiplier for x in self.reload_times) if self.has_grip else None
+        # self.reload_times_with_angled_grip : tuple[float | None, float | None] = tuple(x / self.angled_grip_reload_speed_multiplier if x is not None and self.has_grip else None for x in self.reload_times)
+        self.reload_times_with_angled_grip = (None, None) # not implemented
 
          # excel fields
         self.excel_border = self.excel_borders[self.class_]
@@ -680,6 +687,7 @@ class Weapon(_Weapon):
             return intervals
         return (intervals[0][0], intervals[-1][-1]),
     
+
 
 @dataclasses_json.dataclass_json
 @dataclass
@@ -852,9 +860,9 @@ def add_secondary_weapon_stats(worksheet : typing.Any, weapon : Weapon, row : in
 
     values = [weapon.class_, weapon.rpm, weapon.capacity, weapon.extra_ammo, weapon.pellets if weapon.pellets != 1 else None,
            weapon.ads_time, weapon.ads_time_with_laser,
-           #Weapon.getReload, Weapon.getReloadTimesWithAngledGrip
+           *weapon.reload_times, *weapon.reload_times_with_angled_grip
           ]
-    skips = [2, 1, 1, 1, 2, 1, 7]
+    skips = [2, 1, 1, 1, 2, 1, 2, 1, 1, 1, 2]
 
     for value, skip in zip(values, skips):
         c = worksheet.cell(row=row, column=col)
