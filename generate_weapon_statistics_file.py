@@ -565,8 +565,10 @@ class Weapon(_Weapon):
         
         # correct reload times (for now)
         if self.reload_times is None:
+            logger.warning(f"Weapon '{self.name}' is missing reload times. Setting it to (None, None).")
             self.reload_times = (None, None)
         elif len(self.reload_times) == 1:
+            # logger.warning(f"Weapon '{self.name}' is missing the full reload time. Setting it to None.")
             self.reload_times = (self.reload_times[0], None)
 
         # derived fields
@@ -1056,59 +1058,49 @@ def modify_stats_worksheet(worksheet : typing.Any, ws : Weapons, stat : Stat, il
 def save_to_xlsx_file(ws : Weapons):
     """ https://openpyxl.readthedocs.io/en/stable/ """
 
-    start = time.time()
-    
     stat_indices = (0, 1, 2, 4, 5, 10, 11)
     illustration_indices = (0, 1, 2, 4, 3, 4, 3)
 
     excel_buffer = io.BytesIO()
     with pd.ExcelWriter(excel_buffer) as writer:
-        logger.info(f"pandas to excel engine: {writer.engine}")
-
-        end = time.time()  # end time
-        logger.info(f"enter context manager: {end - start:.4f} seconds")
-        start = time.time()
+        logger.info(f"pandas excel engine: {writer.engine}")
 
         for i_stat, i_illustration in zip(stat_indices, illustration_indices):
+            start = time.time()
             stat = stats[i_stat](ws)
-            end = time.time()  # end time
-            logger.info(f"pandas calculate {stat.name}: {end - start:.4f} seconds")
-            start = time.time()
+            end = time.time()
+            logger.info(f"calculate {stat.name!r}: {end - start} s")
 
+            start = time.time()
             stat_illustrations[i_illustration](ws, stat).to_excel(writer, sheet_name=stat.short_name, header=False, startrow=8)
+            end = time.time()
+            logger.info(f"style {stat.name!r}: {end - start} s")
 
-            end = time.time()  # end time
-            logger.info(f"pandas style {stat.name}: {end - start:.4f} seconds")
-            start = time.time()
+        start = time.time()
+    end = time.time()
+    logger.info(f"write to buffer: {end - start} s")
 
-    end = time.time()  # end time
-    logger.info(f"pandas write: {end - start:.4f} seconds")
     start = time.time()
-
     workbook = openpyxl.load_workbook(excel_buffer)
-
     for i_stat, i_illustration in zip(stat_indices, illustration_indices):
         stat = stats[i_stat](ws)
         illustration = stat_illustrations[i_illustration]
         worksheet = workbook[stat.short_name]
 
         modify_stats_worksheet(worksheet, ws, stat, illustration)
+    end = time.time()
+    logger.info(f"modify stat sheets: {end - start} s")
 
-    end = time.time()  # end time
-    logger.info(f"openpyxl modify stat sheets: {end - start:.4f} seconds")
     start = time.time()
-
     add_attachment_overview(workbook, ws)
-
-    end = time.time()  # end time
-    logger.info(f"openpyxl attachment overview: {end - start:.4f} seconds")
-    start = time.time()
+    end = time.time()
+    logger.info(f"add attachment overview: {end - start} s")
 
     # save to file
+    start = time.time()
     workbook.save(xlsx_output_file_name)
-
-    end = time.time()  # end time
-    logger.info(f"openpyxl write: {end - start:.4f} seconds")
+    end = time.time()
+    logger.info(f"write excel file: {end - start} s")
     start = time.time()
     
     return xlsx_output_file_name
@@ -1136,14 +1128,14 @@ if __name__ == "__main__":
     if failed: raise Exception(f"See above error messages.")
 
     end = time.time()  # end time
-    logger.info(f"get data: {end - start:.4f} seconds")
+    logger.info(f"get weapon data: {end - start} s")
 
 
     # save to excel file
     excel_file_name = save_to_xlsx_file(ws)
 
     end = time.time()  # end time
-    logger.info(f"total: {end - start:.4f} seconds")
+    logger.info(f"total: {end - start} seconds")
 
     if "GOOGLE_SERVICE_ACCOUNT_CREDENTIALS" in os.environ:
         # we are in the github action
