@@ -518,7 +518,7 @@ class _Weapon:
     has_laser : bool
     has_grip : bool
     _extended_barrel : dict[str, int] | bool = field(metadata=dataclasses_json.config(field_name="extended_barrel"))
-    reload_times : tuple[float] | tuple[float, float] | None = None
+    reload_times : tuple[float | None, float | None] | tuple[float | None, float | None, float | None, float | None] | None = None
 
 class Weapon(_Weapon):
     colors = {class_: RGBA.from_rgb_hex(color) for class_, color in weapon_colors.items()}
@@ -533,9 +533,9 @@ class Weapon(_Weapon):
     laser_ads_speed_multiplier = 0.0
     angled_grip_reload_speed_multiplier = 0.0
 
-    empty_color = RGBA(0,0,0,0)
+    reload_times : tuple[float | None, float | None, float | None, float | None]
 
-    reload_times : tuple[float | None, float | None]
+    empty_color = RGBA(0,0,0,0)
 
     def __init__(self, file_path, operators : list["Operator"]):
         json_content = deserialize_json(file_path)
@@ -565,11 +565,15 @@ class Weapon(_Weapon):
         
         # correct reload times (for now)
         if self.reload_times is None:
-            logger.warning(f"Weapon '{self.name}' is missing reload times. Setting it to (None, None).")
-            self.reload_times = (None, None)
-        elif len(self.reload_times) == 1:
+            logger.warning(f"Weapon '{self.name}' is missing reload times. Setting it to (None, None, None, None).")
+            self.reload_times = (None, None, None, None)
+        elif len(self.reload_times) == 2:
             # logger.warning(f"Weapon '{self.name}' is missing the full reload time. Setting it to None.")
-            self.reload_times = (self.reload_times[0], None)
+            self.reload_times += (None, None)
+        elif len(self.reload_times) == 4:
+            pass
+        else:
+            raise Exception(f"Weapon '{self.name}' has invalid reload times '{self.reload_times}'")
 
         # derived fields
         self.base_name = self.name
@@ -580,8 +584,6 @@ class Weapon(_Weapon):
         self.rpms = self.rpm / 60000.
         self.ads_time_with_laser = self.ads_time / self.laser_ads_speed_multiplier if self.has_laser else None
         self.capacity = str(self._capacity[0]) + "+" + str(self._capacity[1])
-        # self.reload_times_with_angled_grip : tuple[float | None, float | None] = tuple(x / self.angled_grip_reload_speed_multiplier if x is not None and self.has_grip else None for x in self.reload_times)
-        self.reload_times_with_angled_grip = (None, None) # not implemented
 
          # excel fields
         self.excel_border = self.excel_borders[self.class_]
@@ -862,7 +864,7 @@ def add_secondary_weapon_stats(worksheet : typing.Any, weapon : Weapon, row : in
 
     values = [weapon.class_, weapon.rpm, weapon.capacity, weapon.extra_ammo, weapon.pellets if weapon.pellets != 1 else None,
            weapon.ads_time, weapon.ads_time_with_laser,
-           *weapon.reload_times, *weapon.reload_times_with_angled_grip
+           *weapon.reload_times
           ]
     skips = [2, 1, 1, 1, 2, 1, 2, 1, 1, 1, 2]
 

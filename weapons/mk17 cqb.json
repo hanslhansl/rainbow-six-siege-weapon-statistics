@@ -1,7 +1,7 @@
 {
     "extra_ammo": 200,
     "capacity": [
-        25,
+        20,
         1
     ],
     "class": "AR",

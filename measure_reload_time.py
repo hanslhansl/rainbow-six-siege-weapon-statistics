@@ -1,149 +1,4 @@
 
-import numpy as np, sys, pathlib, cv2
-import cv2 as cv
-from matplotlib import pyplot as plt
-from dataclasses import dataclass
-
-
-img_path = "test1.png"
-DIGIT_TEMPLATES_DIRECTORY = [pth for pth in (pathlib.Path(__file__).parent / "digit_templates").iterdir()]
-MATCH_THRESHOLD = 0.8  # Treffer-Schwelle
-scales = [1.0]  # Multi-Scale
-
-
-
-# --- Non-Maximum Suppression ---
-def non_max_suppression(boxes, overlapThresh=0.3):
-    if len(boxes) == 0:
-        return []
-
-    boxes = np.array(boxes)
-    pick = []
-
-    x1 = boxes[:,0]
-    y1 = boxes[:,1]
-    x2 = boxes[:,2]
-    y2 = boxes[:,3]
-
-    area = (x2 - x1 + 1) * (y2 - y1 + 1)
-    idxs = np.argsort(y2)
-
-    while len(idxs) > 0:
-        last = idxs[-1]
-        i = last
-        pick.append(i)
-
-        xx1 = np.maximum(x1[i], x1[idxs[:-1]])
-        yy1 = np.maximum(y1[i], y1[idxs[:-1]])
-        xx2 = np.minimum(x2[i], x2[idxs[:-1]])
-        yy2 = np.minimum(y2[i], y2[idxs[:-1]])
-
-        w = np.maximum(0, xx2 - xx1 + 1)
-        h = np.maximum(0, yy2 - yy1 + 1)
-
-        overlap = (w * h) / area[idxs[:-1]]
-        idxs = np.delete(
-            idxs,
-            np.concatenate(([len(idxs)-1], np.where(overlap > overlapThresh)[0]))
-        )
-
-    return boxes[pick].astype("int")
-
-def non_max_suppression_per_digit(all_boxes : list[MatchResult], digit_labels):
-    final_boxes : list[MatchResult] = []
-    for digit in digit_labels:
-        digit_boxes = [b for b in all_boxes if b.label == digit]
-        if digit_boxes:
-            boxes_array = np.array([b.box for b in digit_boxes])
-            pick = non_max_suppression(boxes_array)
-            for i in range(len(pick)):
-                final_boxes.append(MatchResult(
-                    box=pick[i],
-                    label=digit,
-                    score=digit_boxes[i].score
-                ))
-    return final_boxes
-
-# --- Template Matching ---
-
-@dataclass
-class MatchResult:
-    box : list[int]
-    label : str
-    score : typing.Any
-
-def match_template(gray_img, template, scale, label):
-    w = int(template.shape[1] * scale)
-    h = int(template.shape[0] * scale)
-    resized_template = cv2.resize(template, (w, h))
-
-    res = cv2.matchTemplate(gray_img, resized_template, cv2.TM_CCOEFF_NORMED)
-    loc = np.where(res >= MATCH_THRESHOLD)
-
-    return [MatchResult(
-            box=[pt[0], pt[1], pt[0]+w, pt[1]+h],
-            label=label,
-            score=res[pt[1], pt[0]]
-        ) for pt in zip(*loc[::-1])]
-
-def match_template_multi_scale(gray_img, template, label, scales):
-    return [r for scale in scales for r in match_template(gray_img, template, scale, label)]
-
-def match_templates_multi_scale(gray_img, templates, labels, scales):
-    return [x for template, label in zip(templates, labels) for x in match_template_multi_scale(gray_img, template, label, scales)]
-
-def detect_number(final_boxes : list[MatchResult]):
-    return "".join(b.label for b in final_boxes)
-
-def highlight_boxes(final_boxes : list[MatchResult], img):
-    output = img.copy()
-    for b in final_boxes:
-        print(*b.box)
-        x1, y1, x2, y2 = b.box
-        cv2.rectangle(output, (x1, y1), (x2, y2), (0,0,255), 2)
-    return output
-
-
-def test():
-    # --- Bild laden ---
-    img = cv2.imread(img_path)
-    gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
-
-    digit_labels = [pth.stem for pth in DIGIT_TEMPLATES_DIRECTORY]
-
-    all_boxes = match_templates_multi_scale(gray, [cv2.imread(pth, cv2.IMREAD_GRAYSCALE) for pth in DIGIT_TEMPLATES_DIRECTORY], digit_labels, scales)
-
-    # --- Nach X-Position sortieren ---
-    final_boxes = sorted(non_max_suppression_per_digit(all_boxes, digit_labels), key=lambda x: x.box[0])
-
-    # --- Ergebnis ausgeben ---
-    detected_number = detect_number(final_boxes)
-    print("Erkannte Zahl:", detected_number)
-
-    # --- Treffer markieren ---
-    cv2.imshow("Detected Digits", highlight_boxes(final_boxes, img))
-    cv2.waitKey(0)
-    cv2.destroyAllWindows()
-
-
-test()
-
-
-
-
-
-
-
-
-
-sys.exit()
-
-
-
-
-
-
-
 # --- CONFIG ---
 rect_rel_x = 0.865
 rect_rel_y = 0.872
@@ -197,37 +52,17 @@ class ReloadEvent:
     statistical_duration: float
     radius: float
 
-def process_rect_old(img, min_number_pixels):
+def process_rect(img, min_number_pixels):
     empty = np.full(img.shape[:2], 255, dtype=np.uint8)
 
-    # Convert to LAB and split channels
-    lab = cv2.cvtColor(img, cv2.COLOR_BGR2LAB)
-    l, a, b = cv2.split(lab)
-
-    # Blackhat to highlight dark details on bright background
-    kernel = cv2.getStructuringElement(cv2.MORPH_RECT, (50,50))
-    blackhat = cv2.morphologyEx(l, cv2.MORPH_BLACKHAT, kernel)
-    mask = cv2.adaptiveThreshold(
-        blackhat,
-        255,
-        cv2.ADAPTIVE_THRESH_MEAN_C,
-        cv2.THRESH_BINARY,
-        51,
-        -10
-    )
-
-    # Morphological operations to reduce noise
-    kernel = np.ones((3,3), np.uint8)
-    morphed_mask = cv2.morphologyEx(mask, cv2.MORPH_CLOSE, kernel)
-
     # Strict but tolerant RGB mask: red/black with GB noise allowed
-    # B, G, R = cv2.split(img)
-    # mask = ((G < 50) & (B < 50)).astype(np.uint8) * 255
+    B, G, R = cv2.split(img)
+    mask = ((G < 0x40) & (B < 0x40)).astype(np.uint8) * 255
 
     # Close gaps between digits
     # kernel = np.ones((3, 3), np.uint8)
     # morphed_mask = cv2.morphologyEx(mask, cv2.MORPH_CLOSE, kernel)
-    # morphed_mask = mask
+    morphed_mask = mask
 
     # Connected components
     num, labels, stats, _ = cv2.connectedComponentsWithStats(morphed_mask)
@@ -246,32 +81,13 @@ def process_rect_old(img, min_number_pixels):
     if valid_blobs == 0:
         return "NONE", "no blobs passed height filter", mask, morphed_mask, empty
 
-    # if cv2.countNonZero(cleaned_mask) < min_number_pixels:
-    #     return "NONE", mask, morphed_mask, empty
-    
     nonzero_points = cv2.findNonZero(cleaned_mask)  # finds all non-zero pixels
     x, y, w, h = cv2.boundingRect(nonzero_points)
     cropped_mask = cleaned_mask[y:y+h, x:x+w]
 
-    # if cropped_mask.size == 0:
-    #     return "NONE", "cropped mask is empty", mask, morphed_mask, cleaned_mask
-
     h, w = cropped_mask.shape
     aspect = w / h
     return "ONE" if aspect < MAX_ASPECT_RATIO_FOR_ONE else "NON_ONE", f"aspect ratio: {aspect:.2f}", mask, morphed_mask, cleaned_mask
-
-templates = [cv2.imread(pth, cv2.IMREAD_GRAYSCALE) for pth in DIGIT_TEMPLATES_DIRECTORY]
-digit_labels = [pth.stem for pth in DIGIT_TEMPLATES_DIRECTORY]
-def process_rect(img, min_number_pixels):
-    gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
-
-    all_boxes = match_templates_multi_scale(gray, templates, digit_labels, scales)
-
-    # --- Nach X-Position sortieren ---
-    final_boxes = sorted(non_max_suppression_per_digit(all_boxes, digit_labels), key=lambda x: x.box[0])
-
-    # --- Ergebnis ausgeben ---
-    detected_number = detect_number(final_boxes)
 
 def process_video(video_path, primary):
     print("--- Video File ---")
@@ -340,16 +156,16 @@ def process_video(video_path, primary):
             # display mask
             combined = np.hstack((rect, *(cv2.cvtColor(m, cv2.COLOR_GRAY2BGR) for m in masks)))
             cv2.imshow("Video", combined)
-            if cv2.waitKey(10) & 0xFF == ord('q'):
+            if cv2.waitKey(1) & 0xFF == ord('q'):
                 break
-            if status == "NONE":
-                cv2.waitKey(0)
+            # if status == "NONE":
+            #     cv2.waitKey(0)
 
+    cv2.destroyAllWindows()
     print()
     return reload_events
 
 reload_events = process_video(VIDEO_PATH, primary)
-
 
 
 # --- Analysis ---
@@ -388,3 +204,4 @@ D_star = res.x[0]
 R_star = max(max(0.0, abs(D_star - m.statistical_duration) - m.radius) for m in reload_events)
 
 print(f"Statistical reload duration: {D_star} ± {R_star} s")
+print(f"Rounded to 3 decimal places: {D_star:.3} ± {R_star:.3} s")
