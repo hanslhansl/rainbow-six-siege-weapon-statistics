@@ -21,6 +21,7 @@ MIN_NUMBER_PIXELS_RATIO = 0.08
 # --- Video Processing ---
 import cv2, numpy as np, sys, typing, time, av, atexit, pathlib, scipy.optimize, scipy.special
 from dataclasses import dataclass
+from decimal import Decimal, ROUND_HALF_UP
 
 def pause():
     print()
@@ -59,18 +60,13 @@ def process_rect(img, min_number_pixels):
     B, G, R = cv2.split(img)
     mask = ((G < 0x40) & (B < 0x40)).astype(np.uint8) * 255
 
-    # Close gaps between digits
-    # kernel = np.ones((3, 3), np.uint8)
-    # morphed_mask = cv2.morphologyEx(mask, cv2.MORPH_CLOSE, kernel)
-    morphed_mask = mask
-
     # Connected components
-    num, labels, stats, _ = cv2.connectedComponentsWithStats(morphed_mask)
+    num, labels, stats, _ = cv2.connectedComponentsWithStats(mask)
     if num <= 1:
-        return "NONE", "found no blobs", mask, morphed_mask, empty
+        return "NONE", "found no blobs", mask, empty
 
     crop_h = img.shape[0]
-    cleaned_mask = np.zeros_like(morphed_mask)
+    cleaned_mask = np.zeros_like(mask)
     valid_blobs = 0
     for i in range(1, num):
         h_i = stats[i, cv2.CC_STAT_HEIGHT]
@@ -79,7 +75,7 @@ def process_rect(img, min_number_pixels):
             valid_blobs += 1
         
     if valid_blobs == 0:
-        return "NONE", "no blobs passed height filter", mask, morphed_mask, empty
+        return "NONE", "no blobs passed height filter", mask, empty
 
     nonzero_points = cv2.findNonZero(cleaned_mask)  # finds all non-zero pixels
     x, y, w, h = cv2.boundingRect(nonzero_points)
@@ -87,7 +83,7 @@ def process_rect(img, min_number_pixels):
 
     h, w = cropped_mask.shape
     aspect = w / h
-    return "ONE" if aspect < MAX_ASPECT_RATIO_FOR_ONE else "NON_ONE", f"aspect ratio: {aspect:.2f}", mask, morphed_mask, cleaned_mask
+    return "ONE" if aspect < MAX_ASPECT_RATIO_FOR_ONE else "NON_ONE", f"aspect ratio: {aspect:.2f}", mask, cleaned_mask
 
 def process_video(video_path, primary):
     print("--- Video File ---")
@@ -145,6 +141,12 @@ def process_video(video_path, primary):
             else:
                 states[-1].end = frame_time
 
+            # display mask
+            # combined = np.hstack((rect, *(cv2.cvtColor(m, cv2.COLOR_GRAY2BGR) for m in masks)))
+            # cv2.imshow("Video", combined)
+            # if cv2.waitKey(1) & 0xFF == ord('q'):
+            #     break
+
             # update progress bar
             processing_speed = (frame_time - last_frame_time) / (time.perf_counter() - start_counter)
             last_frame_time = frame_time
@@ -152,14 +154,6 @@ def process_video(video_path, primary):
             bar = '█' * filled_length + '-' * (BAR_WIDTH - filled_length)
             sys.stdout.write(f"\r\033[K|{bar}| {frame_time:.2f}/{total_duration:.2f} s | {frame_time / total_duration:.2%} | {processing_speed:.2f} s/s | {status!r} ({reason})")
             sys.stdout.flush()
-
-            # display mask
-            combined = np.hstack((rect, *(cv2.cvtColor(m, cv2.COLOR_GRAY2BGR) for m in masks)))
-            cv2.imshow("Video", combined)
-            if cv2.waitKey(1) & 0xFF == ord('q'):
-                break
-            # if status == "NONE":
-            #     cv2.waitKey(0)
 
     cv2.destroyAllWindows()
     print()
@@ -197,11 +191,13 @@ res = scipy.optimize.minimize(
     method='Nelder-Mead',  # robust 1D optimizer
     options={'xatol':1e-9, 'disp': True}
 )
-
 D_star = res.x[0]
 
 # Estimate effective radius (uncertainty), max violation after robust estimate
 R_star = max(max(0.0, abs(D_star - m.statistical_duration) - m.radius) for m in reload_events)
 
 print(f"Statistical reload duration: {D_star} ± {R_star} s")
-print(f"Rounded to 3 decimal places: {D_star:.3} ± {R_star:.3} s")
+def round_half_up(fl, ndigits=0):
+    q = Decimal('1.' + '0' * ndigits)
+    return float(Decimal.from_float(fl).quantize(q, rounding=ROUND_HALF_UP))
+print(f"Rounded to 3 decimal places: {round_half_up(D_star, ndigits=3)} ± {round_half_up(R_star, ndigits=3)} s")

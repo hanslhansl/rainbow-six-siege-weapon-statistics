@@ -565,12 +565,11 @@ class Weapon(_Weapon):
         
         # correct reload times (for now)
         if self.reload_times is None:
-            logger.warning(f"Weapon '{self.name}' is missing reload times. Setting it to (None, None, None, None).")
+            logger.warning(f"Weapon '{self.name}' is missing reload times. Assuming (None, None, None, None).")
             self.reload_times = (None, None, None, None)
-        elif len(self.reload_times) == 2:
-            # logger.warning(f"Weapon '{self.name}' is missing the full reload time. Setting it to None.")
+        elif not self.has_grip and len(self.reload_times) == 2:
             self.reload_times += (None, None)
-        elif len(self.reload_times) == 4:
+        elif self.has_grip and len(self.reload_times) == 4:
             pass
         else:
             raise Exception(f"Weapon '{self.name}' has invalid reload times '{self.reload_times}'")
