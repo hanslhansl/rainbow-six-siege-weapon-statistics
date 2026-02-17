@@ -502,8 +502,8 @@ class Weapons:
                 return w.color
             return w.empty_color
         return pred
+    
         
-
 @dataclasses_json.dataclass_json
 @dataclass
 class _Weapon:
@@ -517,8 +517,8 @@ class _Weapon:
     _damages : dict[int, int] = field(metadata=dataclasses_json.config(field_name="damages"))
     has_laser : bool
     has_grip : bool
-    _extended_barrel : dict[str, int] | bool = field(metadata=dataclasses_json.config(field_name="extended_barrel"))
-    reload_times : tuple[float | None, float | None] | tuple[float | None, float | None, float | None, float | None] | None = None
+    _extended_barrel : dict[int, int] | bool = field(metadata=dataclasses_json.config(field_name="extended_barrel"))
+    reload_times : tuple[float | None, float | None] | tuple[float | None, float | None, float | None, float | None]
 
 class Weapon(_Weapon):
     colors = {class_: RGBA.from_rgb_hex(color) for class_, color in weapon_colors.items()}
@@ -534,6 +534,7 @@ class Weapon(_Weapon):
     angled_grip_reload_speed_multiplier = 0.0
 
     reload_times : tuple[float | None, float | None, float | None, float | None]
+    """tactical, full [, +angled grip]"""
 
     empty_color = RGBA(0,0,0,0)
 
@@ -564,10 +565,10 @@ class Weapon(_Weapon):
             raise Exception(f"Weapon '{self.name}' has an invalid weapon class '{json_content["class"]}'.")
         
         # correct reload times (for now)
-        if self.reload_times is None:
-            logger.warning(f"Weapon '{self.name}' is missing reload times. Assuming (None, None, None, None).")
-            self.reload_times = (None, None, None, None)
-        elif not self.has_grip and len(self.reload_times) == 2:
+        if not all(rt is not None for rt in self.reload_times):
+            logger.warning(f"Weapon '{self.name}' has invalid reload times '{self.reload_times}'")
+
+        if not self.has_grip and len(self.reload_times) == 2:
             self.reload_times += (None, None)
         elif self.has_grip and len(self.reload_times) == 4:
             pass
@@ -690,7 +691,6 @@ class Weapon(_Weapon):
             return intervals
         return (intervals[0][0], intervals[-1][-1]),
     
-
 
 @dataclasses_json.dataclass_json
 @dataclass
@@ -821,12 +821,12 @@ def add_secondary_weapon_stats_header(worksheet : typing.Any, row : int, col : i
         ("ads", 6),
         ("+ laser", 9),
         empty,
-        ("full reload", 11),
         ("tactical", 8),
+        ("full reload", 11),
         ("+ angled grip", 7),
         (None, 7),
         empty,
-        ("operators", 50)
+        ("operators", 100)
     )
 
     for value, width in values_widths:

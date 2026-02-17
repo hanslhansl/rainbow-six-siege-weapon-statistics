@@ -1,4 +1,5 @@
 {
+    "ads_time": 0.38,
     "capacity": [
         32,
         1
@@ -47,12 +48,17 @@
         "39": 0,
         "40": 16
     },
+    "extended_barrel": false,
     "extra_ammo": 96,
+    "has_grip": true,
+    "has_laser": true,
     "name": "SMG-12",
     "pellets": 1,
-    "rpm": 1270,
-    "ads_time": 0.38,
-    "has_laser": true,
-    "has_grip": true,
-    "extended_barrel": false
+    "reload_times": [
+        null,
+        null,
+        null,
+        null
+    ],
+    "rpm": 1270
 }

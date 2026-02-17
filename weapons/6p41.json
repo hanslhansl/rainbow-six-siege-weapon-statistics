@@ -1,4 +1,5 @@
 {
+    "ads_time": 0.56,
     "capacity": [
         100,
         0
@@ -47,12 +48,17 @@
         "39": 30,
         "40": 30
     },
+    "extended_barrel": false,
     "extra_ammo": 201,
+    "has_grip": true,
+    "has_laser": true,
     "name": "6P41",
     "pellets": 1,
-    "rpm": 680,
-    "ads_time": 0.56,
-    "has_laser": true,
-    "has_grip": true,
-    "extended_barrel": false
+    "reload_times": [
+        null,
+        null,
+        null,
+        null
+    ],
+    "rpm": 680
 }

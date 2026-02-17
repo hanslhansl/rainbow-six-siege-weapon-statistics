@@ -1,5 +1,5 @@
 {
-    "extra_ammo": 43,
+    "ads_time": 0.34,
     "capacity": [
         7,
         0
@@ -48,11 +48,15 @@
         "39": 0,
         "40": 18
     },
+    "extended_barrel": false,
+    "extra_ammo": 43,
+    "has_grip": false,
+    "has_laser": true,
     "name": "M870",
     "pellets": 8,
-    "rpm": 100,
-    "ads_time": 0.34,
-    "has_laser": true,
-    "has_grip": false,
-    "extended_barrel": false
+    "reload_times": [
+        null,
+        null
+    ],
+    "rpm": 100
 }

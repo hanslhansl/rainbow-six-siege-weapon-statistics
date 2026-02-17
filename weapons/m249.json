@@ -1,5 +1,5 @@
 {
-    "extra_ammo": 201,
+    "ads_time": 0.56,
     "capacity": [
         100,
         0
@@ -48,11 +48,17 @@
         "39": 32,
         "40": 32
     },
+    "extended_barrel": false,
+    "extra_ammo": 201,
+    "has_grip": true,
+    "has_laser": true,
     "name": "M249",
     "pellets": 1,
-    "rpm": 650,
-    "ads_time": 0.56,
-    "has_laser": true,
-    "has_grip": true,
-    "extended_barrel": false
+    "reload_times": [
+        null,
+        null,
+        null,
+        null
+    ],
+    "rpm": 650
 }

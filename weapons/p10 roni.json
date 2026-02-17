@@ -1,10 +1,10 @@
 {
+    "ads_time": 0.46,
     "capacity": [
         15,
         1
     ],
     "class": "SMG",
-    "extra_ammo": 165,
     "damages": {
         "0": 0,
         "1": 0,
@@ -48,12 +48,6 @@
         "39": 0,
         "40": 15
     },
-    "name": "P10 RONI",
-    "pellets": 1,
-    "rpm": 980,
-    "ads_time": 0.46,
-    "has_laser": true,
-    "has_grip": true,
     "extended_barrel": {
         "0": 0,
         "1": 0,
@@ -96,5 +90,17 @@
         "38": 0,
         "39": 0,
         "40": 23
-    }
+    },
+    "extra_ammo": 165,
+    "has_grip": true,
+    "has_laser": true,
+    "name": "P10 RONI",
+    "pellets": 1,
+    "reload_times": [
+        null,
+        null,
+        null,
+        null
+    ],
+    "rpm": 980
 }

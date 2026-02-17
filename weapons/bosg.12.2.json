@@ -1,4 +1,5 @@
 {
+    "ads_time": 0.52,
     "capacity": [
         2,
         0
@@ -47,12 +48,17 @@
         "39": 0,
         "40": 75
     },
+    "extended_barrel": false,
     "extra_ammo": 59,
+    "has_grip": true,
+    "has_laser": true,
     "name": "BOSG.12.2",
     "pellets": 1,
-    "rpm": 600,
-    "ads_time": 0.52,
-    "has_laser": true,
-    "has_grip": true,
-    "extended_barrel": false
+    "reload_times": [
+        null,
+        null,
+        null,
+        null
+    ],
+    "rpm": 600
 }

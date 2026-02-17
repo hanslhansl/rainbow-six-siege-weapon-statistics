@@ -1,4 +1,5 @@
 {
+    "ads_time": 0.34,
     "capacity": [
         5,
         0
@@ -47,12 +48,15 @@
         "39": 0,
         "40": 13
     },
+    "extended_barrel": false,
     "extra_ammo": 31,
+    "has_grip": false,
+    "has_laser": true,
     "name": "ITA12S",
     "pellets": 8,
-    "rpm": 80,
-    "ads_time": 0.34,
-    "has_laser": true,
-    "has_grip": false,
-    "extended_barrel": false
+    "reload_times": [
+        null,
+        null
+    ],
+    "rpm": 80
 }

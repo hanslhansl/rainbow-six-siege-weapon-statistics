@@ -1,5 +1,5 @@
 {
-    "extra_ammo": 200,
+    "ads_time": 0.52,
     "capacity": [
         20,
         1
@@ -48,13 +48,6 @@
         "39": 0,
         "40": 26
     },
-    "name": "MK17 CQB",
-    "pellets": 1,
-    "rpm": 585,
-    "ads_time": 0.52,
-    "has_laser": true,
-    "has_grip": true,
-    "reload_times" : [1.175, null, 0.903, null],
     "extended_barrel": {
         "0": 0,
         "1": 0,
@@ -97,5 +90,17 @@
         "38": 0,
         "39": 0,
         "40": 39
-    }
+    },
+    "extra_ammo": 200,
+    "has_grip": true,
+    "has_laser": true,
+    "name": "MK17 CQB",
+    "pellets": 1,
+    "reload_times": [
+        1.175,
+        null,
+        0.903,
+        null
+    ],
+    "rpm": 585
 }

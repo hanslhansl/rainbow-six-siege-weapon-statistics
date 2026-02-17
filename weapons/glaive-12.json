@@ -1,5 +1,5 @@
 {
-    "extra_ammo": 25,
+    "ads_time": 0.52,
     "capacity": [
         4,
         0
@@ -48,11 +48,17 @@
         "39": 0,
         "40": 40
     },
+    "extended_barrel": false,
+    "extra_ammo": 25,
+    "has_grip": true,
+    "has_laser": true,
     "name": "Glaive-12",
     "pellets": 1,
-    "rpm": 500,
-    "ads_time": 0.52,
-    "has_laser": true,
-    "has_grip": true,
-    "extended_barrel": false
+    "reload_times": [
+        null,
+        null,
+        null,
+        null
+    ],
+    "rpm": 500
 }

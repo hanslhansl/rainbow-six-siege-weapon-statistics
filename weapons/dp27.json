@@ -1,5 +1,5 @@
 {
-    "extra_ammo": 211,
+    "ads_time": 0.56,
     "capacity": [
         70,
         0
@@ -48,11 +48,15 @@
         "39": 40,
         "40": 40
     },
+    "extended_barrel": false,
+    "extra_ammo": 211,
+    "has_grip": false,
+    "has_laser": false,
     "name": "DP27",
     "pellets": 1,
-    "rpm": 550,
-    "ads_time": 0.56,
-    "has_laser": false,
-    "has_grip": false,
-    "extended_barrel": false
+    "reload_times": [
+        null,
+        null
+    ],
+    "rpm": 550
 }

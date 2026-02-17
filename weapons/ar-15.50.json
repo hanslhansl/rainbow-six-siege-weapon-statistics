@@ -1,5 +1,5 @@
 {
-    "extra_ammo": 90,
+    "ads_time": 0.52,
     "capacity": [
         10,
         1
@@ -48,11 +48,17 @@
         "39": 48,
         "40": 47
     },
+    "extended_barrel": false,
+    "extra_ammo": 90,
+    "has_grip": true,
+    "has_laser": true,
     "name": "AR-15.50",
     "pellets": 1,
-    "rpm": 430,
-    "ads_time": 0.52,
-    "has_laser": true,
-    "has_grip": true,
-    "extended_barrel": false
+    "reload_times": [
+        null,
+        null,
+        null,
+        null
+    ],
+    "rpm": 430
 }

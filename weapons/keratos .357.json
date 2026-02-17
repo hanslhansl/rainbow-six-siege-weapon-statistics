@@ -1,4 +1,5 @@
 {
+    "ads_time": 0.24,
     "capacity": [
         6,
         0
@@ -47,12 +48,15 @@
         "39": 0,
         "40": 46
     },
+    "extended_barrel": false,
     "extra_ammo": 55,
+    "has_grip": false,
+    "has_laser": true,
     "name": "KERATOS .357",
     "pellets": 1,
-    "rpm": 480,
-    "ads_time": 0.24,
-    "has_laser": true,
-    "has_grip": false,
-    "extended_barrel": false
+    "reload_times": [
+        null,
+        null
+    ],
+    "rpm": 480
 }

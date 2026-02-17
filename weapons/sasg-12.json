@@ -1,5 +1,5 @@
 {
-    "extra_ammo": 50,
+    "ads_time": 0.34,
     "capacity": [
         10,
         1
@@ -48,11 +48,17 @@
         "39": 0,
         "40": 11
     },
+    "extended_barrel": false,
+    "extra_ammo": 50,
+    "has_grip": true,
+    "has_laser": true,
     "name": "SASG-12",
     "pellets": 8,
-    "rpm": 340,
-    "ads_time": 0.34,
-    "has_laser": true,
-    "has_grip": true,
-    "extended_barrel": false
+    "reload_times": [
+        null,
+        null,
+        null,
+        null
+    ],
+    "rpm": 340
 }

@@ -1,5 +1,5 @@
 {
-    "extra_ammo": 43,
+    "ads_time": 0.34,
     "capacity": [
         7,
         0
@@ -48,11 +48,17 @@
         "39": 0,
         "40": 19
     },
+    "extended_barrel": false,
+    "extra_ammo": 43,
+    "has_grip": true,
+    "has_laser": true,
     "name": "SG-CQB",
     "pellets": 8,
-    "rpm": 85,
-    "ads_time": 0.34,
-    "has_laser": true,
-    "has_grip": true,
-    "extended_barrel": false
+    "reload_times": [
+        null,
+        null,
+        null,
+        null
+    ],
+    "rpm": 85
 }

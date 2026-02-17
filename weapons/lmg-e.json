@@ -1,5 +1,5 @@
 {
-    "extra_ammo": 151,
+    "ads_time": 0.56,
     "capacity": [
         150,
         0
@@ -48,11 +48,17 @@
         "39": 27,
         "40": 27
     },
+    "extended_barrel": false,
+    "extra_ammo": 151,
+    "has_grip": true,
+    "has_laser": true,
     "name": "LMG-E",
     "pellets": 1,
-    "rpm": 720,
-    "ads_time": 0.56,
-    "has_laser": true,
-    "has_grip": true,
-    "extended_barrel": false
+    "reload_times": [
+        null,
+        null,
+        null,
+        null
+    ],
+    "rpm": 720
 }

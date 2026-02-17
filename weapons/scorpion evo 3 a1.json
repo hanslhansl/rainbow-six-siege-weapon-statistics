@@ -1,10 +1,10 @@
 {
+    "ads_time": 0.46,
     "capacity": [
         40,
         1
     ],
     "class": "SMG",
-    "extra_ammo": 160,
     "damages": {
         "0": 0,
         "1": 0,
@@ -48,11 +48,17 @@
         "39": 0,
         "40": 13
     },
+    "extended_barrel": false,
+    "extra_ammo": 160,
+    "has_grip": true,
+    "has_laser": true,
     "name": "SCORPION EVO 3 A1",
     "pellets": 1,
-    "rpm": 1080,
-    "ads_time": 0.46,
-    "has_laser": true,
-    "has_grip": true,
-    "extended_barrel": false
+    "reload_times": [
+        null,
+        null,
+        null,
+        null
+    ],
+    "rpm": 1080
 }

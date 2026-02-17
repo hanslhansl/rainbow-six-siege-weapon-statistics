@@ -1,4 +1,5 @@
 {
+    "ads_time": 0.52,
     "capacity": [
         40,
         1
@@ -47,12 +48,17 @@
         "39": 0,
         "40": 26
     },
+    "extended_barrel": false,
     "extra_ammo": 160,
+    "has_grip": true,
+    "has_laser": true,
     "name": "AK-74M",
     "pellets": 1,
-    "rpm": 650,
-    "ads_time": 0.52,
-    "has_laser": true,
-    "has_grip": true,
-    "extended_barrel": false
+    "reload_times": [
+        1.454,
+        2.801,
+        null,
+        null
+    ],
+    "rpm": 650
 }

@@ -1,5 +1,5 @@
 {
-    "extra_ammo": 160,
+    "ads_time": 0.56,
     "capacity": [
         80,
         1
@@ -48,11 +48,17 @@
         "39": 30,
         "40": 30
     },
+    "extended_barrel": false,
+    "extra_ammo": 160,
+    "has_grip": true,
+    "has_laser": true,
     "name": "T-95 LSW",
     "pellets": 1,
-    "rpm": 650,
-    "ads_time": 0.56,
-    "has_laser": true,
-    "has_grip": true,
-    "extended_barrel": false
+    "reload_times": [
+        null,
+        null,
+        null,
+        null
+    ],
+    "rpm": 650
 }

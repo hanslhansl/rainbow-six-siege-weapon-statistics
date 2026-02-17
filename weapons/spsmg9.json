@@ -1,5 +1,5 @@
 {
-    "extra_ammo": 100,
+    "ads_time": 0.38,
     "capacity": [
         20,
         1
@@ -48,12 +48,6 @@
         "39": 0,
         "40": 19
     },
-    "name": "SPSMG9",
-    "pellets": 1,
-    "rpm": 980,
-    "ads_time": 0.38,
-    "has_laser": true,
-    "has_grip": false,
     "extended_barrel": {
         "0": 0,
         "1": 0,
@@ -96,5 +90,15 @@
         "38": 0,
         "39": 0,
         "40": 29
-    }
+    },
+    "extra_ammo": 100,
+    "has_grip": false,
+    "has_laser": true,
+    "name": "SPSMG9",
+    "pellets": 1,
+    "reload_times": [
+        null,
+        null
+    ],
+    "rpm": 980
 }

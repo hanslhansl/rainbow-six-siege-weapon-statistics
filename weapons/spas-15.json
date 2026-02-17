@@ -1,5 +1,5 @@
 {
-    "extra_ammo": 42,
+    "ads_time": 0.34,
     "capacity": [
         6,
         1
@@ -48,11 +48,15 @@
         "39": 0,
         "40": 10
     },
+    "extended_barrel": false,
+    "extra_ammo": 42,
+    "has_grip": false,
+    "has_laser": true,
     "name": "SPAS-15",
     "pellets": 8,
-    "rpm": 300,
-    "ads_time": 0.34,
-    "has_laser": true,
-    "has_grip": false,
-    "extended_barrel": false
+    "reload_times": [
+        null,
+        null
+    ],
+    "rpm": 300
 }

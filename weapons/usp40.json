@@ -1,5 +1,5 @@
 {
-    "extra_ammo": 84,
+    "ads_time": 0.24,
     "capacity": [
         12,
         1
@@ -48,11 +48,15 @@
         "39": 0,
         "40": 28
     },
+    "extended_barrel": false,
+    "extra_ammo": 84,
+    "has_grip": false,
+    "has_laser": true,
     "name": "USP40",
     "pellets": 1,
-    "rpm": 480,
-    "ads_time": 0.24,
-    "has_laser": true,
-    "has_grip": false,
-    "extended_barrel": false
+    "reload_times": [
+        null,
+        null
+    ],
+    "rpm": 480
 }

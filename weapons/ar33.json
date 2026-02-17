@@ -1,4 +1,5 @@
 {
+    "ads_time": 0.52,
     "capacity": [
         25,
         1
@@ -47,12 +48,17 @@
         "39": 0,
         "40": 24
     },
+    "extended_barrel": false,
     "extra_ammo": 150,
+    "has_grip": true,
+    "has_laser": true,
     "name": "AR33",
     "pellets": 1,
-    "rpm": 749,
-    "ads_time": 0.52,
-    "has_laser": true,
-    "has_grip": true,
-    "extended_barrel": false
+    "reload_times": [
+        null,
+        null,
+        null,
+        null
+    ],
+    "rpm": 749
 }

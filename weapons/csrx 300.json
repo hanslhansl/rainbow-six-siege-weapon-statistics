@@ -1,5 +1,5 @@
 {
-    "extra_ammo": 30,
+    "ads_time": 0.52,
     "capacity": [
         5,
         1
@@ -48,11 +48,15 @@
         "39": 109,
         "40": 109
     },
+    "extended_barrel": false,
+    "extra_ammo": 30,
+    "has_grip": false,
+    "has_laser": false,
     "name": "CSRX 300",
     "pellets": 1,
-    "rpm": 50,
-    "ads_time": 0.52,
-    "has_laser": false,
-    "has_grip": false,
-    "extended_barrel": false
+    "reload_times": [
+        null,
+        null
+    ],
+    "rpm": 50
 }

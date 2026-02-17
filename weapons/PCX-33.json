@@ -1,5 +1,5 @@
 {
-    "extra_ammo": 123,
+    "ads_time": 0.52,
     "capacity": [
         31,
         1
@@ -48,12 +48,6 @@
         "39": 0,
         "40": 21
     },
-    "name": "PCX-33",
-    "pellets": 1,
-    "rpm": 745,
-    "ads_time": 0.52,
-    "has_laser": true,
-    "has_grip": true,
     "extended_barrel": {
         "0": 0,
         "1": 0,
@@ -96,5 +90,17 @@
         "38": 0,
         "39": 0,
         "40": 32
-    }
+    },
+    "extra_ammo": 123,
+    "has_grip": true,
+    "has_laser": true,
+    "name": "PCX-33",
+    "pellets": 1,
+    "reload_times": [
+        null,
+        null,
+        null,
+        null
+    ],
+    "rpm": 745
 }

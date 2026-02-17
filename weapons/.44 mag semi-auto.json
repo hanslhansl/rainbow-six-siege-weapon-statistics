@@ -1,4 +1,5 @@
 {
+    "ads_time": 0.24,
     "capacity": [
         7,
         1
@@ -47,12 +48,15 @@
         "39": 0,
         "40": 32
     },
+    "extended_barrel": false,
     "extra_ammo": 63,
+    "has_grip": false,
+    "has_laser": true,
     "name": ".44 Mag Semi-Auto",
     "pellets": 1,
-    "rpm": 480,
-    "ads_time": 0.24,
-    "has_laser": true,
-    "has_grip": false,
-    "extended_barrel": false
+    "reload_times": [
+        0.82,
+        1.562
+    ],
+    "rpm": 480
 }

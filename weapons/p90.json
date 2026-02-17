@@ -1,4 +1,5 @@
 {
+    "ads_time": 0.46,
     "capacity": [
         50,
         1
@@ -47,13 +48,6 @@
         "39": 0,
         "40": 13
     },
-    "extra_ammo": 150,
-    "name": "P90",
-    "pellets": 1,
-    "rpm": 970,
-    "ads_time": 0.46,
-    "has_laser": true,
-    "has_grip": false,
     "extended_barrel": {
         "0": 0,
         "1": 0,
@@ -96,5 +90,15 @@
         "38": 0,
         "39": 0,
         "40": 19
-    }
+    },
+    "extra_ammo": 150,
+    "has_grip": false,
+    "has_laser": true,
+    "name": "P90",
+    "pellets": 1,
+    "reload_times": [
+        null,
+        null
+    ],
+    "rpm": 970
 }

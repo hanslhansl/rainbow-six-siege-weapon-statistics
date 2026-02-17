@@ -1,4 +1,5 @@
 {
+    "ads_time": 0.46,
     "capacity": [
         34,
         1
@@ -47,13 +48,6 @@
         "39": 0,
         "40": 21
     },
-    "extra_ammo": 136,
-    "name": "9mm C1",
-    "pellets": 1,
-    "rpm": 575,
-    "ads_time": 0.46,
-    "has_laser": true,
-    "has_grip": true,
     "extended_barrel": {
         "0": 0,
         "1": 0,
@@ -96,5 +90,17 @@
         "38": 0,
         "39": 0,
         "40": 32
-    }
+    },
+    "extra_ammo": 136,
+    "has_grip": true,
+    "has_laser": true,
+    "name": "9mm C1",
+    "pellets": 1,
+    "reload_times": [
+        null,
+        null,
+        null,
+        null
+    ],
+    "rpm": 575
 }

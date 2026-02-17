@@ -1,5 +1,5 @@
 {
-    "extra_ammo": 100,
+    "ads_time": 0.52,
     "capacity": [
         20,
         1
@@ -48,11 +48,17 @@
         "39": 43,
         "40": 43
     },
+    "extended_barrel": false,
+    "extra_ammo": 100,
+    "has_grip": true,
+    "has_laser": true,
     "name": "Mk 14 EBR",
     "pellets": 1,
-    "rpm": 440,
-    "ads_time": 0.52,
-    "has_laser": true,
-    "has_grip": true,
-    "extended_barrel": false
+    "reload_times": [
+        null,
+        null,
+        null,
+        null
+    ],
+    "rpm": 440
 }

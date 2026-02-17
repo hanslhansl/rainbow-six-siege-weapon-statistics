@@ -1,5 +1,5 @@
 {
-    "extra_ammo": 110,
+    "ads_time": 0.52,
     "capacity": [
         10,
         1
@@ -48,11 +48,17 @@
         "39": 0,
         "40": 45
     },
+    "extended_barrel": false,
+    "extra_ammo": 110,
+    "has_grip": true,
+    "has_laser": true,
     "name": "TCSG12",
     "pellets": 1,
-    "rpm": 490,
-    "ads_time": 0.52,
-    "has_laser": true,
-    "has_grip": true,
-    "extended_barrel": false
+    "reload_times": [
+        1.166,
+        2.582,
+        null,
+        null
+    ],
+    "rpm": 490
 }

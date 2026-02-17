@@ -1,5 +1,5 @@
 {
-    "extra_ammo": 49,
+    "ads_time": 0.34,
     "capacity": [
         6,
         0
@@ -48,11 +48,15 @@
         "39": 0,
         "40": 20
     },
+    "extended_barrel": false,
+    "extra_ammo": 49,
+    "has_grip": false,
+    "has_laser": true,
     "name": "SIX12 SD",
     "pellets": 8,
-    "rpm": 220,
-    "ads_time": 0.34,
-    "has_laser": true,
-    "has_grip": false,
-    "extended_barrel": false
+    "reload_times": [
+        null,
+        null
+    ],
+    "rpm": 220
 }

@@ -1,4 +1,5 @@
 {
+    "ads_time": 0.52,
     "capacity": [
         25,
         1
@@ -47,14 +48,6 @@
         "39": 0,
         "40": 23
     },
-    "extra_ammo": 125,
-    "name": "R4-C",
-    "pellets": 1,
-    "rpm": 860,
-    "ads_time": 0.52,
-    "has_laser": true,
-    "has_grip": true,
-    "reload_times" : [1.108, null,  0.888, null],
     "extended_barrel": {
         "0": 0,
         "1": 0,
@@ -97,5 +90,17 @@
         "38": 0,
         "39": 0,
         "40": 34
-    }
+    },
+    "extra_ammo": 125,
+    "has_grip": true,
+    "has_laser": true,
+    "name": "R4-C",
+    "pellets": 1,
+    "reload_times": [
+        1.108,
+        null,
+        0.888,
+        null
+    ],
+    "rpm": 860
 }

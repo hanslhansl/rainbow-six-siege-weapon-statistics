@@ -1,5 +1,5 @@
 {
-    "extra_ammo": 150,
+    "ads_time": 0.52,
     "capacity": [
         30,
         1
@@ -48,11 +48,15 @@
         "39": 0,
         "40": 25
     },
+    "extended_barrel": false,
+    "extra_ammo": 150,
+    "has_grip": false,
+    "has_laser": true,
     "name": "AUG A2",
     "pellets": 1,
-    "rpm": 720,
-    "ads_time": 0.52,
-    "has_laser": true,
-    "has_grip": false,
-    "extended_barrel": false
+    "reload_times": [
+        null,
+        null
+    ],
+    "rpm": 720
 }

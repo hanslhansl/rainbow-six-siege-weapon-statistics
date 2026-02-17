@@ -1,4 +1,5 @@
 {
+    "ads_time": 0.46,
     "capacity": [
         30,
         1
@@ -47,13 +48,6 @@
         "39": 0,
         "40": 16
     },
-    "extra_ammo": 150,
-    "name": "MP5",
-    "pellets": 1,
-    "rpm": 800,
-    "ads_time": 0.46,
-    "has_laser": true,
-    "has_grip": true,
     "extended_barrel": {
         "0": 0,
         "1": 0,
@@ -96,5 +90,17 @@
         "38": 0,
         "39": 0,
         "40": 24
-    }
+    },
+    "extra_ammo": 150,
+    "has_grip": true,
+    "has_laser": true,
+    "name": "MP5",
+    "pellets": 1,
+    "reload_times": [
+        null,
+        null,
+        null,
+        null
+    ],
+    "rpm": 800
 }

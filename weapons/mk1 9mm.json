@@ -1,5 +1,5 @@
 {
-    "extra_ammo": 91,
+    "ads_time": 0.24,
     "capacity": [
         13,
         1
@@ -48,11 +48,15 @@
         "39": 0,
         "40": 28
     },
+    "extended_barrel": false,
+    "extra_ammo": 91,
+    "has_grip": false,
+    "has_laser": true,
     "name": "MK1 9mm",
     "pellets": 1,
-    "rpm": 480,
-    "ads_time": 0.24,
-    "has_laser": true,
-    "has_grip": false,
-    "extended_barrel": false
+    "reload_times": [
+        null,
+        null
+    ],
+    "rpm": 480
 }

@@ -1,4 +1,5 @@
 {
+    "ads_time": 0.46,
     "capacity": [
         30,
         1
@@ -47,13 +48,6 @@
         "39": 0,
         "40": 18
     },
-    "extra_ammo": 150,
-    "name": "MP5K",
-    "pellets": 1,
-    "rpm": 800,
-    "ads_time": 0.46,
-    "has_laser": true,
-    "has_grip": false,
     "extended_barrel": {
         "0": 0,
         "1": 0,
@@ -96,5 +90,15 @@
         "38": 0,
         "39": 0,
         "40": 26
-    }
+    },
+    "extra_ammo": 150,
+    "has_grip": false,
+    "has_laser": true,
+    "name": "MP5K",
+    "pellets": 1,
+    "reload_times": [
+        null,
+        null
+    ],
+    "rpm": 800
 }
