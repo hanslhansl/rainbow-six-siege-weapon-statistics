@@ -54,8 +54,6 @@ Most weapons have, in addition to the bullets loaded in the magazine, one bullet
 The time in seconds it takes to aim down sight while standing still. The laser attachment increases the ads speed by $10\\%$. The reduced ads time with laser is calculated as $ads \\over 1.1$.
 
 ## Reload time
-Ubisoft provides values for the duration of reload animations, i.e. the time between hitting the reload button and the operator reaching an idle position again, in-game. However, these values aren't really gameplay relevant.
-
-More relevant is the time between the ammo counter reaching $0$ (or $1$ in case of a tactical reload and a bullet in the chamber) and again displaying something else (e.g. $30$). This is the definition I am using, partly because it is much easier to automatically measure.
+Ubisoft provides values for the duration of reload animations, i.e. the time between hitting the reload button and the operator reaching an idle position again, in-game. However, these values aren't really gameplay relevant. More relevant is the time between the ammo counter reaching $0$ (or $1$ in case of a tactical reload and a bullet in the chamber) and again displaying something else (e.g. $30$). This is the definition I am using, partly because it is much easier to automatically measure.
 
 Reload times differ for tactical vs. full reload. The angled grip increases the reload speed. I couldn't figure out the mathematical correlation so I measured all 4 (2 for weapons without grip) separately.
