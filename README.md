@@ -33,7 +33,7 @@ The damage per shot is calculated as $DamagePerShot = Damage \* Pellets$. No mea
 ## Fire rate
 Currently, for all fully automatic weapons I am using the fire rates listed in-game. For all other weapons I measure the fire rates myself. I am doing this by emptying a magazine of size $n$ and measuring the time $t$ (in seconds) between the in-game ammo counter decreasing the first time and the ammo counter reaching 0. The fire rate in rounds per seconds is calculated as ${n-1 \\over t} rps$ and in rounds per minute as $60{n-1 \\over t} rpm$.
 
-As [already mentioned](#time-measuring) my time measurements can vary up to $Δt$ from the real values. The actual fire rates are therefor in the interval defined by $60{n-1 \\over t \\pm Δt} rpm$. For example a measured fire rate of 800 rpm for a weapon with 31 bullets per magazine would mean an actual fire rate of something inbetween 797 rpm and 803 rpm. Because of this innaccuracy I am usually rounding the fire rate to a reasonable integer within said interval (e.g. measured 433.47 rpm become 430 rpm).
+As [already mentioned](#time-measuring) my time measurements can vary up to $Δt$ from the real values. The actual fire rates are therefor in the interval defined by $60{n-1 \\over t \\pm Δt} rpm$. For example a measured fire rate of 800 rpm for a weapon with 31 bullets per magazine would mean an actual fire rate of something inbetween 797 rpm and 803 rpm. Because of this innaccuracy I am usually rounding the fire rate to a reasonable integer within said interval.
 
 ## Damage per second - DPS
 The damage per second is calculated as $DPS = DmgPerShot \* RPS = DmgPerShot \* RPM / 60$. No measuring necessary.
