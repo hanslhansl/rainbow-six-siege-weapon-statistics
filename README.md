@@ -36,19 +36,19 @@ Currently, for all fully automatic weapons I am using the fire rates listed in-g
 As [already mentioned](#time-measuring) my time measurements can vary up to $Δt$ from the real values. The actual fire rates are therefor in the interval defined by $60{n-1 \\over t \\pm Δt} rpm$. For example a measured fire rate of 800 rpm for a weapon with 31 bullets per magazine would mean an actual fire rate of something inbetween 797 rpm and 803 rpm. Because of this innaccuracy I am usually rounding the fire rate to a reasonable integer within said interval.
 
 ## Damage per second - DPS
-The damage per second is calculated as $DPS = DmgPerShot \* RPS = DmgPerShot \* RPM / 60$. No measuring necessary.
+The damage per second is calculated as $DPS = DamagePerShot \* RPS$. No measuring necessary.
 
 ## Bullets to down or kill - BTDOK
 For a target with $x$ hp the BTDOK is calculated as $\\lceil {x \\over Damage} \\rceil$. No measuring necessary.
 
 ## Shots to down or kill - STDOK
-For a target with $x$ hp the STDOK is calculated as $\\lceil {x \\over Damage per shot} \\rceil$. No measuring necessary.
+For a target with $x$ hp the STDOK is calculated as $\\lceil {x \\over DamagePerShot} \\rceil$. No measuring necessary.
 
 ## Time to down or kill - TTDOK
 For a target with $x$ hp the TTDOK in milliseconds is calculated as ${STDOK - 1 \\over rpms}$. No measuring necessary.
 
 ## Magazine capacity
-Most weapons have, in addition to the bullets loaded in the magazine, one bullet loaded in the chamber. For those weapons this value is displayed as $Capacity+1$ (e.g. $30+1$, $20+1$, etc.). For all other weapons without a bullet loaded in the chamber this value is displayed as $Capacity+0$ (e.g. $100+0$, $80+0$).
+Most weapons have, in addition to the bullets loaded in the magazine, one bullet loaded in the chamber. For those weapons this value is displayed as $Capacity+1$ (e.g. $30+1$). For weapons without a bullet loaded in the chamber this value is displayed as $Capacity+0$ (e.g. $100+0$).
 
 ## Aim down sight time - ADS time
 The time in seconds it takes to aim down sight while standing still. The laser attachment increases the ads speed by $10\\%$. The reduced ads time with laser is calculated as $ads \\over 1.1$.
