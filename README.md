@@ -21,8 +21,8 @@ I am using the distance value displayed on the shooting range panel to measure t
 ### Shotguns
 Shotguns are the exception, they have two damage drop-off intervals, usually $\[5; 6]$ and $\[10; 12]$. Because the first interval starts at 5 meters it is not possible to verify the damage below 5 meters in the Shooting Range. Therefor I have to trust Ubisoft on the ingame shotgun damage stats for distances less than 5 meters.
 
-## Hit areas
-There are three body hit areas in R6S: the head, the torso and the limbs. The torso has a damage multiplier of 1 and therefor receives the base damage. This is the value I am measuring. Most weapons deal infinite damage to the head. The only exception are shotguns which deal $150\\%$ of the base damage to the head. Limb damage is a bit more complicated. As of now I believe most weapons deal $75\\%$ of the base damage to limbs. However, there exists at least one exception to this rule though, Kali's CSRX 300, which deals $60\\%$ to limbs. At some point I will test all weapon's limb damage multiplier. soon (tm).
+### Hit areas
+There are three body hit areas in R6S: the head, the torso and the limbs. The torso has a damage multiplier of $1$ and therefor receives the base damage. This is the value I am measuring. Most weapons deal infinite damage to the head. The only exception are shotguns which deal $150\\%$ of the base damage to the head. Limb damage is a bit more complicated. As of now I believe most weapons deal $75\\%$ of the base damage to limbs. However, there exists at least one exception to this rule, Kali's CSRX 300, which deals $60\\%$ to limbs. At some point I will test all weapon's limb damage multiplier. soon (tm).
 
 ## Bullets per shot - Pellet count
 This value is displayed in the shooting range. Most weapons shoot exactly one bullet per shot. The only exception are shotguns, most of which shoot 8 bullets per shot. For shotguns this metric is also called pellet count.
