@@ -11,8 +11,10 @@ I am measuring time intervals by recording the game and going off of frame time.
 
 ## Damage per bullet
 I am measuring the damage values in the in-game Shooting Range which limits my measurements to distances of 5 to 40 meters (thanks Ubi). This would mean that I need to measure 36 distinct damage values (from 5 to 40 meters) per weapon. However:
-* Damage in R6S never increases over distance. It only decreases or stagnates. Therefor, if the damage at distance A is equal to the damage at distance B the damage at all distances inbetween A and B is also equal. Because of this I don't have to measure at all distances. The unmeasured but deducible damage values are supplemented automatically by the Python script.
+* Damage in R6S never increases over distance. It only decreases or stagnates. Therefor, if the damage at distance A is equal to the damage at distance B the damage at all distances inbetween A and B is also equal. Because of this I don't have to measure at all distances.
 * Most weapons in R6S have exactly one damage drop-off interval. Up until drop-off start they deal the base damage. From drop-off start to drop-off end they progressively lose damage over distance. From drop-off end on they deal the final damage. Because of this the damage up until 5 meters (which can't be measured in the shooting range) can be assumed to equal the damage at 5 meters.
+
+The unmeasured but deducible damage values are supplemented automatically by the Python script.
 
 I am using the distance value displayed on the shooting range panel to measure the distance to the dummy. This value (just like yellow ping btw.) is a rounded up integer value (e.g 7.1 m is displayed as 8 m). To position yourself exactly $n$ meters away from the dummy you have to stand where the displayed value is about to switch from $n$ to $n+1$. To measure the weapon damages at the exact distances and not inbetween I am trying to be as precise with this as possible. 
 
