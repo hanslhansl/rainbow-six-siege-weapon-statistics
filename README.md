@@ -4,7 +4,7 @@ Provides detailed statistics for all weapons in Tom Clancy's Rainbow Six Siege.
 After every game patch a spreadsheet of the important stats is [released](https://github.com/hanslhansl/rainbow-six-siege-weapon-statistics/releases). The most recent version can be found on [Google Sheets](https://docs.google.com/spreadsheets/d/1QgbGALNZGLlvf6YyPLtywZnvgIHkstCwGl1tvCt875Q)/[Google Drive](https://docs.google.com/spreadsheets/d/e/2PACX-1vQ1KitQsZksdVP9YPDInxK3xE2gtu1mpUxV5_PNyE8sSm-vFINdbiL8vo9RA2CRSIbIUePLVA1GCTWZ/pubhtml).
 
 # About how the data is collected
-Generally speaking I am trying to collect as much of the data myself and by hand because Ubisoft has proven to be an unreliable source for statistics. At the same time I am trying to cut corners where possible.
+Generally, I am trying to collect as much of the data myself and by hand because Ubisoft has proven to be an unreliable source for statistics. At the same time I am trying to cut corners where possible.
 
 ## Time measuring
 I am measuring time intervals by recording the game and going off of frame time. I am recording at 120 fps which means that, in theory, every time measurement can deviate up to $Δt={1\\over120} s\\approx0.0083 s$ from the actual value. In conclusion, this means that every time related stat (e.g. fire rate, DPS, ads time, ...) should be taken with a grain of salt.
