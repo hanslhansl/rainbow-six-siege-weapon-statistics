@@ -7,12 +7,13 @@ After every game patch a spreadsheet of the important stats is [released](https:
 Generally, I am trying to collect as much of the data myself and by hand because Ubisoft has proven to be an unreliable source for statistics. At the same time I am trying to cut corners where possible.
 
 ## Time measuring
-I am measuring time intervals by recording the game and going off of frame time. I am recording at 120 fps which means that, in theory, every time measurement can deviate up to $Δt={1\\over120} s\\approx0.0083 s$ from the actual value. In conclusion, this means that every time related stat (e.g. fire rate, DPS, ads time, ...) should be taken with a grain of salt.
+I am measuring time intervals by recording the game and going off of frame time. I am recording at 120 fps which means that, in theory, every time measurement can deviate up to $Δt={1\\over120} s\\approx0.0083 s$ from the actual value. In conclusion, this means that every time related stat (e.g. fire rate, dps, ads time, ...) should be taken with a grain of salt.
 
 ## Damage per bullet
 I am measuring the damage values in the in-game Shooting Range which limits my measurements to distances of 5 to 40 meters (thanks Ubi). This would mean that I need to measure 36 distinct damage values (from 5 to 40 meters) per weapon. However:
 * Damage in R6S never increases over distance. It only decreases or stagnates. Therefor, if the damage at distance A is equal to the damage at distance B the damage at all distances inbetween A and B is also equal. Because of this I don't have to measure at all distances. The unmeasured but deducible damage values are supplemented automatically by the Python script.
 * Most weapons in R6S have exactly one damage drop-off interval. Up until drop-off start they deal the base damage. From drop-off start to drop-off end they progressively lose damage over distance. From drop-off end on they deal the final damage. Because of this the damage up until 5 meters (which can't be measured in the shooting range) can be assumed to equal the damage at 5 meters.
+
 I am using the distance value displayed on the shooting range panel to measure the distance to the dummy. This value (just like yellow ping btw.) is a rounded up integer value (e.g 7.1 m is displayed as 8 m). To position yourself exactly $n$ meters away from the dummy you have to stand where the displayed value is about to switch from $n$ to $n+1$. To measure the weapon damages at the exact distances and not inbetween I am trying to be as precise with this as possible. 
 
 ### Shotguns
