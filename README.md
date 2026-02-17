@@ -1,5 +1,6 @@
 # Rainbow Six Siege Weapon Statistics
 Provides detailed statistics for all weapons in Tom Clancy's Rainbow Six Siege.
+
 After every game patch a spreadsheet of the important stats is [released](https://github.com/hanslhansl/rainbow-six-siege-weapon-statistics/releases). The most recent version can be found on [Google Sheets](https://docs.google.com/spreadsheets/d/1QgbGALNZGLlvf6YyPLtywZnvgIHkstCwGl1tvCt875Q)/[Google Drive](https://docs.google.com/spreadsheets/d/e/2PACX-1vQ1KitQsZksdVP9YPDInxK3xE2gtu1mpUxV5_PNyE8sSm-vFINdbiL8vo9RA2CRSIbIUePLVA1GCTWZ/pubhtml).
 
 # About how the data is collected
