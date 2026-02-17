@@ -58,6 +58,4 @@ Ubisoft provides values for the duration of reload animations, i.e. the time bet
 
 More relevant is the time between the ammo counter reaching $0$ (or $1$ in case of a tactical reload and a bullet in the chamber) and again displaying something else (e.g. $30$). This is the definition I am using, partly because it is much easier to automatically measure.
 
-Reload times differ for tactical vs. full reload.
-
-The angled grip increases the reload speed. I couldn't figure out the mathematical correlation so I measured all 4 (2 for weapons without grip) separately.
+Reload times differ for tactical vs. full reload. The angled grip increases the reload speed. I couldn't figure out the mathematical correlation so I measured all 4 (2 for weapons without grip) separately.
