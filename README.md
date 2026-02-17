@@ -28,7 +28,7 @@ There are three body hit areas in R6S: the head, the torso and the limbs. The to
 This value is displayed in the shooting range. Most weapons shoot exactly one bullet per shot. The only exception are shotguns, most of which shoot 8 bullets per shot. For shotguns this metric is also called pellet count.
 
 ## Damage per shot
-The damage per shot is calculated as $DmgPerShot = Damage \* Pellets$. Only for shotguns this value varies from the damage per bullet. No measuring necessary.
+The damage per shot is calculated as $DamagePerShot = Damage \* Pellets$. No measuring necessary. Only for shotguns does this value differ from the damage per bullet.
 
 ## Fire rate
 Currently, for all fully automatic weapons I am using the fire rates listed in-game. For all other weapons I measure the fire rates myself. I am doing this by emptying a magazine of size $n$ and measuring the time $t$ (in seconds) between the in-game ammo counter decreasing the first time and the ammo counter reaching 0. The fire rate in rounds per seconds is calculated as ${n-1 \\over t} rps$ and in rounds per minute as $60{n-1 \\over t} rpm$. It is important to subract $1$ from $n$ because the first bullet is shot immediatelly after pulling the trigger and therefor doesn't contribute to the measured time. Without subtracting $1$ the calculated fire rate would vary with the number of bullets shot (which of course can't be correct).
