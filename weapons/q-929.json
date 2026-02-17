@@ -55,7 +55,7 @@
     "name": "Q-929",
     "pellets": 1,
     "reload_times": [
-        null,
+        0.975,
         null
     ],
     "rpm": 480

@@ -55,7 +55,7 @@
     "name": "5.7 USG",
     "pellets": 1,
     "reload_times": [
-        null,
+        1.192,
         null
     ],
     "rpm": 480

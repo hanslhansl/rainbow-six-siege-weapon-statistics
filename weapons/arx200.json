@@ -55,7 +55,7 @@
     "name": "ARX200",
     "pellets": 1,
     "reload_times": [
-        null,
+        1.209,
         null,
         null,
         null

@@ -97,7 +97,7 @@
     "name": "BEARING 9",
     "pellets": 1,
     "reload_times": [
-        null,
+        1.201,
         null
     ],
     "rpm": 1100
