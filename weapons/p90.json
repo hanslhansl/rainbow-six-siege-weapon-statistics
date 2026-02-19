@@ -97,7 +97,7 @@
     "name": "P90",
     "pellets": 1,
     "reload_times": [
-        null,
+        1.417,
         null
     ],
     "rpm": 970

@@ -97,7 +97,7 @@
     "name": "MPX",
     "pellets": 1,
     "reload_times": [
-        null,
+        1.042,
         null,
         null,
         null

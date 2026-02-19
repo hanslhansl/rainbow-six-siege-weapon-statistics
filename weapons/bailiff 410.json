@@ -55,7 +55,7 @@
     "name": "Bailiff 410",
     "pellets": 4,
     "reload_times": [
-        null,
+        2.237,
         null
     ],
     "rpm": 500

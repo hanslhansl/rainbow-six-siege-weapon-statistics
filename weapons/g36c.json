@@ -97,7 +97,7 @@
     "name": "G36C",
     "pellets": 1,
     "reload_times": [
-        null,
+        1.145,
         null,
         null,
         null

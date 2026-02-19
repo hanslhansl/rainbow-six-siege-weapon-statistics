@@ -97,7 +97,7 @@
     "name": "P10 RONI",
     "pellets": 1,
     "reload_times": [
-        null,
+        0.826,
         null,
         null,
         null

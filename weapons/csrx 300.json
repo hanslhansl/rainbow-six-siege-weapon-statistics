@@ -55,7 +55,7 @@
     "name": "CSRX 300",
     "pellets": 1,
     "reload_times": [
-        null,
+        1.145,
         null
     ],
     "rpm": 50

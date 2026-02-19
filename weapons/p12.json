@@ -55,7 +55,7 @@
     "name": "P12",
     "pellets": 1,
     "reload_times": [
-        null,
+        1.133,
         null
     ],
     "rpm": 480

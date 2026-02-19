@@ -97,7 +97,7 @@
     "name": "416-C CARBINE",
     "pellets": 1,
     "reload_times": [
-        null,
+        1.101,
         null,
         null,
         null

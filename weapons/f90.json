@@ -97,7 +97,7 @@
     "name": "F90",
     "pellets": 1,
     "reload_times": [
-        null,
+        1.165,
         null,
         null,
         null

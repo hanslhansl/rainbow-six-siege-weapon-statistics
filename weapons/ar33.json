@@ -55,7 +55,7 @@
     "name": "AR33",
     "pellets": 1,
     "reload_times": [
-        null,
+        1.032,
         null,
         null,
         null

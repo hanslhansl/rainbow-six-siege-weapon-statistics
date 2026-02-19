@@ -97,7 +97,7 @@
     "name": "SPEAR .308",
     "pellets": 1,
     "reload_times": [
-        null,
+        1.154,
         null,
         null,
         null

@@ -55,7 +55,7 @@
     "name": "SDP 9mm",
     "pellets": 1,
     "reload_times": [
-        null,
+        0.89,
         null
     ],
     "rpm": 480

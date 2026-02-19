@@ -13,7 +13,7 @@ attachment_overview_file_name = "attachment_overview"
 xlsx_output_file_name = "rainbow-six-siege-weapon-statistics"
 
 # the directory containing the weapon damage files
-weapon_data_dir = "weapons"
+weapon_data_directory = "weapons"
 
 # the distance the weapon damage stats start at (usually 0)
 first_distance = 0
@@ -40,7 +40,7 @@ weapon_colors = {"AR":"#5083EA",
 ###################################################
 
 #imports
-import os, json, typing, copy, sys, itertools, colorama, sys, colorsys, pandas as pd, pandas.io.formats.style, numpy as np, io, math, colorlog, logging
+import os, json, typing, copy, sys, itertools, colorama, sys, colorsys, pandas as pd, pandas.io.formats.style, numpy as np, io, math, colorlog, logging, atexit, pathlib
 import openpyxl, dataclasses_json, warnings, googleapiclient.http, openpyxl.workbook.workbook, googleapiclient.discovery, functools
 import google.oauth2.service_account, marshmallow.exceptions, time
 from openpyxl.cell.text import InlineFont
@@ -49,6 +49,7 @@ from openpyxl.styles import PatternFill, Border, Alignment, NamedStyle, Side, Fo
 from openpyxl.utils import get_column_letter
 from dataclasses import dataclass, field, InitVar, replace
 
+BASE_DIR = pathlib.Path(__file__).resolve().parent
 
 handler = colorlog.StreamHandler()
 handler.setFormatter(colorlog.ColoredFormatter(
@@ -61,7 +62,6 @@ handler.setFormatter(colorlog.ColoredFormatter(
         'CRITICAL': 'bold_red',
     }
 ))
-
 logger = logging.getLogger()
 logger.setLevel(logging.INFO)
 logger.addHandler(handler)
@@ -70,9 +70,13 @@ logger.addHandler(handler)
 # colorama.just_fix_windows_console()
 patch_version = sys.argv[1] if len(sys.argv) > 1 else "<insert patch>"
 
-operators_file_name += ".json"
-attachment_overview_file_name += ".json"
-xlsx_output_file_name += ".xlsx"
+operators_file_path = (BASE_DIR / operators_file_name).with_suffix(".json")
+assert operators_file_path.is_file(), f"{operators_file_path} is not a valid file path."
+attachment_overview_file_path = (BASE_DIR / attachment_overview_file_name).with_suffix(".json")
+assert attachment_overview_file_path.is_file(), f"{attachment_overview_file_path} is not a valid file path."
+xlsx_output_file_path = (BASE_DIR / xlsx_output_file_name).with_suffix(".xlsx")
+weapon_data_directory = BASE_DIR / weapon_data_directory
+assert weapon_data_directory.is_dir(), f"{weapon_data_directory} is not a valid directory."
 
 github_link = "https://github.com/hanslhansl/Rainbow-Six-Siege-Weapon-Statistics/"
 google_sheets_link = "https://docs.google.com/spreadsheets/d/1QgbGALNZGLlvf6YyPLtywZnvgIHkstCwGl1tvCt875Q"
@@ -80,21 +84,15 @@ google_drive_link = "https://docs.google.com/spreadsheets/d/e/2PACX-1vQ1KitQsZks
 
 tdok_hp_levels = (100, 110, 125, 120, 130, 145)
 tdok_with_rook = (False, False, False, True, True, True)
-tdok_levels_descriptions = tuple(f"{int(i%3)+1} armor {'+ rook ' if with_rook else ''}({hp} hp)"
-                                 for i, (hp, with_rook) in enumerate(zip(tdok_hp_levels, tdok_with_rook)))
-tdok_levels_descriptions_short = tuple(f"{int(i%3)+1}A{'+R' if with_rook else ''} ({hp})"
-                                 for i, (hp, with_rook) in enumerate(zip(tdok_hp_levels, tdok_with_rook)))
+tdok_levels_descriptions = tuple(f"{int(i%3)+1} armor {'+ rook ' if with_rook else ''}({hp} hp)" for i, (hp, with_rook) in enumerate(zip(tdok_hp_levels, tdok_with_rook)))
+tdok_levels_descriptions_short = tuple(f"{int(i%3)+1}A{'+R' if with_rook else ''} ({hp})" for i, (hp, with_rook) in enumerate(zip(tdok_hp_levels, tdok_with_rook)))
 
 top_alignment = Alignment(vertical="top", wrapText=True)
 center_alignment = Alignment("center", wrapText=True)
 left_alignment = Alignment("left", wrapText=True)
-black_border = Border(*(Side(border_style="medium", color="000000") for i in range(4)))
+black_border = Border(*(Side(border_style="medium", color="000000") for _ in range(4)))
 
 # check if the settings are correct
-if not os.path.isfile(operators_file_name):
-    raise Exception(f"{operators_file_name!r} is not a valid file path.")
-if not os.path.isdir(weapon_data_dir):
-    raise Exception(f"{weapon_data_dir!r} is not a valid directory.")
 if not 0 <= first_distance:
     raise Exception(f"'first_distance' must be >=0 but is {first_distance!r}.")
 if not first_distance <= last_distance:
@@ -203,21 +201,21 @@ def illustration_method(func):
 class Weapons:
 
     def __init__(self):
-        attachment_categories = deserialize_json(attachment_overview_file_name)
+        attachment_categories = deserialize_json(attachment_overview_file_path)
         Weapon.extended_barrel_damage_multiplier = 1.0 + attachment_categories["Barrels"]["Extended barrel"]["damage bonus"]
         Weapon.laser_ads_speed_multiplier = 1.0 + attachment_categories["Under Barrel"]["Laser"]["ads speed bonus"]
         Weapon.angled_grip_reload_speed_multiplier = 1.0 + attachment_categories["Grips"]["Angled grip"]["weapon reload speed bonus"]
 
         # get operators
-        json_content = deserialize_json(operators_file_name)
+        json_content = deserialize_json(operators_file_path)
         if type(json_content) != dict:
-            raise Exception(f"File '{operators_file_name}' doesn't deserialize to a dict of operators and weapons lists.")
+            raise Exception(f"File '{operators_file_path}' doesn't deserialize to a dict of operators and weapons lists.")
         self.operators = [Operator(js, op_name) for (op_name, js) in json_content.items()]
 
         # get weapons
         weapons : list[Weapon] = []
-        for file_name in os.listdir(weapon_data_dir):
-            file_path = os.path.join(weapon_data_dir, file_name)
+        for file_name in os.listdir(weapon_data_directory):
+            file_path = os.path.join(weapon_data_directory, file_name)
 
             name, extension = os.path.splitext(file_name);		
             if not extension == ".json":
@@ -565,7 +563,7 @@ class Weapon(_Weapon):
             raise Exception(f"Weapon '{self.name}' has an invalid weapon class '{json_content["class"]}'.")
         
         # correct reload times (for now)
-        if not all(rt is not None for rt in self.reload_times[:2]):
+        if not all(rt is not None for rt in self.reload_times[:1]):
             logger.warning(f"Weapon '{self.name}' has invalid reload times '{self.reload_times}'")
 
         if not self.has_grip and len(self.reload_times) == 2:
@@ -953,10 +951,10 @@ def add_extended_barrel_overview(worksheet : typing.Any, ws : Weapons, row : int
     return row
 
 def add_attachment_overview(workbook : typing.Any, ws : Weapons):
-    json_content = deserialize_json(attachment_overview_file_name)
+    json_content = deserialize_json(attachment_overview_file_path)
     
     if not isinstance(json_content, dict):
-        raise Exception(f"File '{attachment_overview_file_name}' doesn't deserialize to a dictionary.")
+        raise Exception(f"File '{attachment_overview_file_path}' doesn't deserialize to a dictionary.")
     attachment_categories : dict[str, typing.Any] = json_content
 
     worksheet = workbook.create_sheet("attachments")
@@ -967,7 +965,7 @@ def add_attachment_overview(workbook : typing.Any, ws : Weapons):
 
     for attachment_category, attachment_dict in attachment_categories.items():
         if not isinstance(attachment_dict, dict):
-            raise Exception(f"An attachment category in file '{attachment_overview_file_name}' doesn't deserialize to a dictionary but to '{type(attachment_dict)}'.")
+            raise Exception(f"An attachment category in file '{attachment_overview_file_path}' doesn't deserialize to a dictionary but to '{type(attachment_dict)}'.")
         attachment_dict : dict[str, typing.Any]
 
         c = worksheet.cell(row=row, column=1)
@@ -976,7 +974,7 @@ def add_attachment_overview(workbook : typing.Any, ws : Weapons):
         
         for attachment_name, attachment in attachment_dict.items():
             if not isinstance(attachment, dict):
-                raise Exception(f"An attachment in file '{attachment_overview_file_name}' doesn't deserialize to a dictionary but to '{type(attachment)}'.")
+                raise Exception(f"An attachment in file '{attachment_overview_file_path}' doesn't deserialize to a dictionary but to '{type(attachment)}'.")
 
             worksheet.merge_cells(start_row=row, end_row=row, start_column=2, end_column=1 + 19)
             c = worksheet.cell(row=row, column=2)
@@ -1099,12 +1097,12 @@ def save_to_xlsx_file(ws : Weapons):
 
     # save to file
     start = time.time()
-    workbook.save(xlsx_output_file_name)
+    workbook.save(xlsx_output_file_path)
     end = time.time()
     logger.info(f"write excel file: {end - start} s")
     start = time.time()
     
-    return xlsx_output_file_name
+    return xlsx_output_file_path
 
 if __name__ == "__main__":
 
@@ -1171,5 +1169,5 @@ if __name__ == "__main__":
 
     else:
         # we are local
-        os.system("start " + excel_file_name)
+        os.system(f"start {excel_file_name}")
 

@@ -23,11 +23,9 @@ MIN_NUMBER_PIXELS_RATIO = 0.08
 
 
 # --- CODE ---
-import cv2, numpy as np, sys, typing, time, av, atexit, pathlib, scipy.optimize, scipy.special, argparse
+import cv2, numpy as np, sys, typing, time, av, atexit, pathlib, scipy.optimize, scipy.special, argparse, collections, json
 from dataclasses import dataclass
 from decimal import Decimal, ROUND_HALF_UP
-atexit.register(lambda: input("\nPress Enter to exit..."))
-
 
 # --- Argument parsing ---
 parser = argparse.ArgumentParser(
@@ -53,24 +51,11 @@ role_group.add_argument(
     help="secondary weapon"
 )
 
-# Group 2: tactical vs full
-mode_group = parser.add_mutually_exclusive_group(required=True)
-mode_group.add_argument(
-    "--tactical",
-    action="store_true",
-    help="tactical reload"
-)
-mode_group.add_argument(
-    "--full",
-    action="store_false",
-    help="full reload"
-)
-
 
 # --- Video processing ---
 @dataclass
 class Status:
-    type: typing.Literal["TARGET", "ANY", "NONE"]
+    type: typing.Literal["ZERO", "ONE", "ANY", "NONE"]
     start: float
     end: float
 
@@ -78,8 +63,53 @@ class Status:
 class ReloadEvent:
     statistical_duration: float
     radius: float
+    type : typing.Literal["TACTICAL", "FULL"]
 
-def process_rect(img, tactical):
+def classify_one(cropped_mask):
+    status = "ANY"
+    h, w = cropped_mask.shape
+    aspect = w / h
+    if aspect <= MAX_ASPECT_RATIO_FOR_ONE:
+        status = "ONE"
+    reason = f"aspect ratio: {aspect:.4f}"
+    return status, reason
+
+def classify_zero(cropped_mask):
+    h, w = cropped_mask.shape
+    status = "ANY"
+
+    # find contours
+    contours, hierarchy = cv2.findContours(
+        cropped_mask,
+        cv2.RETR_CCOMP,
+        cv2.CHAIN_APPROX_SIMPLE
+    )
+    reason = f"contours: {len(contours)}"
+    
+    # check if there's exactly one hole
+    if len(contours) == 2:
+        hole, = [cnt for i, cnt in enumerate(contours) if hierarchy[0][i][3] != -1]
+
+        hx, hy, hw, hh = cv2.boundingRect(hole)
+        hx = hx + hw / 2
+        hy = hy + hh / 2
+        hole_center_relative_x_offset = abs(hx/w - 0.5)
+        hole_center_relative_y_offset = abs(hy/h - 0.5)
+        reason = f"hole center rel offset: ({hole_center_relative_x_offset:.4f}, {hole_center_relative_y_offset:.4f})"
+
+        # check if the hole is centered
+        if hole_center_relative_x_offset <= MIN_RELATIVE_HOLE_CENTER_OFFSET_FOR_ZERO and hole_center_relative_y_offset <= MIN_RELATIVE_HOLE_CENTER_OFFSET_FOR_ZERO:
+
+            hole_height_ratio = hh / h
+            reason = f"rel hole height: ({hole_height_ratio:.4f})"
+
+            # check if the hole is high enough
+            if hole_height_ratio >= MIN_RELATIVE_HOLE_HEIGHT_FOR_ZERO:
+                status = "ZERO"
+
+    return status, reason
+
+def process_rect(img):
     # Strict but tolerant RGB mask: red/black with GB noise allowed
     B, G, R = cv2.split(img)
     mask = ((G < 0x40) & (B < 0x40)).astype(np.uint8) * 255
@@ -111,48 +141,16 @@ def process_rect(img, tactical):
     x, y, w, h = cv2.boundingRect(nonzero_points)
     cropped_mask = cleaned_mask[y:y+h, x:x+w]
 
-    h, w = cropped_mask.shape
     status = "ANY"
     reason = f"valid blobs: {valid_blobs}"
     if valid_blobs == 1:
-        if tactical:
-            aspect = w / h
-            if aspect <= MAX_ASPECT_RATIO_FOR_ONE:
-                status = "TARGET"
-            reason = f"aspect ratio: {aspect:.4f}"
-        else:
-            # find contours
-            contours, hierarchy = cv2.findContours(
-                cropped_mask,
-                cv2.RETR_CCOMP,
-                cv2.CHAIN_APPROX_SIMPLE
-            )
-            reason = f"contours: {len(contours)}"
-            
-            # check if there's exactly one hole
-            if len(contours) == 2:
-                hole, = [cnt for i, cnt in enumerate(contours) if hierarchy[0][i][3] != -1]
-
-                hx, hy, hw, hh = cv2.boundingRect(hole)
-                hx = hx + hw / 2
-                hy = hy + hh / 2
-                hole_center_relative_x_offset = abs(hx/w - 0.5)
-                hole_center_relative_y_offset = abs(hy/h - 0.5)
-                reason = f"hole center rel offset: ({hole_center_relative_x_offset:.4f}, {hole_center_relative_y_offset:.4f})"
-
-                # check if the hole is centered
-                if hole_center_relative_x_offset <= MIN_RELATIVE_HOLE_CENTER_OFFSET_FOR_ZERO and hole_center_relative_y_offset <= MIN_RELATIVE_HOLE_CENTER_OFFSET_FOR_ZERO:
-
-                    hole_height_ratio = hh / h
-                    reason = f"rel hole height: ({hole_height_ratio:.4f})"
-
-                    # check if the hole is high enough
-                    if hole_height_ratio >= MIN_RELATIVE_HOLE_HEIGHT_FOR_ZERO:
-                        status = "TARGET"
+        status, reason = classify_one(cropped_mask)
+        if status != "ONE":
+            status, reason = classify_zero(cropped_mask)
 
     return status, reason, mask, morphed_mask, cleaned_mask
 
-def process_video(video_path, primary, tactical):
+def process_video(video_path, primary):
     print("--- Video File ---")
 
     with av.open(video_path) as container:
@@ -181,7 +179,7 @@ def process_video(video_path, primary, tactical):
             rect = frame.to_rgb().to_ndarray(format="bgr24")[rect_y:rect_y+rect_h, rect_x:rect_x+rect_w]
 
             # get status from rect
-            status, reason, *masks = process_rect(rect, tactical)
+            status, reason, *masks = process_rect(rect)
 
             # update states
             frame_time = frame.time
@@ -190,7 +188,7 @@ def process_video(video_path, primary, tactical):
 
                 if len(states) > 2:
                     e0, e1, e2 = states[-3:]
-                    if e0.type == "ANY" and e1.type == "TARGET" and e2.type == "ANY":
+                    if (e0.type in ("ANY", "ONE") and e1.type == "ZERO" and e2.type in ("ANY", "ONE")) or (e0.type == "ANY" and e1.type == "ONE" and e2.type == "ANY"):
                         t0, t1 = e0.end, e1.start
                         t2, t3 = e1.end, e2.start
                         assert t0 < t1 < t2 < t3, f"Timestamps must be in order: {t0}, {t1}, {t2}, {t3}"
@@ -198,8 +196,9 @@ def process_video(video_path, primary, tactical):
                         E = (t2 + t3) / 2
                         D = E - S
                         R = (-t0 + t3 - t2 + t1) / 2
-                        reload_events.append(ReloadEvent(statistical_duration=D, radius=R))
-                        sys.stdout.write(f"\r\033[Kreload: {S:10.6f}s → {E:10.6f}s | Δt: {D:.6f} ± {R:.6f} s | min/max Δt: {t2 - t1:.6f}/{t3 - t0:.6f} s\n")
+                        type = "TACTICAL" if e1.type=="ONE" else "FULL"
+                        reload_events.append(ReloadEvent(statistical_duration=D, radius=R, type=type))
+                        sys.stdout.write(f"\r\033[K{type} reload: {S:10.6f}s → {E:10.6f}s | Δt: {D:.6f} ± {R:.6f} s | min/max Δt: {t2 - t1:.6f}/{t3 - t0:.6f} s\n")
                         sys.stdout.flush()
             else:
                 states[-1].end = frame_time
@@ -235,39 +234,78 @@ def interval_cost(D, measurements, sigma=0.0005, delta=1.5):
         total += scipy.special.huber(delta, v / sigma)
     return total
 
+def round_half_up(fl, ndigits=0):
+    q = Decimal('1.' + '0' * ndigits)
+    return float(Decimal.from_float(fl).quantize(q, rounding=ROUND_HALF_UP))
+
 def analyze_reload_events(reload_events : list[ReloadEvent]):
     print("\n--- Analysis ---")
 
-    # Run optimization, initial guess: weighted average
-    x0 = np.mean([m.statistical_duration for m in reload_events])
+    groups : collections.defaultdict[str, list[ReloadEvent]] = collections.defaultdict(list)
+    for event in reload_events:
+        groups[event.type].append(event)
+    event_groups = list(groups.values())
 
-    res = scipy.optimize.minimize(
-        interval_cost,
-        x0=[x0],
-        args=(reload_events,),
-        method='Nelder-Mead',  # robust 1D optimizer
-        options={'xatol':1e-9, 'disp': True}
-    )
-    D_star = res.x[0]
+    result : list[tuple[float, float, str]] = []
 
-    # Estimate effective radius (uncertainty), max violation after robust estimate
-    R_star = max(max(0.0, abs(D_star - m.statistical_duration) - m.radius) for m in reload_events)
+    for event_group in event_groups:
+        type = event_group[0].type
 
-    print(f"Statistical reload duration: {D_star} ± {R_star} s")
-    def round_half_up(fl, ndigits=0):
-        q = Decimal('1.' + '0' * ndigits)
-        return float(Decimal.from_float(fl).quantize(q, rounding=ROUND_HALF_UP))
-    print(f"Rounded to 3 decimal places: {round_half_up(D_star, ndigits=3)} ± {round_half_up(R_star, ndigits=3)} s")
+        # Run optimization, initial guess: weighted average
+        x0 = np.mean([m.statistical_duration for m in event_group])
+
+        res = scipy.optimize.minimize(
+            interval_cost,
+            x0=[x0],
+            args=(event_group,),
+            method='Nelder-Mead',  # robust 1D optimizer
+            options={'xatol':1e-9, 'disp': False}
+        )
+        D_star = res.x[0]
+
+        # Estimate effective radius (uncertainty), max violation after robust estimate
+        R_star = max(max(0.0, abs(D_star - m.statistical_duration) - m.radius) for m in event_group)
+
+        print(f"{len(event_group)} {type} reloads, statistical duration: {D_star} ± {R_star} s")
+        print(f"rounded to 3 decimal places: {round_half_up(D_star, ndigits=3)} ± {round_half_up(R_star, ndigits=3)} s\n")
+
+        result.append((D_star, R_star, type))
+    return result
 
 
 if __name__ == "__main__":
     args = parser.parse_args()
+    atexit.register(lambda: input("\npress enter to exit..."))
     VIDEO_PATH = pathlib.Path(args.filepath)
     assert VIDEO_PATH.is_file(), f"Video file not found: {VIDEO_PATH}"
-    reload_events = process_video(VIDEO_PATH, args.primary, args.tactical)
-    analyze_reload_events(reload_events)
+    reload_events = process_video(VIDEO_PATH, args.primary)
+    result = analyze_reload_events(reload_events)
 
-    print(f"\nfinished scanning for {'primary' if args.primary else 'secondary'} weapon {'tactical' if args.tactical else 'full'} reloads in video: {VIDEO_PATH}")
+    print(f"finished scanning for {'primary' if args.primary else 'secondary'} weapon reloads in video: {VIDEO_PATH}", end="")
+
+    parent_path = pathlib.Path(__file__).parent
+    weapons_dict = {path.stem: path for path in (parent_path / "weapons").glob("*.json")}
+    
+    # Get weapon name from video file and update corresponding JSON
+    weapon_json_path = weapons_dict[VIDEO_PATH.stem]
+    with open(weapon_json_path, 'r') as f:
+        weapon_data = json.load(f)
+    
+    # Update reload_times based on results
+    for D_star, R_star, reload_type in result:
+        assert R_star < 0.0084, f"Unreasonably high uncertainty: {R_star:.3f} s"
+        assert reload_type in ("TACTICAL", "FULL"), f"Unexpected reload type: {reload_type}"
+        index = 0 if reload_type == "TACTICAL" else 1
+        weapon_data["reload_times"][index] = round_half_up(D_star, 3)
+    
+    # Save the updated JSON file
+    with open(weapon_json_path, 'w') as f:
+        json.dump(weapon_data, f, indent=4)
+    
+    print(f"Updated {weapon_json_path}")
+    
+    # for D_star, R_star, type in result:
+    #     print(f"\n{type} reload: {D_star:.3f} ± {R_star:.3f} s")
 
 
 """

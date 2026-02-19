@@ -97,7 +97,7 @@
     "name": "POF-9",
     "pellets": 1,
     "reload_times": [
-        null,
+        1.258,
         null,
         null,
         null

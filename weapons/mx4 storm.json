@@ -97,7 +97,7 @@
     "name": "Mx4 Storm",
     "pellets": 1,
     "reload_times": [
-        null,
+        1.343,
         null,
         null,
         null

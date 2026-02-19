@@ -55,7 +55,7 @@
     "name": "PMR90A2",
     "pellets": 1,
     "reload_times": [
-        null,
+        1.5,
         null,
         null,
         null

@@ -55,7 +55,7 @@
     "name": "T-95 LSW",
     "pellets": 1,
     "reload_times": [
-        null,
+        1.265,
         null,
         null,
         null

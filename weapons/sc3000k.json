@@ -97,7 +97,7 @@
     "name": "SC3000K",
     "pellets": 1,
     "reload_times": [
-        null,
+        1.048,
         null,
         null,
         null

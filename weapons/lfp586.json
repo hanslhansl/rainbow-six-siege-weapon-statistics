@@ -55,7 +55,7 @@
     "name": "LFP586",
     "pellets": 1,
     "reload_times": [
-        null,
+        1.891,
         null
     ],
     "rpm": 480

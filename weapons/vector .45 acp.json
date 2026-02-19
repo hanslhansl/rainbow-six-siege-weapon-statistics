@@ -97,7 +97,7 @@
     "name": "VECTOR .45 ACP",
     "pellets": 1,
     "reload_times": [
-        null,
+        0.992,
         null,
         null,
         null

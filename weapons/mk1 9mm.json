@@ -55,7 +55,7 @@
     "name": "MK1 9mm",
     "pellets": 1,
     "reload_times": [
-        null,
+        0.775,
         null
     ],
     "rpm": 480

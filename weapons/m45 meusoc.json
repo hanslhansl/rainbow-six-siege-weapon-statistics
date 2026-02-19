@@ -55,7 +55,7 @@
     "name": "M45 MEUSOC",
     "pellets": 1,
     "reload_times": [
-        null,
+        0.749,
         null
     ],
     "rpm": 480

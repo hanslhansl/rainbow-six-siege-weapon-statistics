@@ -55,7 +55,7 @@
     "name": "PMM",
     "pellets": 1,
     "reload_times": [
-        null,
+        0.692,
         null
     ],
     "rpm": 480
