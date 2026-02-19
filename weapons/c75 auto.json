@@ -55,7 +55,7 @@
     "name": "C75 Auto",
     "pellets": 1,
     "reload_times": [
-        null,
+        0.917,
         null
     ],
     "rpm": 1000

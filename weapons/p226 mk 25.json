@@ -55,7 +55,7 @@
     "name": "P226 MK 25",
     "pellets": 1,
     "reload_times": [
-        null,
+        1.093,
         null
     ],
     "rpm": 480

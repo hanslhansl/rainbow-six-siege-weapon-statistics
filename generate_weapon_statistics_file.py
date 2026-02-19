@@ -572,6 +572,7 @@ class Weapon(_Weapon):
             pass
         else:
             raise Exception(f"Weapon '{self.name}' has invalid reload times '{self.reload_times}'")
+        self.reload_times = (self.reload_times[0],) + (None,)*3
 
         # derived fields
         self.base_name = self.name

@@ -55,7 +55,7 @@
     "name": "CAMRS",
     "pellets": 1,
     "reload_times": [
-        null,
+        1.364,
         null,
         null,
         null

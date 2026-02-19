@@ -55,7 +55,7 @@
     "name": "RG15",
     "pellets": 1,
     "reload_times": [
-        null,
+        1.044,
         null
     ],
     "rpm": 480

@@ -40,17 +40,8 @@ parser.add_argument(
 
 # Group 1: primary vs secondary
 role_group = parser.add_mutually_exclusive_group(required=True)
-role_group.add_argument(
-    "--primary",
-    action="store_true",
-    help="primary weapon"
-)
-role_group.add_argument(
-    "--secondary",
-    action="store_false",
-    help="secondary weapon"
-)
-
+role_group.add_argument("--primary", dest="mode", action="store_const", const="primary")
+role_group.add_argument("--secondary", dest="mode", action="store_const", const="secondary")
 
 # --- Video processing ---
 @dataclass
@@ -150,7 +141,7 @@ def process_rect(img):
 
     return status, reason, mask, morphed_mask, cleaned_mask
 
-def process_video(video_path, primary):
+def process_video(video_path, mode):
     print("--- Video File ---")
 
     with av.open(video_path) as container:
@@ -161,7 +152,11 @@ def process_video(video_path, primary):
         height = stream.height
         print(f"resolution: {width}x{height}")
         rect_x = int(rect_rel_x * width)
-        rect_y = int((rect_rel_y + (0 if primary else secondary_rect_y_offset)) * height)
+        if mode == "primary":
+            y_offset = 0
+        elif mode == "secondary":
+            y_offset = secondary_rect_y_offset
+        rect_y = int((rect_rel_y + y_offset) * height)
         rect_w = int(rect_rel_w * width)
         rect_h = int(rect_rel_h * height)
 
@@ -186,20 +181,33 @@ def process_video(video_path, primary):
             if len(states) == 0 or status != states[-1].type:
                 states.append(Status(type=status, start=frame_time, end=frame_time))
 
-                if len(states) > 2:
-                    e0, e1, e2 = states[-3:]
-                    if (e0.type in ("ANY", "ONE") and e1.type == "ZERO" and e2.type in ("ANY", "ONE")) or (e0.type == "ANY" and e1.type == "ONE" and e2.type == "ANY"):
-                        t0, t1 = e0.end, e1.start
-                        t2, t3 = e1.end, e2.start
-                        assert t0 < t1 < t2 < t3, f"Timestamps must be in order: {t0}, {t1}, {t2}, {t3}"
-                        S = (t0 + t1) / 2
-                        E = (t2 + t3) / 2
-                        D = E - S
-                        R = (-t0 + t3 - t2 + t1) / 2
-                        type = "TACTICAL" if e1.type=="ONE" else "FULL"
-                        reload_events.append(ReloadEvent(statistical_duration=D, radius=R, type=type))
-                        sys.stdout.write(f"\r\033[K{type} reload: {S:10.6f}s → {E:10.6f}s | Δt: {D:.6f} ± {R:.6f} s | min/max Δt: {t2 - t1:.6f}/{t3 - t0:.6f} s\n")
-                        sys.stdout.flush()
+                type = None
+
+                if len(states) >= 3:
+                    e2, e1, e0 = states[-3:]
+                    if e2.type == "ANY" and e1.type in ("ZERO", "ONE") and e0.type == "ANY": # tactical
+                        t0, t1 = e2.end, e1.start
+                        t2, t3 = e1.end, e0.start
+                        type = "TACTICAL"
+
+                if len(states) >= 4:
+                    e3, e2, e1, e0 = states[-4:]
+                    if e3.type == "ANY" and e2.type == "ONE" and e1.type == "ZERO" and e0.type == "ANY": # full
+                        t0, t1 = e2.end, e1.start
+                        t2, t3 = e1.end, e0.start
+                        type = "FULL"
+
+                if type is not None:
+                    t0, t1 = e2.end, e1.start
+                    t2, t3 = e1.end, e0.start
+                    assert t0 < t1 < t2 < t3, f"Timestamps must be in order: {t0}, {t1}, {t2}, {t3}"
+                    S = (t0 + t1) / 2
+                    E = (t2 + t3) / 2
+                    D = E - S
+                    R = (-t0 + t3 - t2 + t1) / 2
+                    reload_events.append(ReloadEvent(statistical_duration=D, radius=R, type=type))
+                    sys.stdout.write(f"\r\033[K{type} reload: {S:10.6f}s → {E:10.6f}s | Δt: {D:.6f} ± {R:.6f} s | min/max Δt: {t2 - t1:.6f}/{t3 - t0:.6f} s\n")
+                    sys.stdout.flush()
             else:
                 states[-1].end = frame_time
 
@@ -211,7 +219,7 @@ def process_video(video_path, primary):
             
             # display mask
             # cv2.imshow("Video", np.hstack((rect, *(cv2.cvtColor(m, cv2.COLOR_GRAY2BGR) for m in masks))))
-            # if cv2.waitKey(0 if status == "TARGET" else 0) & 0xFF == ord('q'):
+            # if cv2.waitKey(1) & 0xFF == ord('q'):
             #     break
 
     cv2.destroyAllWindows()
@@ -250,6 +258,7 @@ def analyze_reload_events(reload_events : list[ReloadEvent]):
 
     for event_group in event_groups:
         type = event_group[0].type
+        assert len(event_group) >= 7, f"Not enough measurements for {type} reload: {len(event_group)} (need at least 7 for robust estimation)"
 
         # Run optimization, initial guess: weighted average
         x0 = np.mean([m.statistical_duration for m in event_group])
@@ -274,20 +283,21 @@ def analyze_reload_events(reload_events : list[ReloadEvent]):
 
 
 if __name__ == "__main__":
-    args = parser.parse_args()
     atexit.register(lambda: input("\npress enter to exit..."))
+    args = parser.parse_args()
     VIDEO_PATH = pathlib.Path(args.filepath)
     assert VIDEO_PATH.is_file(), f"Video file not found: {VIDEO_PATH}"
-    reload_events = process_video(VIDEO_PATH, args.primary)
+    reload_events = process_video(VIDEO_PATH, args.mode)
     result = analyze_reload_events(reload_events)
 
-    print(f"finished scanning for {'primary' if args.primary else 'secondary'} weapon reloads in video: {VIDEO_PATH}", end="")
+    print(f"finished scanning for {'primary' if args.mode == 'primary' else 'secondary' if args.mode == 'secondary' else ''} weapon reloads in video: {VIDEO_PATH}")
 
     parent_path = pathlib.Path(__file__).parent
     weapons_dict = {path.stem: path for path in (parent_path / "weapons").glob("*.json")}
     
     # Get weapon name from video file and update corresponding JSON
-    weapon_json_path = weapons_dict[VIDEO_PATH.stem]
+    weapon_name = VIDEO_PATH.stem
+    weapon_json_path = weapons_dict[weapon_name]
     with open(weapon_json_path, 'r') as f:
         weapon_data = json.load(f)
     
@@ -296,6 +306,7 @@ if __name__ == "__main__":
         assert R_star < 0.0084, f"Unreasonably high uncertainty: {R_star:.3f} s"
         assert reload_type in ("TACTICAL", "FULL"), f"Unexpected reload type: {reload_type}"
         index = 0 if reload_type == "TACTICAL" else 1
+        assert weapon_data["reload_times"][index] is None, f"Reload time for {reload_type} reload already set for {weapon_name}: {weapon_data['reload_times'][index]}"
         weapon_data["reload_times"][index] = round_half_up(D_star, 3)
     
     # Save the updated JSON file
@@ -304,9 +315,6 @@ if __name__ == "__main__":
     
     print(f"Updated {weapon_json_path}")
     
-    # for D_star, R_star, type in result:
-    #     print(f"\n{type} reload: {D_star:.3f} ± {R_star:.3f} s")
-
 
 """
 

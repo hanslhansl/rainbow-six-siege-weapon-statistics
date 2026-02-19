@@ -55,7 +55,7 @@
     "name": "SKELETON KEY",
     "pellets": 8,
     "reload_times": [
-        null,
+        0.965,
         null
     ],
     "rpm": 220

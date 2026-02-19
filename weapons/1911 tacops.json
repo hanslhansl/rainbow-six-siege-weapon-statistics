@@ -55,7 +55,7 @@
     "name": "1911 TACOPS",
     "pellets": 1,
     "reload_times": [
-        null,
+        1.04,
         null
     ],
     "rpm": 480

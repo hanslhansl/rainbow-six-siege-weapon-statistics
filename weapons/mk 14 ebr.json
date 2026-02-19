@@ -55,7 +55,7 @@
     "name": "Mk 14 EBR",
     "pellets": 1,
     "reload_times": [
-        null,
+        1.133,
         null,
         null,
         null

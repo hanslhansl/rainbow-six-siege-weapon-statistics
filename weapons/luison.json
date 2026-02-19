@@ -55,7 +55,7 @@
     "name": "LUISON",
     "pellets": 1,
     "reload_times": [
-        null,
+        1.096,
         null
     ],
     "rpm": 440

@@ -55,7 +55,7 @@
     "name": "SPAS-15",
     "pellets": 8,
     "reload_times": [
-        null,
+        0.9,
         null
     ],
     "rpm": 300

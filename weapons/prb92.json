@@ -55,7 +55,7 @@
     "name": "PRB92",
     "pellets": 1,
     "reload_times": [
-        null,
+        1.1,
         null
     ],
     "rpm": 480

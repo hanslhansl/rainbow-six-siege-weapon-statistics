@@ -55,7 +55,7 @@
     "name": "LMG-E",
     "pellets": 1,
     "reload_times": [
-        null,
+        4.013,
         null,
         null,
         null

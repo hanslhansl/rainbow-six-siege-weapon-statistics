@@ -55,7 +55,7 @@
     "name": "SASG-12",
     "pellets": 8,
     "reload_times": [
-        null,
+        1.148,
         null,
         null,
         null

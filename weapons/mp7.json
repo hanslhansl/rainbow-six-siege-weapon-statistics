@@ -97,7 +97,7 @@
     "name": "MP7",
     "pellets": 1,
     "reload_times": [
-        null,
+        1.059,
         null
     ],
     "rpm": 900

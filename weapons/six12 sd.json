@@ -55,7 +55,7 @@
     "name": "SIX12 SD",
     "pellets": 8,
     "reload_times": [
-        null,
+        1.256,
         null
     ],
     "rpm": 220

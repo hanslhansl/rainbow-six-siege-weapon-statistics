@@ -55,7 +55,7 @@
     "name": "SR-25",
     "pellets": 1,
     "reload_times": [
-        null,
+        1.183,
         null,
         null,
         null

@@ -55,7 +55,7 @@
     "name": "AR-15.50",
     "pellets": 1,
     "reload_times": [
-        null,
+        0.87,
         null,
         null,
         null
