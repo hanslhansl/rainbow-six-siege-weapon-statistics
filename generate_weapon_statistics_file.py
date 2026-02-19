@@ -40,8 +40,8 @@ weapon_colors = {"AR":"#5083EA",
 ###################################################
 
 #imports
-import os, json, typing, copy, sys, itertools, colorama, sys, colorsys, pandas as pd, pandas.io.formats.style, numpy as np, io, math, colorlog, logging, atexit, pathlib
-import openpyxl, dataclasses_json, warnings, googleapiclient.http, openpyxl.workbook.workbook, googleapiclient.discovery, functools
+import os, json, typing, copy, sys, itertools, sys, colorsys, pandas as pd, numpy as np, io, math, colorlog, logging, pathlib
+import openpyxl, dataclasses_json, warnings, googleapiclient.http, googleapiclient.discovery, functools
 import google.oauth2.service_account, marshmallow.exceptions, time
 from openpyxl.cell.text import InlineFont
 from openpyxl.cell.rich_text import TextBlock, CellRichText
@@ -199,7 +199,6 @@ def illustration_method(func):
     return wrapper
 
 class Weapons:
-
     def __init__(self):
         attachment_categories = deserialize_json(attachment_overview_file_path)
         Weapon.extended_barrel_damage_multiplier = 1.0 + attachment_categories["Barrels"]["Extended barrel"]["damage bonus"]
@@ -1054,10 +1053,7 @@ def modify_stats_worksheet(worksheet : typing.Any, ws : Weapons, stat : Stat, il
 
     return
 
-
 def save_to_xlsx_file(ws : Weapons):
-    """ https://openpyxl.readthedocs.io/en/stable/ """
-
     stat_indices = (0, 1, 2, 4, 5, 10, 11)
     illustration_indices = (0, 1, 2, 4, 3, 4, 3)
 

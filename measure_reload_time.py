@@ -23,7 +23,7 @@ MIN_NUMBER_PIXELS_RATIO = 0.08
 
 
 # --- CODE ---
-import cv2, numpy as np, sys, typing, time, av, atexit, pathlib, scipy.optimize, scipy.special, argparse, collections, json
+import cv2, numpy as np, sys, typing, av, atexit, pathlib, scipy.optimize, scipy.special, argparse, collections, json
 from dataclasses import dataclass
 from decimal import Decimal, ROUND_HALF_UP
 
