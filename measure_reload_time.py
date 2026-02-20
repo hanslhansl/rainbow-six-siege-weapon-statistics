@@ -192,7 +192,7 @@ def process_video(video_path, mode):
 
                 if len(states) >= 4:
                     e3, e2, e1, e0 = states[-4:]
-                    if e3.type == "ANY" and e2.type == "ONE" and e1.type == "ZERO" and e0.type == "ANY": # full
+                    if e3.type == "ANY" and e2.type == "ONE" and e1.type == "ZERO" and e0.type in ("ONE", "ANY"): # full
                         t0, t1 = e2.end, e1.start
                         t2, t3 = e1.end, e0.start
                         type = "FULL"
