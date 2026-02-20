@@ -6,24 +6,21 @@ rect_rel_h = 0.043
 secondary_rect_y_offset = 0.035
 
 # Blob filtering
-MIN_HEIGHT_RATIO = 0.8   # relative to crop height
+MIN_NORMALIZED_HEIGHT_FOR_BLOB = 0.8   # relative to crop height
+
+# ZERO detection
+MAX_NORMALIZED_HOLE_CENTER_OFFSET_FOR_ZERO_FOUR = 0.1
+MIN_NORMALIZED_HOLE_HEIGHT_FOR_ZERO = 0.6
 
 # ONE detection
 MAX_ASPECT_RATIO_FOR_ONE = 19 / 44  # width / height
 
-# ZERO detection
-MIN_RELATIVE_HOLE_CENTER_OFFSET_FOR_ZERO = 0.1
-MIN_RELATIVE_HOLE_HEIGHT_FOR_ZERO = 0.6
-
 # Progress bar
-BAR_WIDTH = 40
-
-# relative to rect area
-MIN_NUMBER_PIXELS_RATIO = 0.08
+PROGRESS_BAR_WIDTH = 40
 
 
 # --- CODE ---
-import cv2, numpy as np, sys, typing, av, atexit, pathlib, scipy.optimize, scipy.special, argparse, collections, json
+import cv2, numpy as np, sys, typing, av, atexit, pathlib, scipy.optimize, scipy.special, argparse, collections, json, itertools
 from dataclasses import dataclass
 from decimal import Decimal, ROUND_HALF_UP
 
@@ -46,7 +43,7 @@ role_group.add_argument("--secondary", dest="mode", action="store_const", const=
 # --- Video processing ---
 @dataclass
 class Status:
-    type: typing.Literal["ZERO", "ONE", "ANY", "NONE"]
+    type: int | None
     start: float
     end: float
 
@@ -56,51 +53,50 @@ class ReloadEvent:
     radius: float
     type : typing.Literal["TACTICAL", "FULL"]
 
-def classify_one(cropped_mask):
-    status = "ANY"
+def classify_digit(cropped_mask):
     h, w = cropped_mask.shape
-    aspect = w / h
-    if aspect <= MAX_ASPECT_RATIO_FOR_ONE:
-        status = "ONE"
-    reason = f"aspect ratio: {aspect:.4f}"
-    return status, reason
+    aspect_ratio = w / h
 
-def classify_zero(cropped_mask):
-    h, w = cropped_mask.shape
-    status = "ANY"
-
+    # check apsect ratio, 1 is narrowest digit
+    if aspect_ratio <= MAX_ASPECT_RATIO_FOR_ONE:
+        return 1, f"aspect ratio: {aspect_ratio:.4f}"
+    
     # find contours
     contours, hierarchy = cv2.findContours(
         cropped_mask,
         cv2.RETR_CCOMP,
         cv2.CHAIN_APPROX_SIMPLE
     )
-    reason = f"contours: {len(contours)}"
-    
-    # check if there's exactly one hole
-    if len(contours) == 2:
-        hole, = [cnt for i, cnt in enumerate(contours) if hierarchy[0][i][3] != -1]
+    no_of_holes = len(contours) - 1
 
+    # if there are 2 holes it's 8
+    if no_of_holes == 2:
+        return 8, f"#holes: {no_of_holes}"
+    
+    # if there is 1 hole it's 0, 4, 6, or 9
+    if no_of_holes == 1:
+        hole, = [cnt for i, cnt in enumerate(contours) if hierarchy[0][i][3] != -1]
         hx, hy, hw, hh = cv2.boundingRect(hole)
         hx = hx + hw / 2
         hy = hy + hh / 2
-        hole_center_relative_x_offset = abs(hx/w - 0.5)
-        hole_center_relative_y_offset = abs(hy/h - 0.5)
-        reason = f"hole center rel offset: ({hole_center_relative_x_offset:.4f}, {hole_center_relative_y_offset:.4f})"
 
-        # check if the hole is centered
-        if hole_center_relative_x_offset <= MIN_RELATIVE_HOLE_CENTER_OFFSET_FOR_ZERO and hole_center_relative_y_offset <= MIN_RELATIVE_HOLE_CENTER_OFFSET_FOR_ZERO:
+        normalized_hole_center_y = hy/h - 0.5
+        if normalized_hole_center_y < -MAX_NORMALIZED_HOLE_CENTER_OFFSET_FOR_ZERO_FOUR:
+            return 9, f"hole center normalized y: ({normalized_hole_center_y:.4f})"
+        if normalized_hole_center_y > MAX_NORMALIZED_HOLE_CENTER_OFFSET_FOR_ZERO_FOUR:
+            return 6, f"hole center normalized y: ({normalized_hole_center_y:.4f})"
 
-            hole_height_ratio = hh / h
-            reason = f"rel hole height: ({hole_height_ratio:.4f})"
+        normalized_hole_height = hh / h
+        return 0 if normalized_hole_height >= MIN_NORMALIZED_HOLE_HEIGHT_FOR_ZERO else 4, f"#normalized hole height: {normalized_hole_height}"
 
-            # check if the hole is high enough
-            if hole_height_ratio >= MIN_RELATIVE_HOLE_HEIGHT_FOR_ZERO:
-                status = "ZERO"
+    # missing: 2, 3, 5, 7
 
-    return status, reason
+    return -1, "unrecognized digit"
 
 def process_rect(img):
+    def pad(arr):
+        return np.pad(arr, ((0, img.shape[0]-arr.shape[0]), (0, 0)), mode='constant', constant_values=127)
+
     # Strict but tolerant RGB mask: red/black with GB noise allowed
     B, G, R = cv2.split(img)
     mask = ((G < 0x40) & (B < 0x40)).astype(np.uint8) * 255
@@ -109,10 +105,14 @@ def process_rect(img):
     kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (3, 3))
     morphed_mask = cv2.morphologyEx(mask, cv2.MORPH_CLOSE, kernel)
 
+    # either all black or all white means mask is empty
+    if np.all(morphed_mask == 0) or np.all(morphed_mask != 0):
+        return None, "mask is empty", mask, morphed_mask
+
     # Connected components
     num, labels, stats, _ = cv2.connectedComponentsWithStats(morphed_mask)
     if num <= 1:
-        return "NONE", "found no blobs", mask, morphed_mask
+        return None, "found no blobs", mask, morphed_mask
 
     # filter out small blobs
     crop_h = img.shape[0]
@@ -120,26 +120,26 @@ def process_rect(img):
     valid_blobs = 0
     for i in range(1, num):
         h_i = stats[i, cv2.CC_STAT_HEIGHT]
-        if h_i >= MIN_HEIGHT_RATIO * crop_h:
+        if h_i >= MIN_NORMALIZED_HEIGHT_FOR_BLOB * crop_h:
             cleaned_mask[labels == i] = 255
             valid_blobs += 1
         
     if valid_blobs == 0:
-        return "NONE", "no blobs passed height filter", mask, morphed_mask
+        return None, "no blobs passed height filter", mask, morphed_mask
 
     # crop to bounding box of all blobs
     nonzero_points = cv2.findNonZero(cleaned_mask)
     x, y, w, h = cv2.boundingRect(nonzero_points)
     cropped_mask = cleaned_mask[y:y+h, x:x+w]
 
-    status = "ANY"
+    output = []
+    digit = -1
     reason = f"valid blobs: {valid_blobs}"
     if valid_blobs == 1:
-        status, reason = classify_one(cropped_mask)
-        if status != "ONE":
-            status, reason = classify_zero(cropped_mask)
+        digit, reason, *output = classify_digit(cropped_mask)
+        output = [pad(a) for a in output]
 
-    return status, reason, mask, morphed_mask, cleaned_mask
+    return digit, reason, mask, morphed_mask, cleaned_mask, pad(cropped_mask), *output
 
 def process_video(video_path, mode):
     print("--- Video File ---")
@@ -185,14 +185,14 @@ def process_video(video_path, mode):
 
                 if len(states) >= 3:
                     e2, e1, e0 = states[-3:]
-                    if e2.type == "ANY" and e1.type in ("ZERO", "ONE") and e0.type == "ANY": # tactical
+                    if e2.type not in (None, 0, 1) and e1.type in (0, 1) and e0.type not in (None, 0, 1): # tactical
                         t0, t1 = e2.end, e1.start
                         t2, t3 = e1.end, e0.start
                         type = "TACTICAL"
 
                 if len(states) >= 4:
                     e3, e2, e1, e0 = states[-4:]
-                    if e3.type == "ANY" and e2.type == "ONE" and e1.type == "ZERO" and e0.type in ("ONE", "ANY"): # full
+                    if e3.type not in (None, 0, 1) and e2.type == 1 and e1.type == 0 and e0.type not in (None, 0): # full
                         t0, t1 = e2.end, e1.start
                         t2, t3 = e1.end, e0.start
                         type = "FULL"
@@ -212,15 +212,17 @@ def process_video(video_path, mode):
                 states[-1].end = frame_time
 
             # update progress bar
-            filled_length = min(round(BAR_WIDTH * frame_time / total_duration), BAR_WIDTH)
-            bar = '█' * filled_length + '-' * (BAR_WIDTH - filled_length)
+            filled_length = min(round(PROGRESS_BAR_WIDTH * frame_time / total_duration), PROGRESS_BAR_WIDTH)
+            bar = '█' * filled_length + '-' * (PROGRESS_BAR_WIDTH - filled_length)
             sys.stdout.write(f"\r\033[K|{bar}| {frame_time:.2f}/{total_duration:.2f} s | {frame_time / total_duration:.2%} | {status!r} ({reason})")
             sys.stdout.flush()
             
             # display mask
-            # cv2.imshow("Video", np.hstack((rect, *(cv2.cvtColor(m, cv2.COLOR_GRAY2BGR) for m in masks))))
-            # if cv2.waitKey(1) & 0xFF == ord('q'):
-            #     break
+            separator = np.full((rect.shape[0], 2, rect.shape[2]), 127, dtype=rect.dtype)
+            chain = itertools.chain.from_iterable((separator, cv2.cvtColor(m, cv2.COLOR_GRAY2BGR)) for m in masks)
+            cv2.imshow("Video", np.hstack((rect, *chain)))
+            if cv2.waitKey(0) & 0xFF == ord('q'):
+                break
 
     cv2.destroyAllWindows()
     print()
