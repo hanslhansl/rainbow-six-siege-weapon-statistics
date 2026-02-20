@@ -58,4 +58,4 @@ The time in seconds between the ammo counter reaching $0$ (or $1$ for a tactical
 
 Reload times differ for tactical vs. full reload. The angled grip increases the reload speed. I couldn't figure out the mathematical correlation so I measured all 4 values per weapon (2 for weapons without grip) separately.
 
-Ubisoft defines _reload time_ slightly different, they provide values for the duration of reload _animations_, i.e. the time between hitting the reload button and the operator returning to an idle position. However, this definition isn't really gameplay relevant and also much more difficult to automatically measure. Interestingly, the in-game values are incorrect according to both definitions.
+Note: Ubisoft defines _reload time_ slightly different, they provide values for the duration of reload _animations_, i.e. the time between hitting the reload button and the operator returning to an idle position. However, this definition isn't really gameplay relevant and also much more difficult to automatically measure. Interestingly, the in-game values are incorrect under both definitions.
