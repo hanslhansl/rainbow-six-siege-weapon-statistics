@@ -54,6 +54,8 @@ Most weapons have, in addition to the bullets loaded in the magazine, one bullet
 The time in seconds it takes to aim down sight while standing still. The laser attachment increases the ads speed by $10\\%$. The reduced ads time with laser is calculated as $ads \\over 1.1$.
 
 ## Reload time
-The time in seconds between the ammo counter reaching $0$ (or $1$ for a tactical reload with a round in the chamber) and displaying a new value (e.g. $30$). Reload times differ for tactical vs. full reload. The angled grip increases the reload speed. I couldn't figure out the mathematical correlation so I measured all 4 values per weapon (2 for weapons without grip) separately.
+The time in seconds between the ammo counter reaching $0$ (or $1$ for a tactical reload with a round in the chamber) and displaying a new value (e.g. $30$). A a _full reload_ occurs when no rounds remain in the weapon; a _tactical reload_ occurs when at least one round remains. For tube-fed and break-action shotguns, a _full reload_ occurs when reloading the weapon from 0 rounds to full capacity; a _tactical reload_ occurs when reloading the weapon from exactly 1 round to full capacity.
+
+Reload times differ for tactical vs. full reload. The angled grip increases the reload speed. I couldn't figure out the mathematical correlation so I measured all 4 values per weapon (2 for weapons without grip) separately.
 
 Ubisoft defines _reload time_ slightly different, they provide values for the duration of reload _animations_, i.e. the time between hitting the reload button and the operator returning to an idle position. However, this definition isn't really gameplay relevant and also much more difficult to automatically measure. Interestingly, the in-game values are incorrect according to both definitions.
