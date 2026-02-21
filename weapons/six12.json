@@ -56,7 +56,7 @@
     "pellets": 8,
     "reload_times": [
         1.25,
-        null
+        1.933
     ],
     "rpm": 220
 }

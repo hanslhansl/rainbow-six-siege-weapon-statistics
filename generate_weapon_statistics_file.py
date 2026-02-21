@@ -562,7 +562,7 @@ class Weapon(_Weapon):
             raise Exception(f"Weapon '{self.name}' has an invalid weapon class '{json_content["class"]}'.")
         
         # correct reload times (for now)
-        if not all(rt is not None for rt in self.reload_times[:1]):
+        if not all(rt is not None for rt in self.reload_times): #[:2]    and self.class_ != "SG"
             logger.warning(f"Weapon '{self.name}' has invalid reload times '{self.reload_times}'")
 
         if not self.has_grip and len(self.reload_times) == 2:
@@ -571,7 +571,7 @@ class Weapon(_Weapon):
             pass
         else:
             raise Exception(f"Weapon '{self.name}' has invalid reload times '{self.reload_times}'")
-        self.reload_times = (self.reload_times[0],) + (None,)*3
+        # self.reload_times = (self.reload_times[0],) + (None,)*3
 
         # derived fields
         self.base_name = self.name
@@ -824,7 +824,7 @@ def add_secondary_weapon_stats_header(worksheet : typing.Any, row : int, col : i
         ("+ angled grip", 7),
         (None, 7),
         empty,
-        ("operators", 100)
+        ("operators", 250)
     )
 
     for value, width in values_widths:
