@@ -79,7 +79,6 @@ def crop_padding(mask):
     x, y, w, h = cv2.boundingRect(nonzero_points)
     cropped = mask[y:y+h, x:x+w]
     return cropped
-    return cv2.copyMakeBorder(cropped, 1, 1, 1, 1, cv2.BORDER_CONSTANT, value=0)
 
 def classify_digit(cropped_mask):
     h, w = cropped_mask.shape
@@ -116,6 +115,9 @@ def classify_digit(cropped_mask):
 
         normalized_hole_height = hh / h
         return 0 if normalized_hole_height >= MIN_NORMALIZED_HOLE_HEIGHT_FOR_ZERO else 4, f"#normalized hole height: {normalized_hole_height}"
+
+    return -2, f"no digit found"
+
 
     H, W = cropped_mask.shape
     y, x = np.indices((H, W))
@@ -192,7 +194,7 @@ def process_rect(img):
     return digit, reason, mask, morphed_mask, cleaned_mask, *output
 
 def process_video(video_path, mode, x_offset = 0, y_offset = 0):
-    print("--- Video File ---")
+    print("\n--- Video File ---")
 
     with av.open(video_path) as container:
         print(f"path: {container.name}")
@@ -285,6 +287,7 @@ def process_video(video_path, mode, x_offset = 0, y_offset = 0):
 
     cv2.destroyAllWindows()
     print()
+    print(f"found {len(reload_events)} {'primary' if args.mode == 'primary' else 'secondary' if args.mode == 'secondary' else 'tertiary'} weapon reloads")
     return reload_events
 
 
@@ -338,44 +341,48 @@ def analyze_reload_events(reload_events : list[ReloadEvent]):
         R_star = max(max(0.0, abs(D_star - m.statistical_duration) - m.radius) for m in event_group)
 
         print(f"{len(event_group)} {type} reloads, statistical duration: {D_star} ± {R_star} s")
-        print(f"rounded to 3 decimal places: {round_half_up(D_star, ndigits=3)} ± {round_half_up(R_star, ndigits=3)} s\n")
+        print(f"rounded to 3 decimal places: {round_half_up(D_star, ndigits=2)} ± {round_half_up(R_star, ndigits=2)} s\n")
 
         result.append((D_star, R_star, type))
+
+    print(f"analyzed {len(event_groups)} reload types")
     return result
 
 
 if __name__ == "__main__":
-    atexit.register(lambda: input("\npress enter to exit..."))
+    cb = lambda: input("\npress enter to exit...")
+    atexit.register(cb)
     args = parser.parse_args()
     VIDEO_PATH = pathlib.Path(args.filepath)
     assert VIDEO_PATH.is_file(), f"Video file not found: {VIDEO_PATH}"
-    reload_events = process_video(VIDEO_PATH, args.mode, args.x_offset, args.y_offset)
+    reload_events = process_video(VIDEO_PATH, args.mode) #, args.x_offset, args.y_offset
     result = analyze_reload_events(reload_events)
 
-    print(f"finished scanning for {'primary' if args.mode == 'primary' else 'secondary' if args.mode == 'secondary' else 'tertiary'} weapon reloads in video: {VIDEO_PATH}")
+    if len(result) != 0:
+        parent_path = pathlib.Path(__file__).parent
+        weapons_dict = {path.stem: path for path in (parent_path / "weapons").glob("*.json")}
+        
+        # Get weapon name from video file and update corresponding JSON
+        weapon_name = VIDEO_PATH.stem
+        weapon_json_path = weapons_dict[weapon_name]
+        with open(weapon_json_path, 'r') as f:
+            weapon_data = json.load(f)
+        
+        # Update reload_times based on results
+        for D_star, R_star, reload_type in result:
+            assert R_star < 0.0084, f"Unreasonably high uncertainty: {R_star:.3f} s"
+            assert reload_type in ("TACTICAL", "FULL"), f"Unexpected reload type: {reload_type}"
+            index = 0 if reload_type == "TACTICAL" else 1
+            assert weapon_data["reload_times"][index] is None, f"Reload time for {reload_type} reload already set for {weapon_name}: {weapon_data['reload_times'][index]}"
+            weapon_data["reload_times"][index] = round_half_up(D_star, 2)
+        
+        # Save the updated JSON file
+        with open(weapon_json_path, 'w') as f:
+            json.dump(weapon_data, f, indent=4)
+        
+        print(f"Updated {weapon_json_path}")
 
-    parent_path = pathlib.Path(__file__).parent
-    weapons_dict = {path.stem: path for path in (parent_path / "weapons").glob("*.json")}
-    
-    # Get weapon name from video file and update corresponding JSON
-    weapon_name = VIDEO_PATH.stem
-    weapon_json_path = weapons_dict[weapon_name]
-    with open(weapon_json_path, 'r') as f:
-        weapon_data = json.load(f)
-    
-    # Update reload_times based on results
-    for D_star, R_star, reload_type in result:
-        assert R_star < 0.0084, f"Unreasonably high uncertainty: {R_star:.3f} s"
-        assert reload_type in ("TACTICAL", "FULL"), f"Unexpected reload type: {reload_type}"
-        index = 0 if reload_type == "TACTICAL" else 1
-        assert weapon_data["reload_times"][index] is None, f"Reload time for {reload_type} reload already set for {weapon_name}: {weapon_data['reload_times'][index]}"
-        weapon_data["reload_times"][index] = round_half_up(D_star, 3)
-    
-    # Save the updated JSON file
-    with open(weapon_json_path, 'w') as f:
-        json.dump(weapon_data, f, indent=4)
-    
-    print(f"Updated {weapon_json_path}")
+        atexit.unregister(cb)
     
 
 """

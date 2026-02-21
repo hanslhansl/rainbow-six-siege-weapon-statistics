@@ -98,8 +98,8 @@
     "pellets": 1,
     "reload_times": [
         1.108,
-        2.381,
-        0.888,
+        2.38,
+        null,
         null
     ],
     "rpm": 860
