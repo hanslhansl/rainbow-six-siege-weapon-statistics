@@ -97,7 +97,7 @@
     "name": "R4-C",
     "pellets": 1,
     "reload_times": [
-        null,
+        1.11,
         2.38,
         null,
         null

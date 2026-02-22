@@ -55,7 +55,7 @@
     "name": "SMG-12",
     "pellets": 1,
     "reload_times": [
-        null,
+        1.19,
         2.52,
         null,
         null

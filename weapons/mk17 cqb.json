@@ -97,7 +97,7 @@
     "name": "MK17 CQB",
     "pellets": 1,
     "reload_times": [
-        null,
+        1.13,
         2.45,
         null,
         null

@@ -55,7 +55,7 @@
     "name": ".44 Vendetta",
     "pellets": 1,
     "reload_times": [
-        null,
+        1.31,
         2.2
     ],
     "rpm": 480

@@ -7,7 +7,7 @@ NORMALIZED_SECONDARY_RECT_Y_OFFSET = 0.035
 NORMALIZED_TERTIARY_RECT_Y_OFFSET = -0.042
 
 # Blob filtering
-MIN_NORMALIZED_HEIGHT_FOR_BLOB = 0.6   # relative to crop height
+MIN_NORMALIZED_HEIGHT_FOR_BLOB = 0.8   # relative to crop height
 
 # ZERO detection
 MAX_NORMALIZED_HOLE_CENTER_OFFSET_FOR_ZERO_FOUR = 0.1
@@ -30,9 +30,10 @@ parser = argparse.ArgumentParser(
     description="scan a video file for reload animations and measure the duration"
 )
 
-# Positional argument
+# Positional Argument: file path
 parser.add_argument(
     "filepath",
+    type=pathlib.Path,
     help="path to the video file"
 )
 
@@ -42,20 +43,36 @@ role_group.add_argument("--primary", dest="mode", action="store_const", const="p
 role_group.add_argument("--secondary", dest="mode", action="store_const", const="secondary")
 role_group.add_argument("--tertiary", dest="mode", action="store_const", const="tertiary")
 
+# Group 2: crop offsets
 parser.add_argument(
-    "-x",
-    "--x-offset",
+    "-l",
+    "--left-crop",
     type=int,
     default=0,
-    help="Horizontal rect offset (integer)"
+    help="Left crop offset (integer)"
 )
 parser.add_argument(
-    "-y",
-    "--y-offset",
+    "-t",
+    "--top-crop",
     type=int,
     default=0,
-    help="Vertical rect offset (integer)"
+    help="Top crop offset (integer)"
 )
+parser.add_argument(
+    "-r",
+    "--right-crop",
+    type=int,
+    default=0,
+    help="Right crop offset (integer)"
+)
+parser.add_argument(
+    "-b",
+    "--bottom-crop",
+    type=int,
+    default=0,
+    help="Bottom crop offset (integer)"
+)
+
 
 # --- Video processing ---
 @dataclass
@@ -79,6 +96,32 @@ def crop_padding(mask):
     x, y, w, h = cv2.boundingRect(nonzero_points)
     cropped = mask[y:y+h, x:x+w]
     return cropped
+
+def analyze_skeleton(skeleton):
+    """Analyze skeleton topology: count endpoints and junctions
+    Assumes skeleton already has 1-pixel border padding"""
+    h, w = skeleton.shape
+    
+    endpoints = 0
+    junctions = 0
+    
+    # Check each white pixel (not on border)
+    for y in range(1, h - 1):
+        for x in range(1, w - 1):
+            if skeleton[y, x] > 0:
+                # Count neighbors in 8-connectivity (convert to int to avoid overflow)
+                neighbors = (
+                    int(skeleton[y-1, x-1]) + int(skeleton[y-1, x]) + int(skeleton[y-1, x+1]) +
+                    int(skeleton[y, x-1]) + int(skeleton[y, x+1]) +
+                    int(skeleton[y+1, x-1]) + int(skeleton[y+1, x]) + int(skeleton[y+1, x+1])
+                ) // 255
+                
+                if neighbors == 1:
+                    endpoints += 1
+                elif neighbors >= 3:
+                    junctions += 1
+    
+    return endpoints, junctions
 
 def classify_digit(cropped_mask):
     h, w = cropped_mask.shape
@@ -116,42 +159,53 @@ def classify_digit(cropped_mask):
         normalized_hole_height = hh / h
         return 0 if normalized_hole_height >= MIN_NORMALIZED_HOLE_HEIGHT_FOR_ZERO else 4, f"#normalized hole height: {normalized_hole_height}"
 
-    return -2, f"no digit found"
-
-
-    H, W = cropped_mask.shape
-    y, x = np.indices((H, W))
-
-    total = cropped_mask.sum()
-
-    x_com = (cropped_mask * x).sum() / total
-    y_com = (cropped_mask * y).sum() / total
-
-    # normalize to [0, 1]
-    x_com_norm = x_com / (W - 1)
-    y_com_norm = y_com / (H - 1)
-
-    center_of_mass = (x_com_norm, y_com_norm)
-
-    if 0.54 < x_com_norm < 0.6 and 0. < y_com_norm < 0.1:
-        return 7, f"centroid: ({center_of_mass})"
-
-
-    # M = cv2.moments(cropped_mask, binaryImage=True)
-    # normalized_cx = M["m10"] / M["m00"] / w
-    # normalized_cy = M["m01"] / M["m00"] / h
-    return -2, f"centroid: ({center_of_mass})"
-
-    horizontal_proj = np.sum(cropped_mask, axis=1)
-    vertical_proj  = np.sum(cropped_mask, axis=0)
-    print(f"horizontal_proj: {horizontal_proj}, vertical_proj: {vertical_proj}")
-
-    # missing: 2, 3, 5, 7
+    # 3 has 3 endpoints
     padded_mask = cv2.copyMakeBorder(cropped_mask, 1, 1, 1, 1, cv2.BORDER_CONSTANT, value=0)
     skeleton = cv2.ximgproc.thinning(padded_mask, thinningType=cv2.ximgproc.THINNING_ZHANGSUEN)
-    skeleton2 = cv2.ximgproc.thinning(padded_mask, thinningType=cv2.ximgproc.THINNING_GUOHALL)
+    endpoints, junctions = analyze_skeleton(skeleton)
+    if endpoints == 3:
+        return 3, f"endpoints: {endpoints}, junctions: {junctions}", skeleton
 
-    return -2, "unrecognized digit", skeleton, skeleton2
+    num_samples = 50
+
+    # match 7
+    p0 = (0.15 * w, 0.08 * h)
+    p1 = (0.85 * w, 0.08 * h)
+    p2 = (0.4 * w, 0.92 * h)
+    points = (
+        (p0, p1),
+        (p1, p2),
+    )
+    lines = [np.linspace(p0, p1, num_samples).astype(int) for p0, p1 in points]
+    # seven = cropped_mask.copy()
+    # for line in lines:
+    #     seven[line[:, 1], line[:, 0]] = 0
+    if all(np.all(cropped_mask[line[:, 1], line[:, 0]] == 255) for line in lines):
+        return 7, f"matched 7"
+    
+    # match 5
+    p0 = (0.85 * w, 0.07 * h)
+    p1 = (0.21 * w, 0.07 * h)
+    p2 = (0.21 * w, 0.4 * h)
+    p3 = (0.85 * w, 0.5 * h)
+    p4 = (0.85 * w, 0.8 * h)
+    p5 = (0.7 * w, 0.93 * h)
+    p6 = (0.3 * w, 0.93 * h)
+    points = (
+        (p0, p1),
+        (p1, p2),
+        (p3, p4),
+        (p5, p6),
+    )
+    lines = [np.linspace(p0, p1, num_samples).astype(int) for p0, p1 in points]
+    # five = cropped_mask.copy()
+    # for line in lines:
+    #     five[line[:, 1], line[:, 0]] = 0
+    if all(np.all(cropped_mask[line[:, 1], line[:, 0]] == 255) for line in lines):
+        return 5, f"matched 5"
+
+
+    return -2, f"no digit found"
 
 def process_rect(img):
     # Strict but tolerant RGB mask: red/black with GB noise allowed
@@ -160,7 +214,7 @@ def process_rect(img):
 
     # either all black or all white means mask is empty
     if np.all(mask == 0) or np.all(mask != 0):
-        return None, "mask is empty", mask
+        return None, "mask is empty"
 
     # morphological closing to fill small holes
     kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (3, 3))
@@ -172,12 +226,12 @@ def process_rect(img):
         return None, "found no blobs", mask, morphed_mask
 
     # filter out small blobs
-    crop_h = img.shape[0]
+    h = img.shape[0]
     cleaned_mask = np.zeros_like(mask)
     valid_blobs = 0
     for i in range(1, num):
         h_i = stats[i, cv2.CC_STAT_HEIGHT]
-        if h_i >= MIN_NORMALIZED_HEIGHT_FOR_BLOB * crop_h:
+        if h_i >= MIN_NORMALIZED_HEIGHT_FOR_BLOB * h:
             cleaned_mask[labels == i] = 255
             valid_blobs += 1
     cleaned_mask = crop_padding(cleaned_mask)
@@ -193,7 +247,7 @@ def process_rect(img):
 
     return digit, reason, mask, morphed_mask, cleaned_mask, *output
 
-def process_video(video_path, mode, x_offset = 0, y_offset = 0):
+def process_video(video_path, mode, l = 0, t = 0, r = 0, b = 0):
     print("\n--- Video File ---")
 
     with av.open(video_path) as container:
@@ -203,43 +257,42 @@ def process_video(video_path, mode, x_offset = 0, y_offset = 0):
         width = stream.width
         height = stream.height
         print(f"resolution: {width}x{height}")
-        # rect_x = int(NORMALIZED_RECT_X * width)
-        rect_x = int(NORMALIZED_RECT_X * (x_offset + width)) - x_offset
+        total_width =  l + width + r
+        total_height = t + height + b
+        print(f"total resolution: {total_width}x{total_height}")
+        rect_x = int(NORMALIZED_RECT_X * total_width) - l
         if mode == "primary":
             normalized_rect_y_offset = 0
         elif mode == "secondary":
             normalized_rect_y_offset = NORMALIZED_SECONDARY_RECT_Y_OFFSET
         elif mode == "tertiary":
             normalized_rect_y_offset = NORMALIZED_TERTIARY_RECT_Y_OFFSET
-        rect_y = int((NORMALIZED_RECT_Y + normalized_rect_y_offset) * (y_offset + height)) - y_offset
-        rect_w = int(NORMALIZED_RECT_W * (x_offset + width))
-        rect_h = int(NORMALIZED_RECT_H * (y_offset + height))
+        rect_y = int((NORMALIZED_RECT_Y + normalized_rect_y_offset) * total_height) - t
+        rect_w = int(NORMALIZED_RECT_W * total_width)
+        rect_h = int(NORMALIZED_RECT_H * total_height)
+        print(f"crop rect: x={rect_x}, y={rect_y}, w={rect_w}, h={rect_h}")
 
         fps = float(stream.average_rate)
         print(f"fps: {fps}")
         total_duration = float(container.duration) / av.time_base
         print(f"duration: {total_duration} s")
 
-        
+
         print("\n--- Video Processing ---")
         states : list[Status] = []
         reload_events : list[ReloadEvent] = []
+        
         for frame in container.decode(video=0):
             # crop frame
             rect = frame.to_rgb().to_ndarray(format="bgr24")[rect_y:rect_y+rect_h, rect_x:rect_x+rect_w]
 
-            # cv2.imshow("Video", rect)
-            # if cv2.waitKey(1) & 0xFF == ord('q'):
-            #     break
-            # continue
-
             # get status from rect
-            status, reason, *masks = process_rect(rect)
+            digit, reason, *masks = process_rect(rect)
 
             # update states
             frame_time = frame.time
-            if len(states) == 0 or status != states[-1].value:
-                states.append(Status(value=status, start=frame_time, end=frame_time))
+            if len(states) == 0 or digit != states[-1].value:
+                states.append(Status(value=digit, start=frame_time, end=frame_time))
 
                 type = None
 
@@ -274,20 +327,21 @@ def process_video(video_path, mode, x_offset = 0, y_offset = 0):
             # update progress bar
             filled_length = min(round(PROGRESS_BAR_WIDTH * frame_time / total_duration), PROGRESS_BAR_WIDTH)
             bar = '█' * filled_length + '-' * (PROGRESS_BAR_WIDTH - filled_length)
-            sys.stdout.write(f"\r\033[K|{bar}| {frame_time:.2f}/{total_duration:.2f} s | {frame_time / total_duration:.2%} | {status!r} ({reason})")
+            sys.stdout.write(f"\r\033[K|{bar}| {frame_time:.4f}/{total_duration:.4f} s | {frame_time / total_duration:.2%} | {digit!r} ({reason})")
             sys.stdout.flush()
             
             # display mask
-            # if status == -2:
-            #     separator = np.full((rect.shape[0], 2, rect.shape[2]), (0,255,0), dtype=rect.dtype)
-            #     chain = itertools.chain.from_iterable((cv2.cvtColor(pad(m, rect), cv2.COLOR_GRAY2BGR), separator) for m in masks)
-            #     cv2.imshow("Video", np.hstack((rect, separator, *chain)))
-            #     if cv2.waitKey(0) & 0xFF == ord('q'):
-            #         break
+            if digit == -2:
+            # if True:
+                separator = np.full((rect.shape[0], 2, rect.shape[2]), (0,255,0), dtype=rect.dtype)
+                chain = itertools.chain.from_iterable((cv2.cvtColor(pad(m, rect), cv2.COLOR_GRAY2BGR), separator) for m in masks)
+                cv2.imshow("Video", np.hstack((rect, separator, *chain)))
+                if cv2.waitKey(0) & 0xFF == ord('q'):
+                    break
 
     cv2.destroyAllWindows()
     print()
-    print(f"found {len(reload_events)} {'primary' if args.mode == 'primary' else 'secondary' if args.mode == 'secondary' else 'tertiary'} weapon reloads")
+    print(f"found {len(reload_events)} {'primary' if mode == 'primary' else 'secondary' if mode == 'secondary' else 'tertiary'} weapon reloads")
     return reload_events
 
 
@@ -351,11 +405,17 @@ def analyze_reload_events(reload_events : list[ReloadEvent]):
 
 if __name__ == "__main__":
     cb = lambda: input("\npress enter to exit...")
-    atexit.register(cb)
-    args = parser.parse_args()
-    VIDEO_PATH = pathlib.Path(args.filepath)
-    assert VIDEO_PATH.is_file(), f"Video file not found: {VIDEO_PATH}"
-    reload_events = process_video(VIDEO_PATH, args.mode) #, args.x_offset, args.y_offset
+    # atexit.register(cb)
+    # args = parser.parse_args()
+    video_path = pathlib.Path(r"D:\clips\2026-02-22 20-52-12.mp4") # args.filepath
+    mode = "primary" # args.mode
+    left_crop = 2108 # args.left_crop
+    top_crop = 1185 # args.top_crop
+    right_crop = 68 # args.right_crop
+    bottom_crop = 63 # args.bottom_crop
+
+    assert video_path.is_file(), f"Video file not found: {video_path}"
+    reload_events = process_video(video_path, mode, l=left_crop, t=top_crop, r=right_crop, b=bottom_crop)
     result = analyze_reload_events(reload_events)
 
     if len(result) != 0:
@@ -363,7 +423,7 @@ if __name__ == "__main__":
         weapons_dict = {path.stem: path for path in (parent_path / "weapons").glob("*.json")}
         
         # Get weapon name from video file and update corresponding JSON
-        weapon_name = VIDEO_PATH.stem
+        weapon_name = video_path.stem
         weapon_json_path = weapons_dict[weapon_name]
         with open(weapon_json_path, 'r') as f:
             weapon_data = json.load(f)
