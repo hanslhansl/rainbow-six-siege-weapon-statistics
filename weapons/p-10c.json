@@ -55,7 +55,7 @@
     "name": "P-10C",
     "pellets": 1,
     "reload_times": [
-        0.901,
+        0.9,
         1.72
     ],
     "rpm": 480

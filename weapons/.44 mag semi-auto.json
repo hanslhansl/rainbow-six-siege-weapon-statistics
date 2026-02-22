@@ -55,7 +55,7 @@
     "name": ".44 Mag Semi-Auto",
     "pellets": 1,
     "reload_times": [
-        0.82,
+        null,
         1.56
     ],
     "rpm": 480

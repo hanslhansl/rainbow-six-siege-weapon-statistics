@@ -55,7 +55,7 @@
     "name": "M249 SAW",
     "pellets": 1,
     "reload_times": [
-        1.294,
+        null,
         4.0,
         null,
         null

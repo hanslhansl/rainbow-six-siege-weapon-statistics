@@ -55,7 +55,7 @@
     "name": "P229",
     "pellets": 1,
     "reload_times": [
-        1.092,
+        null,
         1.84
     ],
     "rpm": 480

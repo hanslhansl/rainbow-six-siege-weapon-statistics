@@ -55,7 +55,7 @@
     "name": "AK-74M",
     "pellets": 1,
     "reload_times": [
-        1.454,
+        null,
         2.8,
         null,
         null

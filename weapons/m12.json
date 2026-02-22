@@ -97,7 +97,7 @@
     "name": "M12",
     "pellets": 1,
     "reload_times": [
-        1.004,
+        1.0,
         2.36,
         null,
         null

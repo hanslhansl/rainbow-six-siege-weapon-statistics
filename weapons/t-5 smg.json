@@ -97,7 +97,7 @@
     "name": "T-5 SMG",
     "pellets": 1,
     "reload_times": [
-        1.033,
+        null,
         2.33,
         null,
         null
