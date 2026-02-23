@@ -88,9 +88,26 @@ class Number:
     end: float
 
 @dataclass
-class ReloadEvent:
-    statistical_duration: float
-    radius: float
+class Event:
+    t0: float
+    t1: float
+    t2: float
+    t3: float
+
+    def __post_init__(self):
+        self.minimum_duration = self.t2 - self.t1
+        self.maximum_duration = self.t3 - self.t0
+
+        self.statistical_start = (self.t0 + self.t1) / 2
+        self.statistical_end = (self.t2 + self.t3) / 2
+
+        self.statistical_duration = self.statistical_end - self.statistical_start
+        self.statistical_radius = (-self.t0 + self.t3 - self.t2 + self.t1) / 2
+
+class TacticalReloadEvent(Event):
+    """tactical reload"""
+class FullReloadEvent(Event):
+    """full reload"""
 
 def pad(arr, relative_to):
     return np.pad(arr, ((0, relative_to.shape[0]-arr.shape[0]), (0, 0)), mode='constant', constant_values=127)
@@ -240,6 +257,23 @@ def process_rect(img):
 
     return number, reason, mask, morphed_mask, *masks
 
+def classify_tactical_reload(ammo_counter : list[Number]):
+    if len(ammo_counter) >= 3:
+        e2, e1, e0 = ammo_counter[-3:]
+        if e2.value not in (None, 0, 1) and e1.value in (0, 1) and e0.value not in (None, 0, 1):
+            t0, t1 = e2.end, e1.start
+            t2, t3 = e1.end, e0.start
+            return TacticalReloadEvent(t0, t1, t2, t3)
+    return None
+def classify_full_reload(ammo_counter : list[Number]):
+    if len(ammo_counter) >= 4:
+        e3, e2, e1, e0 = ammo_counter[-4:]
+        if e3.value not in (None, 0, 1) and e2.value == 1 and e1.value == 0 and e0.value not in (None, 0):
+            t0, t1 = e2.end, e1.start
+            t2, t3 = e1.end, e0.start
+            return FullReloadEvent(t0, t1, t2, t3)
+    return None
+
 def process_video(video_path, mode, l = 0, t = 0, r = 0, b = 0):
     print("--- Video File ---")
 
@@ -282,7 +316,7 @@ def process_video(video_path, mode, l = 0, t = 0, r = 0, b = 0):
 
         print("--- Video Processing ---")
         ammo_counter : list[Number] = []
-        reload_events = collections.defaultdict[typing.Literal["TACTICAL", "FULL"], list[ReloadEvent]](list)
+        events : list[Event] = []
         
         for frame in container.decode(video=0):
             frame_time = frame.time
@@ -315,40 +349,34 @@ def process_video(video_path, mode, l = 0, t = 0, r = 0, b = 0):
 
                 ammo_counter.append(Number(value=number, start=frame_time, end=frame_time))
 
-                type = None
+                new_events = [
+                    classify_tactical_reload(ammo_counter),
+                    classify_full_reload(ammo_counter)
+                ]
+                for e in new_events:
+                    if e is not None:
+                        t0, t1, t2, t3 = e.t0, e.t1, e.t2, e.t3
+                        if not (t0 < t1 < t2 < t3):
+                            handle_error(rect, masks, f"Timestamps must be in order: {t0}, {t1}, {t2}, {t3}")
+                        sys.stdout.write(
+                            f"\r\033[K{e.__doc__}: {e.statistical_start:10.6f}s → {e.statistical_end:10.6f}s | "
+                            f"Δt: {e.statistical_duration:.6f} ± {e.statistical_radius:.6f} s | "
+                            f"min/max Δt: {t2 - t1:.6f}/{t3 - t0:.6f} s\n"
+                            )
+                        sys.stdout.flush()
+                        events.append(e)
 
-                if len(ammo_counter) >= 3:
-                    e2, e1, e0 = ammo_counter[-3:]
-                    if e2.value not in (None, 0, 1) and e1.value in (0, 1) and e0.value not in (None, 0, 1): # tactical
-                        type = "TACTICAL"
 
-                if len(ammo_counter) >= 4:
-                    e3, e2, e1, e0 = ammo_counter[-4:]
-                    if e3.value not in (None, 0, 1) and e2.value == 1 and e1.value == 0 and e0.value not in (None, 0): # full
-                        type = "FULL"
-
-                if type is not None:
-                    t0, t1 = e2.end, e1.start
-                    t2, t3 = e1.end, e0.start
-                    if not (t0 < t1 < t2 < t3):
-                        handle_error(rect, masks, f"Timestamps must be in order: {t0}, {t1}, {t2}, {t3}")
-                    S = (t0 + t1) / 2
-                    E = (t2 + t3) / 2
-                    D = E - S
-                    R = (-t0 + t3 - t2 + t1) / 2
-                    reload_events[type].append(ReloadEvent(statistical_duration=D, radius=R))
-                    sys.stdout.write(f"\r\033[K{type} reload: {S:10.6f}s → {E:10.6f}s | Δt: {D:.6f} ± {R:.6f} s | min/max Δt: {t2 - t1:.6f}/{t3 - t0:.6f} s\n")
-                    sys.stdout.flush()
             else:
                 ammo_counter[-1].end = frame_time
 
     print()
-    print(f"found {sum(len(v) for v in reload_events.values())} {'primary' if mode == 'primary' else 'secondary' if mode == 'secondary' else 'tertiary'} weapon reloads")
-    return reload_events
+    print(f"found {len(events)} events")
+    return events
 
 
 # --- Analysis ---
-def interval_cost(D, reload_events : list[ReloadEvent], sigma=0.0005, delta=1.5):
+def interval_cost(D, reload_events : list[Event], sigma=0.0005, delta=1.5):
     """
     D: current duration estimate (scalar)
     reload_events: list of ReloadEvent
@@ -358,7 +386,7 @@ def interval_cost(D, reload_events : list[ReloadEvent], sigma=0.0005, delta=1.5)
     total = 0.0
     for re in reload_events:
         # compute interval violation
-        v = max(0.0, abs(D - re.statistical_duration) - re.radius)
+        v = max(0.0, abs(D - re.statistical_duration) - re.statistical_radius)
         # scale by sigma and apply Huber
         total += scipy.special.huber(delta, v / sigma)
     return total
@@ -367,33 +395,38 @@ def round_half_up(fl, ndigits=0):
     q = Decimal('1.' + '0' * ndigits)
     return float(Decimal.from_float(fl).quantize(q, rounding=ROUND_HALF_UP))
 
-def analyze_reload_events(type, reload_events : list[ReloadEvent]):
-    assert len(reload_events) >= 7, f"Not enough measurements for {type} reload: {len(reload_events)} (need at least 7 for robust estimation)"
+def analyze_reload_events(type : type, events : list[Event]):
+    assert len(events) >= 7, f"Not enough measurements for {type.__doc__}: {len(events)} (need at least 7 for robust estimation)"
 
     # Run optimization, initial guess: weighted average
-    x0 = np.mean([m.statistical_duration for m in reload_events])
+    x0 = np.mean([m.statistical_duration for m in events])
 
     res = scipy.optimize.minimize(
         interval_cost,
         x0=[x0],
-        args=(reload_events,),
+        args=(events,),
         method='Nelder-Mead',  # robust 1D optimizer
         options={'xatol':1e-9, 'disp': False}
     )
     D_star = float(res.x[0])
 
     # Estimate effective radius (uncertainty), max violation after robust estimate
-    R_star = max(max(0.0, abs(D_star - m.statistical_duration) - m.radius) for m in reload_events)
+    R_star = max(max(0.0, abs(D_star - m.statistical_duration) - m.statistical_radius) for m in events)
 
-    print(f"{len(reload_events)} {type} reloads, statistical duration: {D_star} ± {R_star} s")
+    print(f"{len(events)} {type.__doc__}, statistical duration: {D_star} ± {R_star} s")
     print(f"rounded to 3 decimal places: {round_half_up(D_star, ndigits=2)} ± {round_half_up(R_star, ndigits=2)} s")
 
     return D_star, R_star, type
 
-def analyze(reload_events : dict[str, list[ReloadEvent]]):
+def analyze(events : list[Event]):
     print("--- Analysis ---")
-    result = [analyze_reload_events(type, events) for type, events in reload_events.items()]
-    print(f"analyzed {len(result)} reload types")
+
+    groups = collections.defaultdict(list)
+    for e in events:
+        groups[type(e)].append(e)
+
+    result = [analyze_reload_events(type, events) for type, events in groups.items()]
+    print(f"analyzed {len(result)} event types")
     return result
 
 
@@ -423,8 +456,8 @@ if __name__ == "__main__":
     
     for video_path in video_paths:
         assert video_path.is_file(), f"Video file not found: {video_path}"
-        reload_events = process_video(video_path, mode, l=left_crop, t=top_crop, r=right_crop, b=bottom_crop)
-        result = analyze(reload_events)
+        events = process_video(video_path, mode, l=left_crop, t=top_crop, r=right_crop, b=bottom_crop)
+        result = analyze(events)
 
         if len(result) != 0:
             parent_path = pathlib.Path(__file__).parent
@@ -437,17 +470,21 @@ if __name__ == "__main__":
                 weapon_data = json.load(f)
             
             # Update reload_times based on results
-            for D_star, R_star, reload_type in result:
+            change_made = False
+            for D_star, R_star, event_type in result:
                 assert R_star < 0.0084, f"Unreasonably high uncertainty: {R_star:.5f} s"
-                assert reload_type in ("TACTICAL", "FULL"), f"Unexpected reload type: {reload_type}"
-                index = 0 if reload_type == "TACTICAL" else 1
+                assert event_type in (TacticalReloadEvent, FullReloadEvent), f"Unexpected reload type: {event_type}"
+                index = 0 if event_type == TacticalReloadEvent else 1
                 current_value = weapon_data["reload_times"][index]
                 new_value = round_half_up(D_star, 2)
-                assert current_value in (None, new_value), f"new {reload_type} reload time for {weapon_name} {new_value} unequal old {current_value}"
-                weapon_data["reload_times"][index] = new_value
+                if current_value is None:
+                    change_made = True
+                    weapon_data["reload_times"][index] = new_value
+                elif current_value != new_value:
+                    raise ValueError(f"new {event_type.__doc__} reload time for {weapon_name} {new_value} unequal old {current_value}")
             
             # Save the updated JSON file
-            if not dry_run:
+            if not dry_run and change_made:
                 with open(weapon_json_path, 'w') as f:
                     json.dump(weapon_data, f, indent=4)
             
