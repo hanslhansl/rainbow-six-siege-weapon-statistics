@@ -146,7 +146,7 @@ def classify_digit(cropped_mask):
 
         template = cropped_mask.copy()
         for line in lines:
-            template[line[:, 1], line[:, 0]] = 127
+            template[line[:, 1], line[:, 0]] = 160
 
         return all(np.all(cropped_mask[line[:, 1], line[:, 0]] == 255) for line in lines), template
 
@@ -164,10 +164,10 @@ def classify_digit(cropped_mask):
 
     points3 = [
         ((0.4, 0.07), (0.6, 0.07)),
-        ((0.8, 0.4), (0.25, 0.7)),
-        ((0.15, 0.91), (0.85, 0.91)),
-
-        ((0., 0.), (0., 0.)),
+        ((0.81, 0.15), (0.81, 0.35)),
+        ((0.5, 0.47), (0.75, 0.47)),
+        ((0.82, 0.6), (0.82, 0.8)),
+        ((0.4, 0.93), (0.6, 0.93)),
         ]
 
     points2 = [
@@ -311,7 +311,7 @@ def process_video(video_path, mode, l = 0, t = 0, r = 0, b = 0):
                 # verify valid state transition
                 if len(ammo_counter) >= 1:
                     old_number = ammo_counter[-1].value
-                    if old_number is not None:
+                    if old_number is not None and number is not None:
                         if old_number == 0:
                             pass
                         elif old_number == 1:
