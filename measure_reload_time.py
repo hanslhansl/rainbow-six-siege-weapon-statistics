@@ -38,7 +38,7 @@ parser = argparse.ArgumentParser(
 parser.add_argument(
     "filepath",
     type=pathlib.Path,
-    help="path to the video file"
+    help="path to the video file (or directory containing video files)"
 )
 
 # Group 1: primary vs secondary
@@ -77,6 +77,8 @@ parser.add_argument(
     help="Bottom crop offset (integer)"
 )
 
+parser.add_argument("--dry-run", action="store_true", help="process the video and print results without updating JSON files")
+parser.add_argument("--angled-grip", action="store_false", help="if the video was recorded with angled grip attached")
 
 # --- Video processing ---
 @dataclass
@@ -99,32 +101,6 @@ def crop_padding(mask):
     x, y, w, h = cv2.boundingRect(nonzero_points)
     cropped = mask[y:y+h, x:x+w]
     return cropped
-
-def analyze_skeleton(mask):
-    """Analyze skeleton topology: count endpoints
-    Assumes skeleton already has 1-pixel border padding"""
-
-    padded_mask = cv2.copyMakeBorder(mask, 1, 1, 1, 1, cv2.BORDER_CONSTANT, value=0)
-    skeleton = cv2.ximgproc.thinning(padded_mask, thinningType=cv2.ximgproc.THINNING_ZHANGSUEN)
-    h, w = skeleton.shape
-    
-    endpoints = 0
-    
-    # Check each white pixel (not on border)
-    for y in range(1, h - 1):
-        for x in range(1, w - 1):
-            if skeleton[y, x] > 0:
-                # Count neighbors in 8-connectivity (convert to int to avoid overflow)
-                neighbors = (
-                    int(skeleton[y-1, x-1]) + int(skeleton[y-1, x]) + int(skeleton[y-1, x+1]) +
-                    int(skeleton[y, x-1]) + int(skeleton[y, x+1]) +
-                    int(skeleton[y+1, x-1]) + int(skeleton[y+1, x]) + int(skeleton[y+1, x+1])
-                ) // 255
-                
-                if neighbors == 1:
-                    endpoints += 1
-    
-    return endpoints, skeleton
 
 def classify_digit(cropped_mask):
     h, w = cropped_mask.shape
@@ -161,66 +137,63 @@ def classify_digit(cropped_mask):
         normalized_hole_height = hh / h
         return 0 if normalized_hole_height >= MIN_NORMALIZED_HOLE_HEIGHT_FOR_ZERO else 4, f"{normalized_hole_height=:.4f}"
 
-
-    # 3 has 3 endpoints
-    endpoints, skeleton = analyze_skeleton(cropped_mask)
-    if endpoints == 3:
-        return 3, f"{endpoints=}", skeleton
-
-    # 2, 5, 7 have 2 endpoints
-    if endpoints != 2:
-        raise ValueError(f"Unable to classify digit with aspect ratio: {aspect_ratio:.4f}, holes: {number_of_holes}, endpoints: {endpoints}")
-
-
-    def match(area, area_range, points, num_samples = 50):
-        if not (area_range[0] <= area <= area_range[1]):
-            return False
+    # match 2, 3, 5, 7 with templates
+    normalized_area = np.sum(cropped_mask) / (255 * w * h)
+    templates = []
+    def match_template(area, points, num_samples = 50):
         points = [((x0*w, y0*h), (x1*w, y1*h)) for (x0, y0), (x1, y1) in points]
         lines = [np.linspace(p0, p1, num_samples).astype(int) for p0, p1 in points]
-        return all(np.all(cropped_mask[line[:, 1], line[:, 0]] == 255) for line in lines)
 
+        template = cropped_mask.copy()
+        for line in lines:
+            template[line[:, 1], line[:, 0]] = 127
 
-    normalized_area = mass / (255 * w * h)
+        return all(np.all(cropped_mask[line[:, 1], line[:, 0]] == 255) for line in lines), template
 
-    if match(normalized_area, (0.45, 0.5), [
-        ((0.15, 0.08), (0.85, 0.08)),
+    points7 = [
+        ((0.15, 0.08), (0.8, 0.08)),
         ((0.85, 0.08), (0.4, 0.92)),
-        ]):
-        return 7, "matched 7"
-    
-    if match(normalized_area, (0.59, 0.64), [
+        ]
+
+    points5 = [
+        ((0.8, 0.07), (0.21, 0.07)),
+        ((0.21, 0.07), (0.21, 0.4)),
+        ((0.85, 0.5), (0.85, 0.8)),
+        ((0.7, 0.93), (0.3, 0.93)),
+        ]
+
+    points3 = [
+        ((0.4, 0.07), (0.6, 0.07)),
+        ((0.8, 0.4), (0.25, 0.7)),
+        ((0.15, 0.91), (0.85, 0.91)),
+
         ((0., 0.), (0., 0.)),
-        ]):
-        return 5, "matched 5"
-    
-    if match(normalized_area, (0.57, 0.59), [
-        ((0., 0.), (0., 0.)),
-        ]):
-        return 2, "matched 2"
-    
+        ]
 
+    points2 = [
+        ((0.4, 0.07), (0.6, 0.07)),
+        ((0.8, 0.4), (0.25, 0.7)),
+        ((0.15, 0.91), (0.85, 0.91)),
+        ]
 
-    mass = np.sum(cropped_mask)
-    y_coords, x_coords = np.indices((h, w))
-    normalized_center_x = np.sum(x_coords * cropped_mask) / mass / w
-    normalized_center_y = np.sum(y_coords * cropped_mask) / mass / h
+    digits = (7, 5, 3, 2)
+    points = (points7, points5, points3, points2)
 
-    digit = None
-    if 0.45 <= normalized_area <= 0.5 and 0.52 <= normalized_center_x <= 0.55 and 0.39 <= normalized_center_y <= 0.41:
-        digit = 7
-    if 0.59 <= normalized_area <= 0.64 and 0.485 <= normalized_center_x <= 0.505 and 0.48 <= normalized_center_y <= 0.5:
-        digit = 5
-    if 0.57 <= normalized_area <= 0.59 and 0.48 <= normalized_center_x <= 0.505 and 0.49 <= normalized_center_y <= 0.51:
-        digit = 2
-    
-    if digit is not None:
-        return digit, f"{normalized_area:.4f} {normalized_center_x:.4f} {normalized_center_y:.4f}"
-
-    raise ValueError(f"Unable to classify digit with area: {normalized_area:.4f}, center: ({normalized_center_x:.4f}, {normalized_center_y:.4f})")
+    for digit, points in zip(digits, points):
+        res, *template = match_template(normalized_area, points)
+        templates.extend(template)
+        if res:
+            return digit, f"matched template", *template
+             
+    return -1, f"{number_of_holes=}, {normalized_area=:.4f}", *templates
 
 def process_rect(img):
     # Strict but tolerant RGB mask: red/black with GB noise allowed
     B, G, R = cv2.split(img)
+    if np.any(np.all(B > 0xE6, axis=0)):
+        return None, "wave overlay"
+
+    # create mask
     mask = crop_padding(((G < 0x40) & (B < 0x40)).astype(np.uint8) * 255)
 
     # either all black or all white means mask is empty
@@ -230,6 +203,8 @@ def process_rect(img):
     # morphological closing to fill small holes
     kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (3, 3))
     morphed_mask = cv2.morphologyEx(mask, cv2.MORPH_CLOSE, kernel)
+    morphed_mask = cv2.GaussianBlur(morphed_mask, (7, 7), 0)
+    morphed_mask = cv2.threshold(morphed_mask, 127, 255, cv2.THRESH_BINARY)[1]
 
     # Connected components
     num, labels, stats, _ = cv2.connectedComponentsWithStats(morphed_mask)
@@ -238,25 +213,46 @@ def process_rect(img):
 
     # filter out small blobs
     h = img.shape[0]
-    cleaned_mask = np.zeros_like(mask)
-    valid_blobs = 0
+    blobs = []
     for i in range(1, num):
         if stats[i, cv2.CC_STAT_HEIGHT] / h >= MIN_NORMALIZED_HEIGHT_FOR_BLOB:
-            cleaned_mask[labels == i] = 255
-            valid_blobs += 1
-    cleaned_mask = crop_padding(cleaned_mask)
-        
-    if valid_blobs == 0:
+            x, y, w, h, area = stats[i]
+            blob = morphed_mask[y:y+h, x:x+w]
+            if area != cv2.countNonZero(blob):
+                return None, "overlapping blobs", mask, morphed_mask, blob
+            blobs.append(blob)
+
+    if len(blobs) == 0:
         return None, "no blobs passed height filter", mask, morphed_mask
 
-    if valid_blobs == 1:
-        digit, reason, *output = classify_digit(cleaned_mask)
-        return digit, reason, mask, morphed_mask, cleaned_mask, *output
+    number = 0
+    masks = []
+    for i, blob in enumerate(blobs):
+        digit, reason, *blob_masks = classify_digit(blob)
+        if digit == -1:
+            return -1, reason, mask, morphed_mask, blob, *blob_masks
+        number += digit * int(10 ** (len(blobs) - 1 - i))
+        masks.append(blob)
+        masks.extend(blob_masks)
+    
+    if len(blobs) != 1:
+        reason = f"found {len(blobs)} blobs"
 
-    return -1, f"{valid_blobs=}", mask, morphed_mask, cleaned_mask
+    return number, reason, mask, morphed_mask, *masks
 
 def process_video(video_path, mode, l = 0, t = 0, r = 0, b = 0):
-    print("\n--- Video File ---")
+    print("--- Video File ---")
+
+    def handle_error(rect, masks, reason):
+        separator = np.full((rect.shape[0], 2, rect.shape[2]), (0,255,0), dtype=rect.dtype)
+        chain = itertools.chain.from_iterable((cv2.cvtColor(pad(m, rect), cv2.COLOR_GRAY2BGR), separator) for m in masks)
+        cv2.imshow("Video", np.hstack((rect, separator, *chain)))
+        cv2.waitKey(1)
+        # if cv2.waitKey(1) & 0xFF == ord('q'):
+        #     break
+        print("\n")
+        raise ValueError(f"Unable to classify digit: {reason}")
+        # print(f"\nUnable to classify digit: {reason}")
 
     with av.open(video_path) as container:
         print(f"path: {container.name}")
@@ -286,20 +282,44 @@ def process_video(video_path, mode, l = 0, t = 0, r = 0, b = 0):
         print(f"duration: {total_duration} s")
 
 
-        print("\n--- Video Processing ---")
+        print("--- Video Processing ---")
         ammo_counter : list[Number] = []
         reload_events = collections.defaultdict[typing.Literal["TACTICAL", "FULL"], list[ReloadEvent]](list)
         
         for frame in container.decode(video=0):
+            frame_time = frame.time
+
             # crop frame
             rect = frame.to_rgb().to_ndarray(format="bgr24")[rect_y:rect_y+rect_h, rect_x:rect_x+rect_w]
 
             # get status from rect
             number, reason, *masks = process_rect(rect)
 
-            # update states
-            frame_time = frame.time
+            # update progress bar
+            filled_length = min(round(PROGRESS_BAR_WIDTH * frame_time / total_duration), PROGRESS_BAR_WIDTH)
+            bar = '█' * filled_length + '-' * (PROGRESS_BAR_WIDTH - filled_length)
+            sys.stdout.write(f"\r\033[K|{bar}| {frame_time:.4f}/{total_duration:.4f} s | {frame_time / total_duration:.2%} | {number!r} ({reason})")
+            sys.stdout.flush()
+            
+            # display masks for debugging, maybe raise
+            if number == -1:
+                handle_error(rect, masks, reason)
+
+            # update ammo_counter/reload_events
             if len(ammo_counter) == 0 or number != ammo_counter[-1].value:
+
+                # verify valid state transition
+                if len(ammo_counter) >= 1:
+                    old_number = ammo_counter[-1].value
+                    if old_number is not None:
+                        if old_number == 0:
+                            pass
+                        elif old_number == 1:
+                            pass
+                        else:
+                            if not old_number > number:
+                                handle_error(rect, masks, f"Invalid state transition: {old_number} → {number}")
+
                 ammo_counter.append(Number(value=number, start=frame_time, end=frame_time))
 
                 type = None
@@ -328,22 +348,6 @@ def process_video(video_path, mode, l = 0, t = 0, r = 0, b = 0):
             else:
                 ammo_counter[-1].end = frame_time
 
-            # update progress bar
-            filled_length = min(round(PROGRESS_BAR_WIDTH * frame_time / total_duration), PROGRESS_BAR_WIDTH)
-            bar = '█' * filled_length + '-' * (PROGRESS_BAR_WIDTH - filled_length)
-            sys.stdout.write(f"\r\033[K|{bar}| {frame_time:.4f}/{total_duration:.4f} s | {frame_time / total_duration:.2%} | {number!r} ({reason})")
-            sys.stdout.flush()
-            
-            # display mask
-            # if digit in -2:
-            if True:
-                separator = np.full((rect.shape[0], 2, rect.shape[2]), (0,255,0), dtype=rect.dtype)
-                chain = itertools.chain.from_iterable((cv2.cvtColor(pad(m, rect), cv2.COLOR_GRAY2BGR), separator) for m in masks)
-                cv2.imshow("Video", np.hstack((rect, separator, *chain)))
-                if cv2.waitKey(1) & 0xFF == ord('q'):
-                    break
-
-    cv2.destroyAllWindows()
     print()
     print(f"found {sum(len(v) for v in reload_events.values())} {'primary' if mode == 'primary' else 'secondary' if mode == 'secondary' else 'tertiary'} weapon reloads")
     return reload_events
@@ -388,28 +392,18 @@ def analyze_reload_events(type, reload_events : list[ReloadEvent]):
     R_star = max(max(0.0, abs(D_star - m.statistical_duration) - m.radius) for m in reload_events)
 
     print(f"{len(reload_events)} {type} reloads, statistical duration: {D_star} ± {R_star} s")
-    print(f"rounded to 3 decimal places: {round_half_up(D_star, ndigits=2)} ± {round_half_up(R_star, ndigits=2)} s\n")
+    print(f"rounded to 3 decimal places: {round_half_up(D_star, ndigits=2)} ± {round_half_up(R_star, ndigits=2)} s")
 
     return D_star, R_star, type
 
 def analyze(reload_events : dict[str, list[ReloadEvent]]):
-    print("\n--- Analysis ---")
+    print("--- Analysis ---")
     result = [analyze_reload_events(type, events) for type, events in reload_events.items()]
     print(f"analyzed {len(result)} reload types")
     return result
 
 
 if __name__ == "__main__":
-    cb = lambda: input("\npress enter to exit...")
-    atexit.register(cb)
-    args = parser.parse_args()
-    video_path = args.filepath
-    mode = args.mode
-    left_crop = args.left_crop
-    top_crop = args.top_crop
-    right_crop = args.right_crop
-    bottom_crop = args.bottom_crop
-
     # video_path = pathlib.Path(r"D:\clips\2026-02-22 20-52-12.mp4")
     # mode = "primary"
     # left_crop = 2108
@@ -417,33 +411,56 @@ if __name__ == "__main__":
     # right_crop = 68
     # bottom_crop = 63
 
-    assert video_path.is_file(), f"Video file not found: {video_path}"
-    reload_events = process_video(video_path, mode, l=left_crop, t=top_crop, r=right_crop, b=bottom_crop)
-    result = analyze(reload_events)
+    cb = lambda: input("\npress enter to exit...")
+    atexit.register(cb)
+    args = parser.parse_args()
+    video_path : pathlib.Path = args.filepath
+    mode = args.mode
+    left_crop = args.left_crop
+    top_crop = args.top_crop
+    right_crop = args.right_crop
+    bottom_crop = args.bottom_crop
+    dry_run = args.dry_run
 
-    if len(result) != 0:
-        parent_path = pathlib.Path(__file__).parent
-        weapons_dict = {path.stem: path for path in (parent_path / "weapons").glob("*.json")}
-        
-        # Get weapon name from video file and update corresponding JSON
-        weapon_name = video_path.stem
-        weapon_json_path = weapons_dict[weapon_name]
-        with open(weapon_json_path, 'r') as f:
-            weapon_data = json.load(f)
-        
-        # Update reload_times based on results
-        for D_star, R_star, reload_type in result:
-            assert R_star < 0.0084, f"Unreasonably high uncertainty: {R_star:.3f} s"
-            assert reload_type in ("TACTICAL", "FULL"), f"Unexpected reload type: {reload_type}"
-            index = 0 if reload_type == "TACTICAL" else 1
-            assert weapon_data["reload_times"][index] is None, f"Reload time for {reload_type} reload already set for {weapon_name}: {weapon_data['reload_times'][index]}"
-            weapon_data["reload_times"][index] = round_half_up(D_star, 2)
-        
-        # Save the updated JSON file
-        with open(weapon_json_path, 'w') as f:
-            json.dump(weapon_data, f, indent=4)
-        
-        print(f"Updated {weapon_json_path}")
+    if video_path.is_file():
+        video_paths = [video_path]
+    else:
+        video_paths = list(video_path.iterdir())
+    
+    for video_path in video_paths:
+        assert video_path.is_file(), f"Video file not found: {video_path}"
+        reload_events = process_video(video_path, mode, l=left_crop, t=top_crop, r=right_crop, b=bottom_crop)
+        result = analyze(reload_events)
 
-        atexit.unregister(cb)
+        if len(result) != 0:
+            parent_path = pathlib.Path(__file__).parent
+            weapons_dict = {path.stem: path for path in (parent_path / "weapons").glob("*.json")}
+            
+            # Get weapon name from video file and update corresponding JSON
+            weapon_name = video_path.stem
+            weapon_json_path = weapons_dict[weapon_name]
+            with open(weapon_json_path, 'r') as f:
+                weapon_data = json.load(f)
+            
+            # Update reload_times based on results
+            for D_star, R_star, reload_type in result:
+                assert R_star < 0.0084, f"Unreasonably high uncertainty: {R_star:.5f} s"
+                assert reload_type in ("TACTICAL", "FULL"), f"Unexpected reload type: {reload_type}"
+                index = 0 if reload_type == "TACTICAL" else 1
+                current_value = weapon_data["reload_times"][index]
+                new_value = round_half_up(D_star, 2)
+                assert current_value in (None, new_value), f"new {reload_type} reload time for {weapon_name} {new_value} unequal old {current_value}"
+                weapon_data["reload_times"][index] = new_value
+            
+            # Save the updated JSON file
+            if not dry_run:
+                with open(weapon_json_path, 'w') as f:
+                    json.dump(weapon_data, f, indent=4)
+            
+                print(f"Updated {weapon_json_path}")
+
+        print()
+
+    cv2.destroyAllWindows()
+    # atexit.unregister(cb)
     

@@ -4,10 +4,10 @@ on:
   workflow_dispatch:
     inputs:
       tag_name:
-        description: 'Tag & Release Name (e.g. Y9S3.1)'
+        description: 'tag & release name (e.g. y9Ss.1)'
         required: true
       release_body:
-        description: 'Release notes'
+        description: 'release notes'
         required: true
 jobs:
   build-and-release:
