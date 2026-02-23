@@ -1,4 +1,7 @@
 # --- CONFIG ---
+# normalized to dimensions of containing rect
+
+# the position the rect of interest
 NORMALIZED_RECT_X = 0.830
 NORMALIZED_RECT_Y = 0.872
 NORMALIZED_RECT_W = 0.132
@@ -6,18 +9,19 @@ NORMALIZED_RECT_H = 0.043
 NORMALIZED_SECONDARY_RECT_Y_OFFSET = 0.035
 NORMALIZED_TERTIARY_RECT_Y_OFFSET = -0.042
 
-# Blob filtering
+# ignore blobs smaller than this
 MIN_NORMALIZED_HEIGHT_FOR_BLOB = 0.8   # relative to crop height
 
-# ZERO detection
-MAX_NORMALIZED_HOLE_CENTER_OFFSET_FOR_ZERO_FOUR = 0.1
+# the hole in 0 and 4 is centered with this tolerance, otherwise 6 or 9
+MAX_NORMALIZED_HOLE_OFFSET_FROM_CENTER_FOR_ZERO_FOUR = 0.1
+# the hole in 0 is this tall, otherwise it's 4
 MIN_NORMALIZED_HOLE_HEIGHT_FOR_ZERO = 0.6
 
-# ONE detection
+# the aspect ratio of 1 is smaller than this
 MAX_ASPECT_RATIO_FOR_ONE = 19 / 44  # width / height
 
 # Progress bar
-PROGRESS_BAR_WIDTH = 40
+PROGRESS_BAR_WIDTH = 30
 
 
 # --- CODE ---
@@ -76,7 +80,7 @@ parser.add_argument(
 
 # --- Video processing ---
 @dataclass
-class Status:
+class Number:
     value: int | None
     start: float
     end: float
@@ -85,7 +89,6 @@ class Status:
 class ReloadEvent:
     statistical_duration: float
     radius: float
-    type : typing.Literal["TACTICAL", "FULL"]
 
 def pad(arr, relative_to):
     return np.pad(arr, ((0, relative_to.shape[0]-arr.shape[0]), (0, 0)), mode='constant', constant_values=127)
@@ -97,13 +100,15 @@ def crop_padding(mask):
     cropped = mask[y:y+h, x:x+w]
     return cropped
 
-def analyze_skeleton(skeleton):
-    """Analyze skeleton topology: count endpoints and junctions
+def analyze_skeleton(mask):
+    """Analyze skeleton topology: count endpoints
     Assumes skeleton already has 1-pixel border padding"""
+
+    padded_mask = cv2.copyMakeBorder(mask, 1, 1, 1, 1, cv2.BORDER_CONSTANT, value=0)
+    skeleton = cv2.ximgproc.thinning(padded_mask, thinningType=cv2.ximgproc.THINNING_ZHANGSUEN)
     h, w = skeleton.shape
     
     endpoints = 0
-    junctions = 0
     
     # Check each white pixel (not on border)
     for y in range(1, h - 1):
@@ -118,10 +123,8 @@ def analyze_skeleton(skeleton):
                 
                 if neighbors == 1:
                     endpoints += 1
-                elif neighbors >= 3:
-                    junctions += 1
     
-    return endpoints, junctions
+    return endpoints, skeleton
 
 def classify_digit(cropped_mask):
     h, w = cropped_mask.shape
@@ -129,7 +132,7 @@ def classify_digit(cropped_mask):
 
     # check apsect ratio, 1 is narrowest digit
     if aspect_ratio <= MAX_ASPECT_RATIO_FOR_ONE:
-        return 1, f"aspect ratio: {aspect_ratio:.4f}"
+        return 1, f"{aspect_ratio=:.4f}"
     
     # find contours
     contours, hierarchy = cv2.findContours(
@@ -137,75 +140,83 @@ def classify_digit(cropped_mask):
         cv2.RETR_CCOMP,
         cv2.CHAIN_APPROX_SIMPLE
     )
-    no_of_holes = len(contours) - 1
+    number_of_holes = len(contours) - 1
 
     # if there are 2 holes it's 8
-    if no_of_holes == 2:
-        return 8, f"#holes: {no_of_holes}"
+    if number_of_holes == 2:
+        return 8, f"{number_of_holes=}"
     
     # if there is 1 hole it's 0, 4, 6, or 9
-    if no_of_holes == 1:
+    if number_of_holes == 1:
         hole, = [cnt for i, cnt in enumerate(contours) if hierarchy[0][i][3] != -1]
         hx, hy, hw, hh = cv2.boundingRect(hole)
-        hx = hx + hw / 2
-        hy = hy + hh / 2
+        normalized_hole_offset_from_center_x = (hx + hw / 2.) / w - 0.5
+        normalized_hole_offset_from_center_y = (hy + hh / 2.) / h - 0.5
 
-        normalized_hole_center_y = hy/h - 0.5
-        if normalized_hole_center_y < -MAX_NORMALIZED_HOLE_CENTER_OFFSET_FOR_ZERO_FOUR:
-            return 9, f"hole center normalized y: ({normalized_hole_center_y:.4f})"
-        if normalized_hole_center_y > MAX_NORMALIZED_HOLE_CENTER_OFFSET_FOR_ZERO_FOUR:
-            return 6, f"hole center normalized y: ({normalized_hole_center_y:.4f})"
+        if normalized_hole_offset_from_center_y < -MAX_NORMALIZED_HOLE_OFFSET_FROM_CENTER_FOR_ZERO_FOUR:
+            return 9, f"{normalized_hole_offset_from_center_y=:.4f}"
+        if normalized_hole_offset_from_center_y > MAX_NORMALIZED_HOLE_OFFSET_FROM_CENTER_FOR_ZERO_FOUR:
+            return 6, f"{normalized_hole_offset_from_center_y=:.4f}"
 
         normalized_hole_height = hh / h
-        return 0 if normalized_hole_height >= MIN_NORMALIZED_HOLE_HEIGHT_FOR_ZERO else 4, f"#normalized hole height: {normalized_hole_height}"
+        return 0 if normalized_hole_height >= MIN_NORMALIZED_HOLE_HEIGHT_FOR_ZERO else 4, f"{normalized_hole_height=:.4f}"
+
 
     # 3 has 3 endpoints
-    padded_mask = cv2.copyMakeBorder(cropped_mask, 1, 1, 1, 1, cv2.BORDER_CONSTANT, value=0)
-    skeleton = cv2.ximgproc.thinning(padded_mask, thinningType=cv2.ximgproc.THINNING_ZHANGSUEN)
-    endpoints, junctions = analyze_skeleton(skeleton)
+    endpoints, skeleton = analyze_skeleton(cropped_mask)
     if endpoints == 3:
-        return 3, f"endpoints: {endpoints}, junctions: {junctions}", skeleton
+        return 3, f"{endpoints=}", skeleton
 
-    num_samples = 50
+    # 2, 5, 7 have 2 endpoints
+    if endpoints != 2:
+        raise ValueError(f"Unable to classify digit with aspect ratio: {aspect_ratio:.4f}, holes: {number_of_holes}, endpoints: {endpoints}")
 
-    # match 7
-    p0 = (0.15 * w, 0.08 * h)
-    p1 = (0.85 * w, 0.08 * h)
-    p2 = (0.4 * w, 0.92 * h)
-    points = (
-        (p0, p1),
-        (p1, p2),
-    )
-    lines = [np.linspace(p0, p1, num_samples).astype(int) for p0, p1 in points]
-    # seven = cropped_mask.copy()
-    # for line in lines:
-    #     seven[line[:, 1], line[:, 0]] = 0
-    if all(np.all(cropped_mask[line[:, 1], line[:, 0]] == 255) for line in lines):
-        return 7, f"matched 7"
+
+    def match(area, area_range, points, num_samples = 50):
+        if not (area_range[0] <= area <= area_range[1]):
+            return False
+        points = [((x0*w, y0*h), (x1*w, y1*h)) for (x0, y0), (x1, y1) in points]
+        lines = [np.linspace(p0, p1, num_samples).astype(int) for p0, p1 in points]
+        return all(np.all(cropped_mask[line[:, 1], line[:, 0]] == 255) for line in lines)
+
+
+    normalized_area = mass / (255 * w * h)
+
+    if match(normalized_area, (0.45, 0.5), [
+        ((0.15, 0.08), (0.85, 0.08)),
+        ((0.85, 0.08), (0.4, 0.92)),
+        ]):
+        return 7, "matched 7"
     
-    # match 5
-    p0 = (0.85 * w, 0.07 * h)
-    p1 = (0.21 * w, 0.07 * h)
-    p2 = (0.21 * w, 0.4 * h)
-    p3 = (0.85 * w, 0.5 * h)
-    p4 = (0.85 * w, 0.8 * h)
-    p5 = (0.7 * w, 0.93 * h)
-    p6 = (0.3 * w, 0.93 * h)
-    points = (
-        (p0, p1),
-        (p1, p2),
-        (p3, p4),
-        (p5, p6),
-    )
-    lines = [np.linspace(p0, p1, num_samples).astype(int) for p0, p1 in points]
-    # five = cropped_mask.copy()
-    # for line in lines:
-    #     five[line[:, 1], line[:, 0]] = 0
-    if all(np.all(cropped_mask[line[:, 1], line[:, 0]] == 255) for line in lines):
-        return 5, f"matched 5"
+    if match(normalized_area, (0.59, 0.64), [
+        ((0., 0.), (0., 0.)),
+        ]):
+        return 5, "matched 5"
+    
+    if match(normalized_area, (0.57, 0.59), [
+        ((0., 0.), (0., 0.)),
+        ]):
+        return 2, "matched 2"
+    
 
 
-    return -2, f"no digit found"
+    mass = np.sum(cropped_mask)
+    y_coords, x_coords = np.indices((h, w))
+    normalized_center_x = np.sum(x_coords * cropped_mask) / mass / w
+    normalized_center_y = np.sum(y_coords * cropped_mask) / mass / h
+
+    digit = None
+    if 0.45 <= normalized_area <= 0.5 and 0.52 <= normalized_center_x <= 0.55 and 0.39 <= normalized_center_y <= 0.41:
+        digit = 7
+    if 0.59 <= normalized_area <= 0.64 and 0.485 <= normalized_center_x <= 0.505 and 0.48 <= normalized_center_y <= 0.5:
+        digit = 5
+    if 0.57 <= normalized_area <= 0.59 and 0.48 <= normalized_center_x <= 0.505 and 0.49 <= normalized_center_y <= 0.51:
+        digit = 2
+    
+    if digit is not None:
+        return digit, f"{normalized_area:.4f} {normalized_center_x:.4f} {normalized_center_y:.4f}"
+
+    raise ValueError(f"Unable to classify digit with area: {normalized_area:.4f}, center: ({normalized_center_x:.4f}, {normalized_center_y:.4f})")
 
 def process_rect(img):
     # Strict but tolerant RGB mask: red/black with GB noise allowed
@@ -230,8 +241,7 @@ def process_rect(img):
     cleaned_mask = np.zeros_like(mask)
     valid_blobs = 0
     for i in range(1, num):
-        h_i = stats[i, cv2.CC_STAT_HEIGHT]
-        if h_i >= MIN_NORMALIZED_HEIGHT_FOR_BLOB * h:
+        if stats[i, cv2.CC_STAT_HEIGHT] / h >= MIN_NORMALIZED_HEIGHT_FOR_BLOB:
             cleaned_mask[labels == i] = 255
             valid_blobs += 1
     cleaned_mask = crop_padding(cleaned_mask)
@@ -239,13 +249,11 @@ def process_rect(img):
     if valid_blobs == 0:
         return None, "no blobs passed height filter", mask, morphed_mask
 
-    output = []
-    digit = -1
-    reason = f"valid blobs: {valid_blobs}"
     if valid_blobs == 1:
         digit, reason, *output = classify_digit(cleaned_mask)
+        return digit, reason, mask, morphed_mask, cleaned_mask, *output
 
-    return digit, reason, mask, morphed_mask, cleaned_mask, *output
+    return -1, f"{valid_blobs=}", mask, morphed_mask, cleaned_mask
 
 def process_video(video_path, mode, l = 0, t = 0, r = 0, b = 0):
     print("\n--- Video File ---")
@@ -279,35 +287,31 @@ def process_video(video_path, mode, l = 0, t = 0, r = 0, b = 0):
 
 
         print("\n--- Video Processing ---")
-        states : list[Status] = []
-        reload_events : list[ReloadEvent] = []
+        ammo_counter : list[Number] = []
+        reload_events = collections.defaultdict[typing.Literal["TACTICAL", "FULL"], list[ReloadEvent]](list)
         
         for frame in container.decode(video=0):
             # crop frame
             rect = frame.to_rgb().to_ndarray(format="bgr24")[rect_y:rect_y+rect_h, rect_x:rect_x+rect_w]
 
             # get status from rect
-            digit, reason, *masks = process_rect(rect)
+            number, reason, *masks = process_rect(rect)
 
             # update states
             frame_time = frame.time
-            if len(states) == 0 or digit != states[-1].value:
-                states.append(Status(value=digit, start=frame_time, end=frame_time))
+            if len(ammo_counter) == 0 or number != ammo_counter[-1].value:
+                ammo_counter.append(Number(value=number, start=frame_time, end=frame_time))
 
                 type = None
 
-                if len(states) >= 3:
-                    e2, e1, e0 = states[-3:]
+                if len(ammo_counter) >= 3:
+                    e2, e1, e0 = ammo_counter[-3:]
                     if e2.value not in (None, 0, 1) and e1.value in (0, 1) and e0.value not in (None, 0, 1): # tactical
-                        t0, t1 = e2.end, e1.start
-                        t2, t3 = e1.end, e0.start
                         type = "TACTICAL"
 
-                if len(states) >= 4:
-                    e3, e2, e1, e0 = states[-4:]
+                if len(ammo_counter) >= 4:
+                    e3, e2, e1, e0 = ammo_counter[-4:]
                     if e3.value not in (None, 0, 1) and e2.value == 1 and e1.value == 0 and e0.value not in (None, 0): # full
-                        t0, t1 = e2.end, e1.start
-                        t2, t3 = e1.end, e0.start
                         type = "FULL"
 
                 if type is not None:
@@ -318,45 +322,45 @@ def process_video(video_path, mode, l = 0, t = 0, r = 0, b = 0):
                     E = (t2 + t3) / 2
                     D = E - S
                     R = (-t0 + t3 - t2 + t1) / 2
-                    reload_events.append(ReloadEvent(statistical_duration=D, radius=R, type=type))
+                    reload_events[type].append(ReloadEvent(statistical_duration=D, radius=R))
                     sys.stdout.write(f"\r\033[K{type} reload: {S:10.6f}s → {E:10.6f}s | Δt: {D:.6f} ± {R:.6f} s | min/max Δt: {t2 - t1:.6f}/{t3 - t0:.6f} s\n")
                     sys.stdout.flush()
             else:
-                states[-1].end = frame_time
+                ammo_counter[-1].end = frame_time
 
             # update progress bar
             filled_length = min(round(PROGRESS_BAR_WIDTH * frame_time / total_duration), PROGRESS_BAR_WIDTH)
             bar = '█' * filled_length + '-' * (PROGRESS_BAR_WIDTH - filled_length)
-            sys.stdout.write(f"\r\033[K|{bar}| {frame_time:.4f}/{total_duration:.4f} s | {frame_time / total_duration:.2%} | {digit!r} ({reason})")
+            sys.stdout.write(f"\r\033[K|{bar}| {frame_time:.4f}/{total_duration:.4f} s | {frame_time / total_duration:.2%} | {number!r} ({reason})")
             sys.stdout.flush()
             
             # display mask
-            if digit == -2:
-            # if True:
+            # if digit in -2:
+            if True:
                 separator = np.full((rect.shape[0], 2, rect.shape[2]), (0,255,0), dtype=rect.dtype)
                 chain = itertools.chain.from_iterable((cv2.cvtColor(pad(m, rect), cv2.COLOR_GRAY2BGR), separator) for m in masks)
                 cv2.imshow("Video", np.hstack((rect, separator, *chain)))
-                if cv2.waitKey(0) & 0xFF == ord('q'):
+                if cv2.waitKey(1) & 0xFF == ord('q'):
                     break
 
     cv2.destroyAllWindows()
     print()
-    print(f"found {len(reload_events)} {'primary' if mode == 'primary' else 'secondary' if mode == 'secondary' else 'tertiary'} weapon reloads")
+    print(f"found {sum(len(v) for v in reload_events.values())} {'primary' if mode == 'primary' else 'secondary' if mode == 'secondary' else 'tertiary'} weapon reloads")
     return reload_events
 
 
 # --- Analysis ---
-def interval_cost(D, measurements, sigma=0.0005, delta=1.5):
+def interval_cost(D, reload_events : list[ReloadEvent], sigma=0.0005, delta=1.5):
     """
     D: current duration estimate (scalar)
-    measurements: list of MeasuredInterval
+    reload_events: list of ReloadEvent
     sigma: small softening for minimal violations
     delta: Huber parameter
     """
     total = 0.0
-    for m in measurements:
+    for re in reload_events:
         # compute interval violation
-        v = max(0.0, abs(D - m.statistical_duration) - m.radius)
+        v = max(0.0, abs(D - re.statistical_duration) - re.radius)
         # scale by sigma and apply Huber
         total += scipy.special.huber(delta, v / sigma)
     return total
@@ -365,58 +369,57 @@ def round_half_up(fl, ndigits=0):
     q = Decimal('1.' + '0' * ndigits)
     return float(Decimal.from_float(fl).quantize(q, rounding=ROUND_HALF_UP))
 
-def analyze_reload_events(reload_events : list[ReloadEvent]):
+def analyze_reload_events(type, reload_events : list[ReloadEvent]):
+    assert len(reload_events) >= 7, f"Not enough measurements for {type} reload: {len(reload_events)} (need at least 7 for robust estimation)"
+
+    # Run optimization, initial guess: weighted average
+    x0 = np.mean([m.statistical_duration for m in reload_events])
+
+    res = scipy.optimize.minimize(
+        interval_cost,
+        x0=[x0],
+        args=(reload_events,),
+        method='Nelder-Mead',  # robust 1D optimizer
+        options={'xatol':1e-9, 'disp': False}
+    )
+    D_star = float(res.x[0])
+
+    # Estimate effective radius (uncertainty), max violation after robust estimate
+    R_star = max(max(0.0, abs(D_star - m.statistical_duration) - m.radius) for m in reload_events)
+
+    print(f"{len(reload_events)} {type} reloads, statistical duration: {D_star} ± {R_star} s")
+    print(f"rounded to 3 decimal places: {round_half_up(D_star, ndigits=2)} ± {round_half_up(R_star, ndigits=2)} s\n")
+
+    return D_star, R_star, type
+
+def analyze(reload_events : dict[str, list[ReloadEvent]]):
     print("\n--- Analysis ---")
-
-    groups : collections.defaultdict[str, list[ReloadEvent]] = collections.defaultdict(list)
-    for event in reload_events:
-        groups[event.type].append(event)
-    event_groups = list(groups.values())
-
-    result : list[tuple[float, float, str]] = []
-
-    for event_group in event_groups:
-        type = event_group[0].type
-        assert len(event_group) >= 7, f"Not enough measurements for {type} reload: {len(event_group)} (need at least 7 for robust estimation)"
-
-        # Run optimization, initial guess: weighted average
-        x0 = np.mean([m.statistical_duration for m in event_group])
-
-        res = scipy.optimize.minimize(
-            interval_cost,
-            x0=[x0],
-            args=(event_group,),
-            method='Nelder-Mead',  # robust 1D optimizer
-            options={'xatol':1e-9, 'disp': False}
-        )
-        D_star = res.x[0]
-
-        # Estimate effective radius (uncertainty), max violation after robust estimate
-        R_star = max(max(0.0, abs(D_star - m.statistical_duration) - m.radius) for m in event_group)
-
-        print(f"{len(event_group)} {type} reloads, statistical duration: {D_star} ± {R_star} s")
-        print(f"rounded to 3 decimal places: {round_half_up(D_star, ndigits=2)} ± {round_half_up(R_star, ndigits=2)} s\n")
-
-        result.append((D_star, R_star, type))
-
-    print(f"analyzed {len(event_groups)} reload types")
+    result = [analyze_reload_events(type, events) for type, events in reload_events.items()]
+    print(f"analyzed {len(result)} reload types")
     return result
 
 
 if __name__ == "__main__":
     cb = lambda: input("\npress enter to exit...")
-    # atexit.register(cb)
-    # args = parser.parse_args()
-    video_path = pathlib.Path(r"D:\clips\2026-02-22 20-52-12.mp4") # args.filepath
-    mode = "primary" # args.mode
-    left_crop = 2108 # args.left_crop
-    top_crop = 1185 # args.top_crop
-    right_crop = 68 # args.right_crop
-    bottom_crop = 63 # args.bottom_crop
+    atexit.register(cb)
+    args = parser.parse_args()
+    video_path = args.filepath
+    mode = args.mode
+    left_crop = args.left_crop
+    top_crop = args.top_crop
+    right_crop = args.right_crop
+    bottom_crop = args.bottom_crop
+
+    # video_path = pathlib.Path(r"D:\clips\2026-02-22 20-52-12.mp4")
+    # mode = "primary"
+    # left_crop = 2108
+    # top_crop = 1185
+    # right_crop = 68
+    # bottom_crop = 63
 
     assert video_path.is_file(), f"Video file not found: {video_path}"
     reload_events = process_video(video_path, mode, l=left_crop, t=top_crop, r=right_crop, b=bottom_crop)
-    result = analyze_reload_events(reload_events)
+    result = analyze(reload_events)
 
     if len(result) != 0:
         parent_path = pathlib.Path(__file__).parent
@@ -444,13 +447,3 @@ if __name__ == "__main__":
 
         atexit.unregister(cb)
     
-
-"""
-
-    "reload_times" : [null, null]
-
-
-,
-    "reload_times" : [null, null, null, null]
-
-"""
