@@ -275,9 +275,7 @@ def process_video(video_path, mode, l = 0, t = 0, r = 0, b = 0):
         rect_w = int(NORMALIZED_RECT_W * total_width)
         rect_h = int(NORMALIZED_RECT_H * total_height)
         print(f"crop rect: x={rect_x}, y={rect_y}, w={rect_w}, h={rect_h}")
-
-        fps = float(stream.average_rate)
-        print(f"fps: {fps}")
+        print(f"fps: {float(stream.average_rate)}")
         total_duration = float(container.duration) / av.time_base
         print(f"duration: {total_duration} s")
 
@@ -311,14 +309,9 @@ def process_video(video_path, mode, l = 0, t = 0, r = 0, b = 0):
                 # verify valid state transition
                 if len(ammo_counter) >= 1:
                     old_number = ammo_counter[-1].value
-                    if old_number is not None and number is not None:
-                        if old_number == 0:
-                            pass
-                        elif old_number == 1:
-                            pass
-                        else:
-                            if not old_number > number:
-                                handle_error(rect, masks, f"Invalid state transition: {old_number} → {number}")
+                    if old_number not in (None, 0, 1) and number is not None:
+                        if not old_number > number:
+                            handle_error(rect, masks, f"Invalid state transition: {old_number} → {number}")
 
                 ammo_counter.append(Number(value=number, start=frame_time, end=frame_time))
 
@@ -337,7 +330,8 @@ def process_video(video_path, mode, l = 0, t = 0, r = 0, b = 0):
                 if type is not None:
                     t0, t1 = e2.end, e1.start
                     t2, t3 = e1.end, e0.start
-                    assert t0 < t1 < t2 < t3, f"Timestamps must be in order: {t0}, {t1}, {t2}, {t3}"
+                    if not (t0 < t1 < t2 < t3):
+                        handle_error(rect, masks, f"Timestamps must be in order: {t0}, {t1}, {t2}, {t3}")
                     S = (t0 + t1) / 2
                     E = (t2 + t3) / 2
                     D = E - S
