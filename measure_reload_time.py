@@ -104,10 +104,66 @@ class Event:
         self.statistical_duration = self.statistical_end - self.statistical_start
         self.statistical_radius = (-self.t0 + self.t3 - self.t2 + self.t1) / 2
 
+    def __str__(self):
+        return (
+            f"{self.__doc__}: {self.statistical_start:10.6f}s → {self.statistical_end:10.6f}s | "
+            f"Δt: {self.statistical_duration:.6f} ± {self.statistical_radius:.6f} s | "
+            f"min/max Δt: {self.t2 - self.t1:.6f}/{self.t3 - self.t0:.6f} s"
+            )
+    
+    @staticmethod
+    def get_display_value(value):
+        return round_half_up(value, ndigits=2)
 class TacticalReloadEvent(Event):
     """tactical reload"""
+
+    @staticmethod
+    def get_json_value(json_data):
+        return json_data["reload_times"][0 if angled_grip else 2]
+    @staticmethod
+    def set_json_value(value, json_data):
+        json_data["reload_times"][0 if angled_grip else 2] = value
 class FullReloadEvent(Event):
     """full reload"""
+
+    @staticmethod
+    def get_json_value(json_data):
+        return json_data["reload_times"][1 if angled_grip else 3]
+    @staticmethod
+    def set_json_value(value, json_data):
+        json_data["reload_times"][1 if angled_grip else 3] = value
+@dataclass
+class FireRateEvent(Event):
+    """fire rate"""
+    rounds : int
+
+    def __str__(self):
+        return super().__str__() + f" | rounds: {self.rounds}"
+
+    def __post_init__(self):
+        super().__post_init__()
+        # Adjust time values to be per bullet (time between shots)
+        # N rounds have N-1 intervals between them
+        intervals = self.rounds - 1
+        self.minimum_duration /= intervals
+        self.maximum_duration /= intervals
+        self.statistical_duration /= intervals
+        self.statistical_radius /= intervals
+
+    @staticmethod
+    def get_display_value(value):
+        return int(round_half_up(60 / value, ndigits=0))
+
+    @staticmethod
+    def get_json_value(json_data):
+        return json_data["rpm"]
+    @staticmethod
+    def set_json_value(value, json_data):
+        json_data["rpm"] = value
+
+def round_half_up(fl, ndigits=0):
+    q = Decimal('1.' + '0' * ndigits)
+    return float(Decimal.from_float(fl).quantize(q, rounding=ROUND_HALF_UP))
 
 def pad(arr, relative_to):
     return np.pad(arr, ((0, relative_to.shape[0]-arr.shape[0]), (0, 0)), mode='constant', constant_values=127)
@@ -257,21 +313,37 @@ def process_rect(img):
 
     return number, reason, mask, morphed_mask, *masks
 
-def classify_tactical_reload(ammo_counter : list[Number]):
+def detect_tactical_reload(ammo_counter : list[Number]):
     if len(ammo_counter) >= 3:
         e2, e1, e0 = ammo_counter[-3:]
         if e2.value not in (None, 0, 1) and e1.value in (0, 1) and e0.value not in (None, 0, 1):
             t0, t1 = e2.end, e1.start
             t2, t3 = e1.end, e0.start
-            return TacticalReloadEvent(t0, t1, t2, t3)
+            return TacticalReloadEvent(t0, t1, t2, t3), False
     return None
-def classify_full_reload(ammo_counter : list[Number]):
+def detect_full_reload(ammo_counter : list[Number]):
     if len(ammo_counter) >= 4:
         e3, e2, e1, e0 = ammo_counter[-4:]
         if e3.value not in (None, 0, 1) and e2.value == 1 and e1.value == 0 and e0.value not in (None, 0):
             t0, t1 = e2.end, e1.start
             t2, t3 = e1.end, e0.start
-            return FullReloadEvent(t0, t1, t2, t3)
+            return FullReloadEvent(t0, t1, t2, t3), False
+    return None
+def detect_burst(ammo_counter : list[Number]):
+    burst : list[Number] = []
+    for number in reversed(ammo_counter):
+        if not isinstance(number.value, int):
+            break
+        if burst and number.value <= burst[0].value:
+            break
+        burst.insert(0, number)
+
+    if len(burst) >= 3:
+        e3 = burst[0]
+        e2 = burst[1]
+        e1 = burst[-2]
+        e0 = burst[-1]
+        return FireRateEvent(e3.end, e2.start, e1.end, e0.start, rounds=len(burst)-1), len(burst) > 3
     return None
 
 def process_video(video_path, mode, l = 0, t = 0, r = 0, b = 0):
@@ -316,7 +388,7 @@ def process_video(video_path, mode, l = 0, t = 0, r = 0, b = 0):
 
         print("--- Video Processing ---")
         ammo_counter : list[Number] = []
-        events : list[Event] = []
+        events = collections.defaultdict[type, list[Event]](list)
         
         for frame in container.decode(video=0):
             frame_time = frame.time
@@ -349,29 +421,33 @@ def process_video(video_path, mode, l = 0, t = 0, r = 0, b = 0):
 
                 ammo_counter.append(Number(value=number, start=frame_time, end=frame_time))
 
-                new_events = [
-                    classify_tactical_reload(ammo_counter),
-                    classify_full_reload(ammo_counter)
+                new_events : list[None | tuple[Event, bool]] = [
+                    detect_tactical_reload(ammo_counter),
+                    detect_full_reload(ammo_counter),
+                    detect_burst(ammo_counter),
                 ]
-                for e in new_events:
-                    if e is not None:
+                for tup in new_events:
+                    if tup is not None:
+                        e, remove_previous = tup
                         t0, t1, t2, t3 = e.t0, e.t1, e.t2, e.t3
                         if not (t0 < t1 < t2 < t3):
                             handle_error(rect, masks, f"Timestamps must be in order: {t0}, {t1}, {t2}, {t3}")
-                        sys.stdout.write(
-                            f"\r\033[K{e.__doc__}: {e.statistical_start:10.6f}s → {e.statistical_end:10.6f}s | "
-                            f"Δt: {e.statistical_duration:.6f} ± {e.statistical_radius:.6f} s | "
-                            f"min/max Δt: {t2 - t1:.6f}/{t3 - t0:.6f} s\n"
-                            )
-                        sys.stdout.flush()
-                        events.append(e)
-
+                        if not remove_previous:
+                            old_e = events[type(e)][-1] if len(events[type(e)]) > 0 else None
+                            if old_e is not None:
+                                sys.stdout.write(f"\r\033[K{old_e}\n")
+                                sys.stdout.flush()
+                        if remove_previous:
+                            events[type(e)].pop()
+                        events[type(e)].append(e)
 
             else:
                 ammo_counter[-1].end = frame_time
 
-    print()
-    print(f"found {len(events)} events")
+    for event_list in events.values():
+        sys.stdout.write(f"\r\033[K{event_list[-1]}\n")
+        sys.stdout.flush()
+    print(f"found {sum(len(v) for v in events.values())} events")
     return events
 
 
@@ -391,12 +467,8 @@ def interval_cost(D, reload_events : list[Event], sigma=0.0005, delta=1.5):
         total += scipy.special.huber(delta, v / sigma)
     return total
 
-def round_half_up(fl, ndigits=0):
-    q = Decimal('1.' + '0' * ndigits)
-    return float(Decimal.from_float(fl).quantize(q, rounding=ROUND_HALF_UP))
-
-def analyze_reload_events(type : type, events : list[Event]):
-    assert len(events) >= 7, f"Not enough measurements for {type.__doc__}: {len(events)} (need at least 7 for robust estimation)"
+def analyze_reload_events(event_type : type[Event], events : list[Event]):
+    assert len(events) >= 7, f"Not enough measurements for {event_type.__doc__}: {len(events)} (need at least 7 for robust estimation)"
 
     # Run optimization, initial guess: weighted average
     x0 = np.mean([m.statistical_duration for m in events])
@@ -413,19 +485,13 @@ def analyze_reload_events(type : type, events : list[Event]):
     # Estimate effective radius (uncertainty), max violation after robust estimate
     R_star = max(max(0.0, abs(D_star - m.statistical_duration) - m.statistical_radius) for m in events)
 
-    print(f"{len(events)} {type.__doc__}, statistical duration: {D_star} ± {R_star} s")
-    print(f"rounded to 3 decimal places: {round_half_up(D_star, ndigits=2)} ± {round_half_up(R_star, ndigits=2)} s")
+    print(f"{len(events)} {event_type.__doc__} events, statistical duration: {D_star} ± {R_star} s -> {event_type.get_display_value(D_star)}")
 
-    return D_star, R_star, type
+    return D_star, R_star, event_type
 
-def analyze(events : list[Event]):
+def analyze(events : dict[type[Event], list[Event]]):
     print("--- Analysis ---")
-
-    groups = collections.defaultdict(list)
-    for e in events:
-        groups[type(e)].append(e)
-
-    result = [analyze_reload_events(type, events) for type, events in groups.items()]
+    result = [analyze_reload_events(event_type, events) for event_type, events in events.items()]
     print(f"analyzed {len(result)} event types")
     return result
 
@@ -448,6 +514,7 @@ if __name__ == "__main__":
     right_crop = args.right_crop
     bottom_crop = args.bottom_crop
     dry_run = args.dry_run
+    angled_grip = args.angled_grip
 
     if video_path.is_file():
         video_paths = [video_path]
@@ -473,15 +540,13 @@ if __name__ == "__main__":
             change_made = False
             for D_star, R_star, event_type in result:
                 assert R_star < 0.0084, f"Unreasonably high uncertainty: {R_star:.5f} s"
-                assert event_type in (TacticalReloadEvent, FullReloadEvent), f"Unexpected reload type: {event_type}"
-                index = 0 if event_type == TacticalReloadEvent else 1
-                current_value = weapon_data["reload_times"][index]
-                new_value = round_half_up(D_star, 2)
+                current_value = event_type.get_json_value(weapon_data)
+                new_value = event_type.get_display_value(D_star)
                 if current_value is None:
                     change_made = True
-                    weapon_data["reload_times"][index] = new_value
+                    event_type.set_json_value(new_value, weapon_data)
                 elif current_value != new_value:
-                    raise ValueError(f"new {event_type.__doc__} reload time for {weapon_name} {new_value} unequal old {current_value}")
+                    raise ValueError(f"new value for {event_type.__doc__} for {weapon_name} '{new_value}' unequal old value '{current_value}'")
             
             # Save the updated JSON file
             if not dry_run and change_made:
