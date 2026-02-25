@@ -55,8 +55,8 @@
     "name": "SPAS-12",
     "pellets": 8,
     "reload_times": [
-        null,
-        null
+        0.6,
+        4.93
     ],
-    "rpm": 220
+    "rpm": 219
 }

@@ -55,8 +55,8 @@
     "name": "SUPER SHORTY",
     "pellets": 8,
     "reload_times": [
-        null,
-        null
+        0.7,
+        3.0
     ],
-    "rpm": 100
+    "rpm": 102
 }

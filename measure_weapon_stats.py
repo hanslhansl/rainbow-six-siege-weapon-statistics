@@ -1,10 +1,10 @@
 # --- CONFIG ---
 # normalized to dimensions of containing rect
 
-# the position the rect of interest
-NORMALIZED_RECT_X = 0.830
+# the position of the rect of interest
+NORMALIZED_RECT_X = 0.745
 NORMALIZED_RECT_Y = 0.872
-NORMALIZED_RECT_W = 0.132
+NORMALIZED_RECT_W = 0.198
 NORMALIZED_RECT_H = 0.043
 NORMALIZED_SECONDARY_RECT_Y_OFFSET = 0.035
 NORMALIZED_TERTIARY_RECT_Y_OFFSET = -0.042
@@ -25,62 +25,38 @@ PROGRESS_BAR_WIDTH = 30
 
 
 # --- CODE ---
-import cv2, cv2.ximgproc, numpy as np, sys, typing, av, atexit, pathlib, scipy.optimize, scipy.special, argparse, collections, json, itertools
+import cv2, numpy as np, sys, typing, av, atexit, pathlib, scipy.optimize, scipy.special, argparse, collections, json, itertools
 from dataclasses import dataclass
 from decimal import Decimal, ROUND_HALF_UP
 
-# --- Argument parsing ---
-parser = argparse.ArgumentParser(
-    description="scan a video file for reload animations and measure the duration"
-)
+# --- argument parsing ---
+parser = argparse.ArgumentParser(description="measure reload times and fire rates of weapons from video recordings and update JSON files accordingly")
 
-# Positional Argument: file path
-parser.add_argument(
-    "filepath",
-    type=pathlib.Path,
-    help="path to the video file (or directory containing video files)"
-)
+# positional argument: file path
+parser.add_argument( "path", type=pathlib.Path, help="path to the video file (or directory containing video files)")
 
-# Group 1: primary vs secondary
+# group 1: primary vs secondary
 role_group = parser.add_mutually_exclusive_group(required=True)
-role_group.add_argument("--primary", dest="mode", action="store_const", const="primary")
-role_group.add_argument("--secondary", dest="mode", action="store_const", const="secondary")
-role_group.add_argument("--tertiary", dest="mode", action="store_const", const="tertiary")
+role_group.add_argument("--primary", dest="weapon_slot", action="store_const", const="primary")
+role_group.add_argument("--secondary", dest="weapon_slot", action="store_const", const="secondary")
+role_group.add_argument("--tertiary", dest="weapon_slot", action="store_const", const="tertiary")
 
-# Group 2: crop offsets
-parser.add_argument(
-    "-l",
-    "--left-crop",
-    type=int,
-    default=0,
-    help="Left crop offset (integer)"
-)
-parser.add_argument(
-    "-t",
-    "--top-crop",
-    type=int,
-    default=0,
-    help="Top crop offset (integer)"
-)
-parser.add_argument(
-    "-r",
-    "--right-crop",
-    type=int,
-    default=0,
-    help="Right crop offset (integer)"
-)
-parser.add_argument(
-    "-b",
-    "--bottom-crop",
-    type=int,
-    default=0,
-    help="Bottom crop offset (integer)"
-)
+# aspect ratio
+parser.add_argument("--aspect-ratio", type=str, required=True, help="in-game aspect ratio like 16:9 or 4:3")
 
+# group 2: crop offsets
+parser.add_argument("-l", "--left-crop", type=int, default=0, help="left crop offset (integer)")
+parser.add_argument("-t", "--top-crop", type=int, default=0, help="top crop offset (integer)")
+parser.add_argument("-r", "--right-crop", type=int, default=0, help="right crop offset (integer)")
+parser.add_argument("-b", "--bottom-crop", type=int, default=0, help="bottom crop offset (integer)")
+
+# don't update json files, just print results
 parser.add_argument("--dry-run", action="store_true", help="process the video and print results without updating JSON files")
+
+# whether the video was recorded with angled grip attached, which changes the reload times and ammo counter behavior
 parser.add_argument("--angled-grip", action="store_false", help="if the video was recorded with angled grip attached")
 
-# --- Video processing ---
+# --- video processing ---
 @dataclass
 class Number:
     value: int | None
@@ -108,7 +84,7 @@ class Event:
         return (
             f"{self.__doc__}: {self.statistical_start:10.6f}s → {self.statistical_end:10.6f}s | "
             f"Δt: {self.statistical_duration:.6f} ± {self.statistical_radius:.6f} s | "
-            f"min/max Δt: {self.t2 - self.t1:.6f}/{self.t3 - self.t0:.6f} s"
+            f"min/max Δt: {self.minimum_duration:.6f}/{self.maximum_duration:.6f} s"
             )
     
     @staticmethod
@@ -119,19 +95,19 @@ class TacticalReloadEvent(Event):
 
     @staticmethod
     def get_json_value(json_data):
-        return json_data["reload_times"][0 if angled_grip else 2]
+        return json_data["reload_times"][0 if ANGLED_GRIP else 2]
     @staticmethod
     def set_json_value(value, json_data):
-        json_data["reload_times"][0 if angled_grip else 2] = value
+        json_data["reload_times"][0 if ANGLED_GRIP else 2] = value
 class FullReloadEvent(Event):
     """full reload"""
 
     @staticmethod
     def get_json_value(json_data):
-        return json_data["reload_times"][1 if angled_grip else 3]
+        return json_data["reload_times"][1 if ANGLED_GRIP else 3]
     @staticmethod
     def set_json_value(value, json_data):
-        json_data["reload_times"][1 if angled_grip else 3] = value
+        json_data["reload_times"][1 if ANGLED_GRIP else 3] = value
 @dataclass
 class FireRateEvent(Event):
     """fire rate"""
@@ -145,10 +121,10 @@ class FireRateEvent(Event):
         # Adjust time values to be per bullet (time between shots)
         # N rounds have N-1 intervals between them
         intervals = self.rounds - 1
-        self.minimum_duration /= intervals
-        self.maximum_duration /= intervals
-        self.statistical_duration /= intervals
-        self.statistical_radius /= intervals
+        # self.minimum_duration /= intervals
+        # self.maximum_duration /= intervals
+        # self.statistical_duration /= intervals
+        # self.statistical_radius /= intervals
 
     @staticmethod
     def get_display_value(value):
@@ -371,7 +347,7 @@ def detect_burst(ammo_counter : list[Number]):
         return FireRateEvent(e3.end, e2.start, e1.end, e0.start, rounds=len(burst)-1), len(burst) > 3
     return None
 
-def process_video(video_path, mode, l = 0, t = 0, r = 0, b = 0):
+def process_video(video_path : pathlib.Path):
     print("--- Video File ---")
 
     def handle_error(rect, masks, reason):
@@ -388,27 +364,31 @@ def process_video(video_path, mode, l = 0, t = 0, r = 0, b = 0):
     with av.open(video_path) as container:
         print(f"path: {container.name}")
         stream = container.streams.video[0]
-
-        width = stream.width
-        height = stream.height
-        print(f"resolution: {width}x{height}")
-        total_width =  l + width + r
-        total_height = t + height + b
-        print(f"total resolution: {total_width}x{total_height}")
-        rect_x = int(NORMALIZED_RECT_X * total_width) - l
-        if mode == "primary":
-            normalized_rect_y_offset = 0
-        elif mode == "secondary":
-            normalized_rect_y_offset = NORMALIZED_SECONDARY_RECT_Y_OFFSET
-        elif mode == "tertiary":
-            normalized_rect_y_offset = NORMALIZED_TERTIARY_RECT_Y_OFFSET
-        rect_y = int((NORMALIZED_RECT_Y + normalized_rect_y_offset) * total_height) - t
-        rect_w = int(NORMALIZED_RECT_W * total_width)
-        rect_h = int(NORMALIZED_RECT_H * total_height)
-        print(f"crop rect: x={rect_x}, y={rect_y}, w={rect_w}, h={rect_h}")
         print(f"fps: {float(stream.average_rate)}")
         total_duration = float(container.duration) / av.time_base
         print(f"duration: {total_duration} s")
+
+        if WEAPON_SLOT == "primary":
+            normalized_rect_y_offset = 0
+        elif WEAPON_SLOT == "secondary":
+            normalized_rect_y_offset = NORMALIZED_SECONDARY_RECT_Y_OFFSET
+        elif WEAPON_SLOT == "tertiary":
+            normalized_rect_y_offset = NORMALIZED_TERTIARY_RECT_Y_OFFSET
+        width = stream.width
+        height = stream.height
+        print(f"resolution: {width}x{height}")
+        absolute_width =  LEFT_CROP + width + RIGHT_CROP
+        absolute_height = TOP_CROP + height + BOTTOM_CROP
+        print(f"absolute resolution: {absolute_width}x{absolute_height}")
+        absolute_rect_x = int(absolute_width * ((NORMALIZED_RECT_X - 1) / ASPECT_RATIO + 1))
+        absolute_rect_y = int((NORMALIZED_RECT_Y + normalized_rect_y_offset) * absolute_height)
+        print(f"absolute rect position: x={absolute_rect_x}, y={absolute_rect_y}")
+        rect_x = absolute_rect_x - LEFT_CROP
+        rect_y = absolute_rect_y - TOP_CROP
+        print(f"rect position: x={rect_x}, y={rect_y}")
+        rect_w = int(absolute_width * NORMALIZED_RECT_W / ASPECT_RATIO)
+        rect_h = int(absolute_height * NORMALIZED_RECT_H)
+        print(f"rect resolution: {rect_w}x{rect_h}")
 
 
         print("--- Video Processing ---")
@@ -471,9 +451,15 @@ def process_video(video_path, mode, l = 0, t = 0, r = 0, b = 0):
             else:
                 ammo_counter[-1].end = frame_time
 
+            separator = np.full((rect.shape[0], 2, rect.shape[2]), (0,255,0), dtype=rect.dtype)
+            chain = itertools.chain.from_iterable((cv2.cvtColor(pad(m, rect), cv2.COLOR_GRAY2BGR), separator) for m in masks)
+            cv2.imshow("Video", np.hstack((rect, separator, *chain)))
+            cv2.waitKey(1)
+
+    sys.stdout.write("\r\033[2K")
+    sys.stdout.flush()
     for event_list in events.values():
-        sys.stdout.write(f"\r\033[K{event_list[-1]}\n")
-        sys.stdout.flush()
+        print((f"{event_list[-1]}"))
     print(f"found {sum(len(v) for v in events.values())} events")
     return events
 
@@ -512,6 +498,7 @@ def analyze_reload_events(event_type : type[Event], events : list[Event]):
 
     # Estimate effective radius (uncertainty), max violation after robust estimate
     R_star = max(max(0.0, abs(D_star - m.statistical_duration) - m.statistical_radius) for m in events)
+    assert R_star < 0.0084, f"Unreasonably high uncertainty: {R_star:.5f} s for {event_type.__doc__}"
 
     print(f"{len(events)} {event_type.__doc__} events, statistical duration: {D_star} ± {R_star} s -> {event_type.get_display_value(D_star)}")
 
@@ -525,33 +512,28 @@ def analyze(events : dict[type[Event], list[Event]]):
 
 
 if __name__ == "__main__":
-    # video_path = pathlib.Path(r"D:\clips\2026-02-22 20-52-12.mp4")
-    # mode = "primary"
-    # left_crop = 2108
-    # top_crop = 1185
-    # right_crop = 68
-    # bottom_crop = 63
-
     cb = lambda: input("\npress enter to exit...")
     atexit.register(cb)
     args = parser.parse_args()
-    video_path : pathlib.Path = args.filepath
-    mode = args.mode
-    left_crop = args.left_crop
-    top_crop = args.top_crop
-    right_crop = args.right_crop
-    bottom_crop = args.bottom_crop
-    dry_run = args.dry_run
-    angled_grip = args.angled_grip
+    PATH : pathlib.Path = args.path
+    WEAPON_SLOT = args.weapon_slot
+    w, h = map(int, args.aspect_ratio.split(":"))
+    ASPECT_RATIO = w / h
+    LEFT_CROP = args.left_crop
+    TOP_CROP = args.top_crop
+    RIGHT_CROP = args.right_crop
+    BOTTOM_CROP = args.bottom_crop
+    DRY_RUN = args.dry_run
+    ANGLED_GRIP = args.angled_grip
 
-    if video_path.is_file():
-        video_paths = [video_path]
+    if PATH.is_file():
+        video_paths = [PATH]
     else:
-        video_paths = list(video_path.iterdir())
+        video_paths = list(PATH.iterdir())
     
     for video_path in video_paths:
         assert video_path.is_file(), f"Video file not found: {video_path}"
-        events = process_video(video_path, mode, l=left_crop, t=top_crop, r=right_crop, b=bottom_crop)
+        events = process_video(video_path)
         results = analyze(events)
 
         if len(results) != 0:
@@ -567,7 +549,6 @@ if __name__ == "__main__":
             # Update reload_times based on results
             change_made = False
             for D_star, R_star, event_type in results:
-                assert R_star < 0.0084, f"Unreasonably high uncertainty: {R_star:.5f} s"
                 current_value = event_type.get_json_value(weapon_data)
                 new_value = event_type.get_display_value(D_star)
                 if current_value is None:
@@ -580,7 +561,7 @@ if __name__ == "__main__":
                     raise ValueError(f"new value for {event_type.__doc__} for {weapon_name} '{new_value}' unequal old value '{current_value}'")
             
             # Save the updated JSON file
-            if not dry_run and change_made:
+            if not DRY_RUN and change_made:
                 with open(weapon_json_path, 'w') as f:
                     json.dump(weapon_data, f, indent=4)
             

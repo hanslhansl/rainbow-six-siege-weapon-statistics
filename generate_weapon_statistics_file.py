@@ -506,7 +506,7 @@ class Weapons:
 class _Weapon:
     name : str
     class_ : str = field(metadata=dataclasses_json.config(field_name="class"))
-    rpm : int
+    # rpm : int
     ads_time : float
     pellets : int
     _capacity : tuple[int, int] = field(metadata=dataclasses_json.config(field_name="capacity")) # magazine, chamber
@@ -516,6 +516,7 @@ class _Weapon:
     has_grip : bool
     _extended_barrel : dict[int, int] | bool = field(metadata=dataclasses_json.config(field_name="extended_barrel"))
     reload_times : tuple[float | None, float | None] | tuple[float | None, float | None, float | None, float | None]
+    rpm : int | None
 
 class Weapon(_Weapon):
     colors = {class_: RGBA.from_rgb_hex(color) for class_, color in weapon_colors.items()}
@@ -545,6 +546,7 @@ class Weapon(_Weapon):
         except marshmallow.exceptions.ValidationError as e:
             raise Exception(f"File '{file_path}' could not be deserialized: {str(e)}.")
         super().__init__(**vars(_w))
+        self.rpm = 100
 
         # get operators
         self.operators : list[Operator] = []

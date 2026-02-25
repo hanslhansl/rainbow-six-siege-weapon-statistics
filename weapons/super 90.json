@@ -55,8 +55,8 @@
     "name": "SUPER 90",
     "pellets": 8,
     "reload_times": [
-        null,
-        null
+        0.58,
+        5.54
     ],
-    "rpm": 220
+    "rpm": 219
 }
