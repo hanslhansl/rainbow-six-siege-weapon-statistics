@@ -55,8 +55,8 @@
     "name": "M1014",
     "pellets": 8,
     "reload_times": [
-        null,
-        null
+        0.6,
+        5.79
     ],
-    "rpm": 215
+    "rpm": 218
 }

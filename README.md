@@ -54,7 +54,7 @@ Most weapons have, in addition to the bullets loaded in the magazine, one bullet
 The time in seconds it takes to aim down sight while standing still. The laser attachment increases the ads speed by $10\\%$. The reduced ads time with laser is calculated as $ads \\over 1.1$.
 
 ## Reload time
-The time in seconds between the ammo counter reaching $0$ (or $1$ for a tactical reload with a round in the chamber) and displaying a new value (e.g. $30$). A _full reload_ occurs when reloading from empty state; a _tactical reload_ occurs when reloading with at least one round remaining. For tube-fed and break-action shotguns, a _full reload_ occurs when reloading from empty state to full capacity; a _tactical reload_ occurs when reloading with exactly one round remaining to full capacity.
+The time in seconds between the ammo counter reaching $0$ (or $1$ for a tactical reload with a round in the chamber) and displaying a new value (e.g. $30$). _Full reload_ means reloading from empty state; _tactical reload_ means reloading with at least one round remaining. For tube-fed and break-action shotguns, _full reload_ means reloading from empty state to full capacity; _tactical reload_ means reloading the final round during a full reload.
 
 Reload times differ for tactical vs. full reload. The angled grip increases the reload speed. I couldn't figure out the mathematical correlation so I measured all 4 values per weapon (2 for weapons without grip) separately.
 

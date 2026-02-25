@@ -313,31 +313,56 @@ def process_rect(img):
 
     return number, reason, mask, morphed_mask, *masks
 
+def get_increasing_suffix(ammo_counter : list[Number], delta : int):
+    suf : list[Number] = []
+    for number in reversed(ammo_counter):
+        if not isinstance(number.value, int):
+            break
+        if suf and number.value + delta != suf[0].value:
+            break
+        suf.insert(0, number)
+    return suf
+
 def detect_tactical_reload(ammo_counter : list[Number]):
     if len(ammo_counter) >= 3:
         e2, e1, e0 = ammo_counter[-3:]
-        if e2.value not in (None, 0, 1) and e1.value in (0, 1) and e0.value not in (None, 0, 1):
-            t0, t1 = e2.end, e1.start
-            t2, t3 = e1.end, e0.start
-            return TacticalReloadEvent(t0, t1, t2, t3), False
+        if None not in (e2.value, e1.value, e0.value):
+            if e2.value > 1 and e1.value <= 1 and e0.value > 1:
+                t0, t1 = e2.end, e1.start
+                t2, t3 = e1.end, e0.start
+                return TacticalReloadEvent(t0, t1, t2, t3), False
     return None
 def detect_full_reload(ammo_counter : list[Number]):
     if len(ammo_counter) >= 4:
         e3, e2, e1, e0 = ammo_counter[-4:]
-        if e3.value not in (None, 0, 1) and e2.value == 1 and e1.value == 0 and e0.value not in (None, 0):
+        if e3.value == 2 and e2.value == 1 and e1.value == 0 and e0.value is not None and e0.value > 1:
             t0, t1 = e2.end, e1.start
             t2, t3 = e1.end, e0.start
             return FullReloadEvent(t0, t1, t2, t3), False
     return None
-def detect_burst(ammo_counter : list[Number]):
-    burst : list[Number] = []
-    for number in reversed(ammo_counter):
-        if not isinstance(number.value, int):
-            break
-        if burst and number.value <= burst[0].value:
-            break
-        burst.insert(0, number)
 
+def detect_tube_fed_tactical_reload(ammo_counter : list[Number]):
+    reload = get_increasing_suffix(ammo_counter, 1)
+    if len(reload) >= 3 and reload[0].value == 0:
+        e2, e1, e0 = reload[-3:]
+        t0, t1 = e2.end, e1.start
+        t2, t3 = e1.end, e0.start
+        return TacticalReloadEvent(t0, t1, t2, t3), len(reload) > 3
+    return None
+def detect_tube_fed_full_reload(ammo_counter : list[Number]):
+    reload = get_increasing_suffix(ammo_counter, 1)
+    if len(reload) >= 3 and len(ammo_counter) > len(reload) + 1:
+        e3 = ammo_counter[-len(reload)-1]
+        e2 = reload[0]
+        e1, e0 = reload[-2:]
+        if e3.value == 1 and e2.value == 0:
+            t0, t1 = e3.end, e2.start
+            t2, t3 = e1.end, e0.start
+            return FullReloadEvent(t0, t1, t2, t3), len(reload) > 3
+    return None
+
+def detect_burst(ammo_counter : list[Number]):
+    burst = get_increasing_suffix(ammo_counter, -1)
     if len(burst) >= 3:
         e3 = burst[0]
         e2 = burst[1]
@@ -416,7 +441,7 @@ def process_video(video_path, mode, l = 0, t = 0, r = 0, b = 0):
                 if len(ammo_counter) >= 1:
                     old_number = ammo_counter[-1].value
                     if old_number not in (None, 0, 1) and number is not None:
-                        if not old_number > number:
+                        if not (old_number > number or old_number + 1 == number):
                             handle_error(rect, masks, f"Invalid state transition: {old_number} → {number}")
 
                 ammo_counter.append(Number(value=number, start=frame_time, end=frame_time))
@@ -424,6 +449,8 @@ def process_video(video_path, mode, l = 0, t = 0, r = 0, b = 0):
                 new_events : list[None | tuple[Event, bool]] = [
                     detect_tactical_reload(ammo_counter),
                     detect_full_reload(ammo_counter),
+                    detect_tube_fed_tactical_reload(ammo_counter),
+                    detect_tube_fed_full_reload(ammo_counter),
                     detect_burst(ammo_counter),
                 ]
                 for tup in new_events:
@@ -450,7 +477,6 @@ def process_video(video_path, mode, l = 0, t = 0, r = 0, b = 0):
     print(f"found {sum(len(v) for v in events.values())} events")
     return events
 
-
 # --- Analysis ---
 def interval_cost(D, reload_events : list[Event], sigma=0.0005, delta=1.5):
     """
@@ -468,7 +494,9 @@ def interval_cost(D, reload_events : list[Event], sigma=0.0005, delta=1.5):
     return total
 
 def analyze_reload_events(event_type : type[Event], events : list[Event]):
-    assert len(events) >= 7, f"Not enough measurements for {event_type.__doc__}: {len(events)} (need at least 7 for robust estimation)"
+    if len(events) < 7:
+        print(f"Not enough measurements for {event_type.__doc__}: {len(events)} (need at least 7 for robust estimation)")
+        return None
 
     # Run optimization, initial guess: weighted average
     x0 = np.mean([m.statistical_duration for m in events])
@@ -491,9 +519,9 @@ def analyze_reload_events(event_type : type[Event], events : list[Event]):
 
 def analyze(events : dict[type[Event], list[Event]]):
     print("--- Analysis ---")
-    result = [analyze_reload_events(event_type, events) for event_type, events in events.items()]
-    print(f"analyzed {len(result)} event types")
-    return result
+    results = [result for event_type, events in events.items() if (result := analyze_reload_events(event_type, events)) is not None]
+    print(f"completed analysis of {len(results)} event types")
+    return results
 
 
 if __name__ == "__main__":
@@ -524,9 +552,9 @@ if __name__ == "__main__":
     for video_path in video_paths:
         assert video_path.is_file(), f"Video file not found: {video_path}"
         events = process_video(video_path, mode, l=left_crop, t=top_crop, r=right_crop, b=bottom_crop)
-        result = analyze(events)
+        results = analyze(events)
 
-        if len(result) != 0:
+        if len(results) != 0:
             parent_path = pathlib.Path(__file__).parent
             weapons_dict = {path.stem: path for path in (parent_path / "weapons").glob("*.json")}
             
@@ -538,14 +566,17 @@ if __name__ == "__main__":
             
             # Update reload_times based on results
             change_made = False
-            for D_star, R_star, event_type in result:
+            for D_star, R_star, event_type in results:
                 assert R_star < 0.0084, f"Unreasonably high uncertainty: {R_star:.5f} s"
                 current_value = event_type.get_json_value(weapon_data)
                 new_value = event_type.get_display_value(D_star)
                 if current_value is None:
                     change_made = True
                     event_type.set_json_value(new_value, weapon_data)
-                elif current_value != new_value:
+                    print(f"setting {event_type.__doc__} for {weapon_name} to {new_value} (was {current_value})")
+                elif current_value == new_value:
+                    print(f"no change in {event_type.__doc__} for {weapon_name} (value is {current_value})")
+                else:
                     raise ValueError(f"new value for {event_type.__doc__} for {weapon_name} '{new_value}' unequal old value '{current_value}'")
             
             # Save the updated JSON file
