@@ -546,7 +546,9 @@ class Weapon(_Weapon):
         except marshmallow.exceptions.ValidationError as e:
             raise Exception(f"File '{file_path}' could not be deserialized: {str(e)}.")
         super().__init__(**vars(_w))
-        self.rpm = 100
+
+        if self.rpm is None:
+            self.rpm = 1
 
         # get operators
         self.operators : list[Operator] = []
