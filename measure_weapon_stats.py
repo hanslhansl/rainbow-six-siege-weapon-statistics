@@ -536,7 +536,7 @@ if __name__ == "__main__":
         events = process_video(video_path)
         results = analyze(events)
 
-        if len(results) != 0:
+        if not DRY_RUN and len(results) != 0:
             parent_path = pathlib.Path(__file__).parent
             weapons_dict = {path.stem: path for path in (parent_path / "weapons").glob("*.json")}
             
@@ -561,7 +561,7 @@ if __name__ == "__main__":
                     raise ValueError(f"new value for {event_type.__doc__} for {weapon_name} '{new_value}' unequal old value '{current_value}'")
             
             # Save the updated JSON file
-            if not DRY_RUN and change_made:
+            if change_made:
                 with open(weapon_json_path, 'w') as f:
                     json.dump(weapon_data, f, indent=4)
             
