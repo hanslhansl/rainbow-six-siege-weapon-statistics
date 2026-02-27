@@ -506,17 +506,16 @@ class Weapons:
 class _Weapon:
     name : str
     class_ : str = field(metadata=dataclasses_json.config(field_name="class"))
-    # rpm : int
+    rpm : int
     ads_time : float
     pellets : int
     _capacity : tuple[int, int] = field(metadata=dataclasses_json.config(field_name="capacity")) # magazine, chamber
     extra_ammo : int
     _damages : dict[int, int] = field(metadata=dataclasses_json.config(field_name="damages"))
     has_laser : bool
-    has_grip : bool
+    has_angled_grip : bool
     _extended_barrel : dict[int, int] | bool = field(metadata=dataclasses_json.config(field_name="extended_barrel"))
     reload_times : tuple[float | None, float | None] | tuple[float | None, float | None, float | None, float | None]
-    rpm : int | None
 
 class Weapon(_Weapon):
     colors = {class_: RGBA.from_rgb_hex(color) for class_, color in weapon_colors.items()}
@@ -547,9 +546,6 @@ class Weapon(_Weapon):
             raise Exception(f"File '{file_path}' could not be deserialized: {str(e)}.")
         super().__init__(**vars(_w))
 
-        if self.rpm is None:
-            self.rpm = 1
-
         # get operators
         self.operators : list[Operator] = []
         for op in operators:
@@ -566,16 +562,15 @@ class Weapon(_Weapon):
             raise Exception(f"Weapon '{self.name}' has an invalid weapon class '{json_content["class"]}'.")
         
         # correct reload times (for now)
-        if not all(rt is not None for rt in self.reload_times): #[:2]    and self.class_ != "SG"
+        if not all(rt is not None for rt in self.reload_times): #[:2]
             logger.warning(f"Weapon '{self.name}' has invalid reload times '{self.reload_times}'")
 
-        if not self.has_grip and len(self.reload_times) == 2:
+        if not self.has_angled_grip and len(self.reload_times) == 2:
             self.reload_times += (None, None)
-        elif self.has_grip and len(self.reload_times) == 4:
+        elif self.has_angled_grip and len(self.reload_times) == 4:
             pass
         else:
             raise Exception(f"Weapon '{self.name}' has invalid reload times '{self.reload_times}'")
-        # self.reload_times = (self.reload_times[0],) + (None,)*3
 
         # derived fields
         self.base_name = self.name

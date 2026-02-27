@@ -121,10 +121,10 @@ class FireRateEvent(Event):
         # Adjust time values to be per bullet (time between shots)
         # N rounds have N-1 intervals between them
         intervals = self.rounds - 1
-        # self.minimum_duration /= intervals
-        # self.maximum_duration /= intervals
-        # self.statistical_duration /= intervals
-        # self.statistical_radius /= intervals
+        self.minimum_duration /= intervals
+        self.maximum_duration /= intervals
+        self.statistical_duration /= intervals
+        self.statistical_radius /= intervals
 
     @staticmethod
     def get_display_value(value):
@@ -451,10 +451,10 @@ def process_video(video_path : pathlib.Path):
             else:
                 ammo_counter[-1].end = frame_time
 
-            separator = np.full((rect.shape[0], 2, rect.shape[2]), (0,255,0), dtype=rect.dtype)
-            chain = itertools.chain.from_iterable((cv2.cvtColor(pad(m, rect), cv2.COLOR_GRAY2BGR), separator) for m in masks)
-            cv2.imshow("Video", np.hstack((rect, separator, *chain)))
-            cv2.waitKey(1)
+            # separator = np.full((rect.shape[0], 2, rect.shape[2]), (0,255,0), dtype=rect.dtype)
+            # chain = itertools.chain.from_iterable((cv2.cvtColor(pad(m, rect), cv2.COLOR_GRAY2BGR), separator) for m in masks)
+            # cv2.imshow("Video", np.hstack((rect, separator, *chain)))
+            # cv2.waitKey(1)
 
     sys.stdout.write("\r\033[2K")
     sys.stdout.flush()
@@ -498,7 +498,7 @@ def analyze_reload_events(event_type : type[Event], events : list[Event]):
 
     # Estimate effective radius (uncertainty), max violation after robust estimate
     R_star = max(max(0.0, abs(D_star - m.statistical_duration) - m.statistical_radius) for m in events)
-    assert R_star < 0.0084, f"Unreasonably high uncertainty: {R_star:.5f} s for {event_type.__doc__}"
+    assert R_star < 0.0084, f"Unreasonably high uncertainty: {D_star} ± {R_star:.5f} s for {event_type.__doc__}"
 
     print(f"{len(events)} {event_type.__doc__} events, statistical duration: {D_star} ± {R_star} s -> {event_type.get_display_value(D_star)}")
 
