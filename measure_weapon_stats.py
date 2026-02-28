@@ -498,7 +498,9 @@ def analyze_reload_events(event_type : type[Event], events : list[Event]):
 
     # Estimate effective radius (uncertainty), max violation after robust estimate
     R_star = max(max(0.0, abs(D_star - m.statistical_duration) - m.statistical_radius) for m in events)
-    assert R_star < 0.0084, f"Unreasonably high uncertainty: {D_star} ± {R_star:.5f} s for {event_type.__doc__}"
+    if R_star >= 0.0084:
+        print(f"Unreasonably high uncertainty: {D_star} ± {R_star:.5f} s for {event_type.__doc__}")
+        return None
 
     print(f"{len(events)} {event_type.__doc__} events, statistical duration: {D_star} ± {R_star} s -> {event_type.get_display_value(D_star)}")
 
@@ -506,9 +508,11 @@ def analyze_reload_events(event_type : type[Event], events : list[Event]):
 
 def analyze(events : dict[type[Event], list[Event]]):
     print("--- Analysis ---")
-    results = [result for event_type, events in events.items() if (result := analyze_reload_events(event_type, events)) is not None]
+    results = [analyze_reload_events(event_type, events) for event_type, events in events.items()]
+    cleaned_results = [res for res in results if res is not None]
+    assert len(cleaned_results) == len(results), "Some event types were discarded, see above for details"
     print(f"completed analysis of {len(results)} event types")
-    return results
+    return cleaned_results
 
 
 if __name__ == "__main__":
