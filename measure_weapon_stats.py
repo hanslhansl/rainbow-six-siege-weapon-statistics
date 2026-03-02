@@ -10,7 +10,7 @@ NORMALIZED_SECONDARY_RECT_Y_OFFSET = 0.035
 NORMALIZED_TERTIARY_RECT_Y_OFFSET = -0.042
 
 # ignore blobs smaller than this
-MIN_NORMALIZED_HEIGHT_FOR_BLOB = 0.8   # relative to crop height
+MIN_NORMALIZED_HEIGHT_FOR_BLOB = 0.7   # relative to crop height
 
 # the hole in 0 and 4 is centered with this tolerance, otherwise 6 or 9
 MAX_NORMALIZED_HOLE_OFFSET_FROM_CENTER_FOR_ZERO_FOUR = 0.1
@@ -32,8 +32,13 @@ from decimal import Decimal, ROUND_HALF_UP
 # --- argument parsing ---
 parser = argparse.ArgumentParser(description="measure reload times and fire rates of weapons from video recordings and update JSON files accordingly")
 
-# positional argument: file path
-parser.add_argument( "path", type=pathlib.Path, help="path to the video file (or directory containing video files)")
+# positional argument(s): file path
+parser.add_argument(
+    "paths",
+    type=lambda s: [pathlib.Path(p) for p in s] if isinstance(s, list) else pathlib.Path(s),
+    nargs="+",
+    help="paths to the video file (or a single directory containing video files)"
+    )
 
 # group 1: primary vs secondary
 role_group = parser.add_mutually_exclusive_group(required=True)
@@ -54,7 +59,10 @@ parser.add_argument("-b", "--bottom-crop", type=int, default=0, help="bottom cro
 parser.add_argument("--dry-run", action="store_true", help="process the video and print results without updating JSON files")
 
 # whether the video was recorded with angled grip attached, which changes the reload times and ammo counter behavior
-parser.add_argument("--angled-grip", action="store_false", help="if the video was recorded with angled grip attached")
+parser.add_argument("--angled-grip", action="store_true", help="if the video was recorded with angled grip attached")
+
+# whether to overwrite existing values in JSON files. can cause accidental data loss.
+parser.add_argument("--overwrite-json", action="store_true", help="allow overwriting existing values in JSON files (may cause data loss)")
 
 # --- video processing ---
 @dataclass
@@ -95,19 +103,19 @@ class TacticalReloadEvent(Event):
 
     @staticmethod
     def get_json_value(json_data):
-        return json_data["reload_times"][0 if ANGLED_GRIP else 2]
+        return json_data["reload_times"][2 if ANGLED_GRIP else 0]
     @staticmethod
     def set_json_value(value, json_data):
-        json_data["reload_times"][0 if ANGLED_GRIP else 2] = value
+        json_data["reload_times"][2 if ANGLED_GRIP else 0] = value
 class FullReloadEvent(Event):
     """full reload"""
 
     @staticmethod
     def get_json_value(json_data):
-        return json_data["reload_times"][1 if ANGLED_GRIP else 3]
+        return json_data["reload_times"][3 if ANGLED_GRIP else 1]
     @staticmethod
     def set_json_value(value, json_data):
-        json_data["reload_times"][1 if ANGLED_GRIP else 3] = value
+        json_data["reload_times"][3 if ANGLED_GRIP else 1] = value
 @dataclass
 class FireRateEvent(Event):
     """fire rate"""
@@ -234,12 +242,12 @@ def classify_digit(cropped_mask):
         if res:
             return digit, f"matched template", *template
              
-    return -1, f"{number_of_holes=}, {normalized_area=:.4f}", *templates
+    return None, f"{number_of_holes=}, {normalized_area=:.4f}", *templates
 
 def process_rect(img):
     # Strict but tolerant RGB mask: red/black with GB noise allowed
     B, G, R = cv2.split(img)
-    if np.any(np.all(B > 0xE6, axis=0)):
+    if np.any(np.all((B > 0xE6) & (G < 0xF5) & (G > 0xE6) & (R < 0xD0), axis=0)):
         return None, "wave overlay"
 
     # create mask
@@ -274,19 +282,22 @@ def process_rect(img):
     if len(blobs) == 0:
         return None, "no blobs passed height filter", mask, morphed_mask
 
-    number = 0
     masks = []
+    digits = []
     for i, blob in enumerate(blobs):
         digit, reason, *blob_masks = classify_digit(blob)
-        if digit == -1:
-            return -1, reason, mask, morphed_mask, blob, *blob_masks
-        number += digit * int(10 ** (len(blobs) - 1 - i))
+        digits.append(digit)
         masks.append(blob)
         masks.extend(blob_masks)
+
+    if None in digits:
+        # return None, reason, mask, morphed_mask, blob, *blob_masks
+        return -1, reason, mask, morphed_mask, blob, *blob_masks
     
     if len(blobs) != 1:
         reason = f"found {len(blobs)} blobs"
 
+    number = sum(digit * int(10 ** (len(digits) - 1 - i)) for i, digit in enumerate(digits))
     return number, reason, mask, morphed_mask, *masks
 
 def get_increasing_suffix(ammo_counter : list[Number], delta : int):
@@ -355,11 +366,15 @@ def process_video(video_path : pathlib.Path):
         chain = itertools.chain.from_iterable((cv2.cvtColor(pad(m, rect), cv2.COLOR_GRAY2BGR), separator) for m in masks)
         cv2.imshow("Video", np.hstack((rect, separator, *chain)))
         cv2.waitKey(1)
-        # if cv2.waitKey(1) & 0xFF == ord('q'):
-        #     break
         print("\n")
         raise ValueError(f"Unable to classify digit: {reason}")
-        # print(f"\nUnable to classify digit: {reason}")
+
+    def update_progress_bar(frame_time, number, reason):
+        # update progress bar
+        filled_length = min(round(PROGRESS_BAR_WIDTH * frame_time / total_duration), PROGRESS_BAR_WIDTH)
+        bar = '█' * filled_length + '-' * (PROGRESS_BAR_WIDTH - filled_length)
+        sys.stdout.write(f"\r\033[K|{bar}| {frame_time:.4f}/{total_duration:.4f} s | {frame_time / total_duration:.2%} | {number!r} ({reason})")
+        sys.stdout.flush()
 
     with av.open(video_path) as container:
         print(f"path: {container.name}")
@@ -405,26 +420,21 @@ def process_video(video_path : pathlib.Path):
             number, reason, *masks = process_rect(rect)
 
             # update progress bar
-            filled_length = min(round(PROGRESS_BAR_WIDTH * frame_time / total_duration), PROGRESS_BAR_WIDTH)
-            bar = '█' * filled_length + '-' * (PROGRESS_BAR_WIDTH - filled_length)
-            sys.stdout.write(f"\r\033[K|{bar}| {frame_time:.4f}/{total_duration:.4f} s | {frame_time / total_duration:.2%} | {number!r} ({reason})")
-            sys.stdout.flush()
+            update_progress_bar(frame_time, number, reason)
             
             # display masks for debugging, maybe raise
             if number == -1:
                 handle_error(rect, masks, reason)
 
-            # update ammo_counter/reload_events
-            if len(ammo_counter) == 0 or number != ammo_counter[-1].value:
-
+            def detect_events(ammo_counter : list[Number]):
                 # verify valid state transition
-                if len(ammo_counter) >= 1:
-                    old_number = ammo_counter[-1].value
-                    if old_number not in (None, 0, 1) and number is not None:
-                        if not (old_number > number or old_number + 1 == number):
-                            handle_error(rect, masks, f"Invalid state transition: {old_number} → {number}")
-
-                ammo_counter.append(Number(value=number, start=frame_time, end=frame_time))
+                if len(ammo_counter) >= 2:
+                    n1, n0 = (n.value for n in ammo_counter[-2:])
+                    if n1 not in (None, 0, 1) and n0 is not None:
+                        if n0 not in (0, 1) and n1 - n0 > 1: # decrease
+                            handle_error(rect, masks, f"Invalid state transition: {n1} → {n0}")
+                        if n0 - n1 > 1: # increase
+                            handle_error(rect, masks, f"Invalid state transition: {n1} → {n0}")
 
                 new_events : list[None | tuple[Event, bool]] = [
                     detect_tactical_reload(ammo_counter),
@@ -444,16 +454,46 @@ def process_video(video_path : pathlib.Path):
                             if old_e is not None:
                                 sys.stdout.write(f"\r\033[K{old_e}\n")
                                 sys.stdout.flush()
+                                update_progress_bar(frame_time, number, reason)
                         if remove_previous:
                             events[type(e)].pop()
                         events[type(e)].append(e)
 
+            # update ammo_counter/reload_events
+            if len(ammo_counter) == 0 or number != ammo_counter[-1].value:
+                ammo_counter.append(Number(value=number, start=frame_time, end=frame_time))
+
+                for _ in range(1):
+                    # dont process yet, if None for less than 100ms, might be a glitch
+                    if len(ammo_counter) >= 2:
+                        n2, n1 = ammo_counter[-2:]
+                        if n1.value is None and n1.end - n1.start < 0.1:
+                            break
+
+                    if len(ammo_counter) >= 3:
+                        n2, n1, n0 = ammo_counter[-3:]
+                        if n1.value is None and n1.end - n1.start < 0.1:
+                            if n2.value == n0.value:
+                                # fix glitch
+                                ammo_counter.pop()
+                                ammo_counter.pop()
+                                ammo_counter[-1].end = n0.end
+                                break
+                            else:
+                                # wasnt a glitch afterall
+                                ammo_counter.pop()
+                                detect_events(ammo_counter)
+                                ammo_counter.append(n0)
+
+                    detect_events(ammo_counter)
             else:
                 ammo_counter[-1].end = frame_time
 
             # separator = np.full((rect.shape[0], 2, rect.shape[2]), (0,255,0), dtype=rect.dtype)
             # chain = itertools.chain.from_iterable((cv2.cvtColor(pad(m, rect), cv2.COLOR_GRAY2BGR), separator) for m in masks)
             # cv2.imshow("Video", np.hstack((rect, separator, *chain)))
+            # if cv2.waitKey(0) & 0xFF == ord('q'):
+            #     break
             # cv2.waitKey(1)
 
     sys.stdout.write("\r\033[2K")
@@ -519,7 +559,7 @@ if __name__ == "__main__":
     cb = lambda: input("\npress enter to exit...")
     atexit.register(cb)
     args = parser.parse_args()
-    PATH : pathlib.Path = args.path
+    PATHS : list[pathlib.Path] = args.paths
     WEAPON_SLOT = args.weapon_slot
     w, h = map(int, args.aspect_ratio.split(":"))
     ASPECT_RATIO = w / h
@@ -529,16 +569,18 @@ if __name__ == "__main__":
     BOTTOM_CROP = args.bottom_crop
     DRY_RUN = args.dry_run
     ANGLED_GRIP = args.angled_grip
+    OVERWRITE_JSON = args.overwrite_json
 
-    if PATH.is_file():
-        video_paths = [PATH]
+    if len(PATHS) == 1 and (dir := PATHS[0]).is_dir():
+        video_paths = list(dir.iterdir())
     else:
-        video_paths = list(PATH.iterdir())
+        video_paths = PATHS
     
     for video_path in video_paths:
         assert video_path.is_file(), f"Video file not found: {video_path}"
         events = process_video(video_path)
         results = analyze(events)
+        assert len({result[2] for result in results}) == 3
 
         if not DRY_RUN and len(results) != 0:
             parent_path = pathlib.Path(__file__).parent
@@ -561,6 +603,10 @@ if __name__ == "__main__":
                     print(f"setting {event_type.__doc__} for {weapon_name} to {new_value} (was {current_value})")
                 elif current_value == new_value:
                     print(f"no change in {event_type.__doc__} for {weapon_name} (value is {current_value})")
+                elif OVERWRITE_JSON:
+                    change_made = True
+                    event_type.set_json_value(new_value, weapon_data)
+                    print(f"overwriting {event_type.__doc__} for {weapon_name} to {new_value} (was {current_value})")
                 else:
                     raise ValueError(f"new value for {event_type.__doc__} for {weapon_name} '{new_value}' unequal old value '{current_value}'")
             
