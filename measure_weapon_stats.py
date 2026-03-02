@@ -77,6 +77,7 @@ class Event:
     t1: float
     t2: float
     t3: float
+    rounds : int
 
     def __post_init__(self):
         self.minimum_duration = self.t2 - self.t1
@@ -116,18 +117,15 @@ class FullReloadEvent(Event):
     @staticmethod
     def set_json_value(value, json_data):
         json_data["reload_times"][3 if ANGLED_GRIP else 1] = value
-@dataclass
 class FireRateEvent(Event):
     """fire rate"""
-    rounds : int
 
     def __str__(self):
         return super().__str__() + f" | rounds: {self.rounds}"
 
     def __post_init__(self):
         super().__post_init__()
-        # Adjust time values to be per bullet (time between shots)
-        # N rounds have N-1 intervals between them
+        # Adjust time values to be per bullet (time between shots), N rounds have N-1 intervals between them
         intervals = self.rounds - 1
         self.minimum_duration /= intervals
         self.maximum_duration /= intervals
@@ -317,7 +315,7 @@ def detect_tactical_reload(ammo_counter : list[Number]):
             if e2.value > 1 and e1.value <= 1 and e0.value > 1:
                 t0, t1 = e2.end, e1.start
                 t2, t3 = e1.end, e0.start
-                return TacticalReloadEvent(t0, t1, t2, t3), False
+                return TacticalReloadEvent(t0, t1, t2, t3, e0.value), False
     return None
 def detect_full_reload(ammo_counter : list[Number]):
     if len(ammo_counter) >= 4:
@@ -325,7 +323,7 @@ def detect_full_reload(ammo_counter : list[Number]):
         if e3.value == 2 and e2.value == 1 and e1.value == 0 and e0.value is not None and e0.value > 1:
             t0, t1 = e2.end, e1.start
             t2, t3 = e1.end, e0.start
-            return FullReloadEvent(t0, t1, t2, t3), False
+            return FullReloadEvent(t0, t1, t2, t3, e0.value), False
     return None
 
 def detect_tube_fed_tactical_reload(ammo_counter : list[Number]):
@@ -334,7 +332,7 @@ def detect_tube_fed_tactical_reload(ammo_counter : list[Number]):
         e2, e1, e0 = reload[-3:]
         t0, t1 = e2.end, e1.start
         t2, t3 = e1.end, e0.start
-        return TacticalReloadEvent(t0, t1, t2, t3), len(reload) > 3
+        return TacticalReloadEvent(t0, t1, t2, t3, e0.value), len(reload) > 3
     return None
 def detect_tube_fed_full_reload(ammo_counter : list[Number]):
     reload = get_increasing_suffix(ammo_counter, 1)
@@ -345,7 +343,7 @@ def detect_tube_fed_full_reload(ammo_counter : list[Number]):
         if e3.value == 1 and e2.value == 0:
             t0, t1 = e3.end, e2.start
             t2, t3 = e1.end, e0.start
-            return FullReloadEvent(t0, t1, t2, t3), len(reload) > 3
+            return FullReloadEvent(t0, t1, t2, t3, e0.value), len(reload) > 3
     return None
 
 def detect_burst(ammo_counter : list[Number]):
@@ -355,7 +353,7 @@ def detect_burst(ammo_counter : list[Number]):
         e2 = burst[1]
         e1 = burst[-2]
         e0 = burst[-1]
-        return FireRateEvent(e3.end, e2.start, e1.end, e0.start, rounds=len(burst)-1), len(burst) > 3
+        return FireRateEvent(e3.end, e2.start, e1.end, e0.start, len(burst)-1), len(burst) > 3
     return None
 
 def process_video(video_path : pathlib.Path):
@@ -519,10 +517,21 @@ def interval_cost(D, reload_events : list[Event], sigma=0.0005, delta=1.5):
         total += scipy.special.huber(delta, v / sigma)
     return total
 
+tactical_reload_to = None
+full_reload_to = None
 def analyze_reload_events(event_type : type[Event], events : list[Event]):
     if len(events) < 7:
         print(f"Not enough measurements for {event_type.__doc__}: {len(events)} (need at least 7 for robust estimation)")
         return None
+    
+    assert all(e.rounds == events[0].rounds for e in events), "All events must have the same number of rounds for valid comparison"
+    global tactical_reload_to, full_reload_to
+    if isinstance(events[0], TacticalReloadEvent):
+        tactical_reload_to = events[0].rounds
+        print(f"tactical reload to {tactical_reload_to} rounds")
+    elif isinstance(events[0], FullReloadEvent):
+        full_reload_to = events[0].rounds
+        print(f"full reload to {full_reload_to} rounds")
 
     # Run optimization, initial guess: weighted average
     x0 = np.mean([m.statistical_duration for m in events])
@@ -592,8 +601,42 @@ if __name__ == "__main__":
             with open(weapon_json_path, 'r') as f:
                 weapon_data = json.load(f)
             
-            # Update reload_times based on results
             change_made = False
+
+            # Update capacity based on reload events, if available
+            if full_reload_to is not None:
+                current_value = weapon_data["capacity"][0]
+                new_value = full_reload_to
+                if current_value is None:
+                    change_made = True
+                    weapon_data["capacity"][0] = new_value
+                    print(f"setting magazine capacity for {weapon_name} to {new_value} (was {current_value})")
+                elif current_value == new_value:
+                    print(f"no change in magazine capacity for {weapon_name} (value is {current_value})")
+                elif OVERWRITE_JSON:
+                    change_made = True
+                    weapon_data["capacity"][0] = new_value
+                    print(f"overwriting magazine capacity for {weapon_name} to {new_value} (was {current_value})")
+                else:
+                    raise ValueError(f"new value for magazine capacity for {weapon_name} '{new_value}' unequal old value '{current_value}'")
+
+                if tactical_reload_to is not None:
+                    current_value = weapon_data["capacity"][1]
+                    new_value = tactical_reload_to - full_reload_to
+                    if current_value is None:
+                        change_made = True
+                        weapon_data["capacity"][1] = new_value
+                        print(f"setting chamber capacity for {weapon_name} to {new_value} (was {current_value})")
+                    elif current_value == new_value:
+                        print(f"no change in chamber capacity for {weapon_name} (value is {current_value})")
+                    elif OVERWRITE_JSON:
+                        change_made = True
+                        weapon_data["capacity"][1] = new_value
+                        print(f"overwriting chamber capacity for {weapon_name} to {new_value} (was {current_value})")
+                    else:
+                        raise ValueError(f"new value for chamber capacity for {weapon_name} '{new_value}' unequal old value '{current_value}'")
+
+            # Update reload_times based on results
             for D_star, R_star, event_type in results:
                 current_value = event_type.get_json_value(weapon_data)
                 new_value = event_type.get_display_value(D_star)
