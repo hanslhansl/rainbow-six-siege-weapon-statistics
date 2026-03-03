@@ -735,7 +735,7 @@ class Stat:
     additional_parameters_description : tuple[str,...] = "",
 
     def __post_init__(self):
-        self.link = f"https://github.com/hanslhansl/Rainbow-Six-Siege-Weapon-Statistics/#{self.link}"
+        self.link = f"{github_link}#{self.link}"
         self.style_data = self.data #data is styled based on style_data, usually they are the same datafram though
 
         self.display_name = self.short_name
@@ -785,15 +785,13 @@ def add_worksheet_header(worksheet : typing.Any, stat : Stat | str, description 
 
     add_header_entry(row, col+6, 14, f'=HYPERLINK("{google_sheets_link}", "spreadsheet on google sheets")', Font(color = "FF0000FF"))
 
-    add_header_entry(row, col+14, 1 + cols_inbetween,
-                  f'=HYPERLINK("{google_drive_link}", "spreadsheet on google drive")', Font(color = "FF0000FF"))
+    add_header_entry(row, col+14, 1 + cols_inbetween, f'=HYPERLINK("{google_drive_link}", "spreadsheet on google drive")', Font(color = "FF0000FF"))
     row += 2
 
     if isinstance(stat, str):
         add_header_entry(row, col, 1 + cols_inbetween, stat, Font(color = "FF0000FF", bold=True))
     else:
-        add_header_entry(row, col, 1 + cols_inbetween,
-                         f'=HYPERLINK("{github_link}#{stat.link}", "{stat.display_name}")', Font(color = "FF0000FF", bold=True))
+        add_header_entry(row, col, 1 + cols_inbetween, f'=HYPERLINK("{stat.link}", "{stat.display_name}")', Font(color = "FF0000FF", bold=True))
     row += 1
 
     add_header_entry(row, col, 1 + cols_inbetween, description)
