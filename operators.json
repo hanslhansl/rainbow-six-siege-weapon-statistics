@@ -276,6 +276,7 @@
     "weapons": [
       "AR33",
       "SR-25",
+      "T-95 LSW",
       "GSH-18"
     ],
     "side": "A"
@@ -336,6 +337,14 @@
       "M249",
       "Reaper MK2",
       "GSH-18"
+    ],
+    "side": "A"
+  },
+  "Solid Snake": {
+    "weapons": [
+      "F2",
+      "PMR90A2",
+      "TACIT .45"
     ],
     "side": "A"
   },
