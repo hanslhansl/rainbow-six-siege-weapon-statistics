@@ -119,22 +119,14 @@ class FullReloadEvent(Event):
         json_data["reload_times"][3 if ANGLED_GRIP else 1] = value
 class FireRateEvent(Event):
     """fire rate"""
+    _intervals = None
 
     def __str__(self):
         return super().__str__() + f" | rounds: {self.rounds}"
 
-    def __post_init__(self):
-        super().__post_init__()
-        # Adjust time values to be per bullet (time between shots), N rounds have N-1 intervals between them
-        intervals = self.rounds - 1
-        self.minimum_duration /= intervals
-        self.maximum_duration /= intervals
-        self.statistical_duration /= intervals
-        self.statistical_radius /= intervals
-
     @staticmethod
-    def get_display_value(value):
-        return int(round_half_up(60 / value, ndigits=0))
+    def get_display_value(value, rounds : int):
+        return int(round_half_up(60 * (rounds - 1) / value, ndigits=0))
 
     @staticmethod
     def get_json_value(json_data):
@@ -551,9 +543,14 @@ def analyze_reload_events(event_type : type[Event], events : list[Event]):
         print(f"Unreasonably high uncertainty: {D_star} ± {R_star:.5f} s for {event_type.__doc__}")
         return None
 
-    print(f"{len(events)} {event_type.__doc__} events, statistical duration: {D_star} ± {R_star} s -> {event_type.get_display_value(D_star)}")
+    if event_type is FireRateEvent:
+        assert all(e.rounds == events[0].rounds for e in events), "All fire rate events must have the same number of rounds"
+        display_value = event_type.get_display_value(D_star, events[0].rounds)
+    else:
+        display_value = event_type.get_display_value(D_star)
+    print(f"{len(events)} {event_type.__doc__} events, statistical duration: {D_star} ± {R_star} s -> {display_value}")
 
-    return D_star, R_star, event_type
+    return D_star, R_star, display_value, event_type
 
 def analyze(events : dict[type[Event], list[Event]]):
     print("--- Analysis ---")
@@ -589,7 +586,7 @@ if __name__ == "__main__":
         assert video_path.is_file(), f"Video file not found: {video_path}"
         events = process_video(video_path)
         results = analyze(events)
-        assert len({result[2] for result in results}) == 3
+        assert len({result[-1] for result in results}) == 3
 
         if not DRY_RUN and len(results) != 0:
             parent_path = pathlib.Path(__file__).parent
@@ -637,9 +634,8 @@ if __name__ == "__main__":
                         raise ValueError(f"new value for chamber capacity for {weapon_name} '{new_value}' unequal old value '{current_value}'")
 
             # Update reload_times based on results
-            for D_star, R_star, event_type in results:
+            for D_star, R_star, new_value, event_type in results:
                 current_value = event_type.get_json_value(weapon_data)
-                new_value = event_type.get_display_value(D_star)
                 if current_value is None:
                     change_made = True
                     event_type.set_json_value(new_value, weapon_data)
