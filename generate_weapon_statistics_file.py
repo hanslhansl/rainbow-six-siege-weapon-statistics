@@ -322,11 +322,11 @@ class Weapons:
 
     # primary stats
     @functools.cache
-    def damage_per_bullet(self):
+    def damage_per_projectile(self):
         return Stat(
-            "damage per bullet",
-            "damage per bullet",
-            "damage-per-bullet",
+            "damage",
+            "damage per projectile",
+            "damage-per-projectile",
             True,
             *self.nest(lambda x: self._damages),
             )
@@ -343,21 +343,21 @@ class Weapons:
     @functools.cache
     def dps(self):
         """damage per second"""
-        bullets_per_second = {name : w.pellets * w.rps for name, w in self.weapons.items()}
+        projectiles_per_second = {name : w.pellets * w.rps for name, w in self.weapons.items()}
         return Stat(
             "dps",
             "damage per second",
             "damage-per-second---dps",
             True,
-            *self.nest(lambda x: self._damages.mul(bullets_per_second, axis=0).round()),
+            *self.nest(lambda x: self._damages.mul(projectiles_per_second, axis=0).round()),
             )
     
     @functools.cache
-    def btdok(self):
+    def ptdok(self):
         return Stat(
-            "btdok",
-            "bullets to down or kill",
-            "bullets-to-down-or-kill---btdok",
+            "ptdok",
+            "projectiles to down or kill",
+            "projectiles-to-down-or-kill---ptdok",
             False,
             *self.nest(lambda hp: np.ceil(hp / self._damages), tdok_hp_levels, "hp"),
             tdok_levels_descriptions_short,
@@ -391,11 +391,11 @@ class Weapons:
             )
     
     @functools.cache
-    def theoretical_btdok(self):
+    def theoretical_ptdok(self):
         return Stat(
-            "theoretical btdok",
+            "theoretical ptdok",
             "",
-            "bullets-to-down-or-kill---btdok",
+            "projectiles-to-down-or-kill---ptdok",
             False,
             *self.nest(lambda hp: hp / self._damages, tdok_hp_levels, "hp"),
             tdok_levels_descriptions_short,
@@ -427,11 +427,11 @@ class Weapons:
             )
 
     @functools.cache
-    def btk(self):
+    def ptk(self):
         return Stat(
-            "btk",
-            "bullets to kill",
-            "bullets-to-down-or-kill---btdok",
+            "ptk",
+            "projectiles to kill",
+            "projectiles-to-down-or-kill---ptdok",
             False,
             *self.nest(lambda hp: np.ceil((hp + 20) / self._damages), tdok_hp_levels, "hp"),
             tdok_levels_descriptions_short,
@@ -515,7 +515,7 @@ class _Weapon:
     has_laser : bool
     has_angled_grip : bool
     _extended_barrel : dict[int, int] | bool = field(metadata=dataclasses_json.config(field_name="extended_barrel"))
-    reload_times : tuple[float | None, float | None] | tuple[float | None, float | None, float | None, float | None]
+    reload_times : tuple[float, float] | tuple[float, float, float | None, float | None]
 
 class Weapon(_Weapon):
     colors = {class_: RGBA.from_rgb_hex(color) for class_, color in weapon_colors.items()}
@@ -530,7 +530,7 @@ class Weapon(_Weapon):
     laser_ads_speed_multiplier = 0.0
     angled_grip_reload_speed_multiplier = 0.0
 
-    reload_times : tuple[float | None, float | None, float | None, float | None]
+    reload_times : tuple[float, float, float | None, float | None]
     """tactical, full [, +angled grip]"""
 
     empty_color = RGBA(0,0,0,0)
@@ -744,19 +744,19 @@ class Stat:
 
 
 stats = (
-    Weapons.damage_per_bullet,
+    Weapons.damage_per_projectile,
     Weapons.damage_per_shot,
     Weapons.dps,
     
-    Weapons.btdok,
+    Weapons.ptdok,
     Weapons.stdok,
     Weapons.ttdok,
     
-    Weapons.theoretical_btdok,
+    Weapons.theoretical_ptdok,
     Weapons.theoretical_stdok,
     Weapons.theoretical_ttdok,
     
-    Weapons.btk,
+    Weapons.ptk,
     Weapons.stk,
     Weapons.ttk,
 )
