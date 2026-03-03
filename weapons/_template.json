@@ -1,25 +1,25 @@
 {
-  "ads_time": 0.34,
+  "ads_time": null,
   "capacity": [
-    5,
-    0
+    null,
+    null
   ],
-  "class": "SG",
+  "class": null,
   "damages": {
     "0": 0,
     "1": 0,
     "2": 0,
     "3": 0,
-    "4": 29,
-    "5": 27,
-    "6": 21,
+    "4": 0,
+    "5": 0,
+    "6": 0,
     "7": 0,
     "8": 0,
     "9": 0,
-    "10": 21,
-    "11": 18,
-    "12": 15,
-    "13": 13,
+    "10": 0,
+    "11": 0,
+    "12": 0,
+    "13": 0,
     "14": 0,
     "15": 0,
     "16": 0,
@@ -46,17 +46,17 @@
     "37": 0,
     "38": 0,
     "39": 0,
-    "40": 13
+    "40": 0
   },
-  "extended_barrel": false,
-  "extra_ammo": 31,
-  "has_laser": true,
-  "name": "ITA12S",
-  "pellets": 8,
+  "extended_barrel": null,
+  "extra_ammo": null,
+  "has_laser": null,
+  "name": null,
+  "pellets": null,
   "reload_times": [
-    0.8,
-    5.61
+    null,
+    null
   ],
-  "rpm": 83,
-  "has_angled_grip": false
+  "rpm": null,
+  "has_angled_grip": null
 }

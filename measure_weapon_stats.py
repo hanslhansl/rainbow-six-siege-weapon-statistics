@@ -35,7 +35,8 @@ parser = argparse.ArgumentParser(description="measure reload times and fire rate
 # positional argument(s): file path
 parser.add_argument(
     "paths",
-    type=lambda s: [pathlib.Path(p) for p in s] if isinstance(s, list) else pathlib.Path(s),
+    # type=lambda s: [pathlib.Path(p) for p in s] if isinstance(s, list) else pathlib.Path(s),
+    type=pathlib.Path,
     nargs="+",
     help="paths to the video file (or a single directory containing video files)"
     )
@@ -94,6 +95,7 @@ class Event:
             f"{self.__doc__}: {self.statistical_start:10.6f}s → {self.statistical_end:10.6f}s | "
             f"Δt: {self.statistical_duration:.6f} ± {self.statistical_radius:.6f} s | "
             f"min/max Δt: {self.minimum_duration:.6f}/{self.maximum_duration:.6f} s"
+            f" | rounds: {self.rounds}"
             )
     
     @staticmethod
@@ -119,10 +121,6 @@ class FullReloadEvent(Event):
         json_data["reload_times"][3 if ANGLED_GRIP else 1] = value
 class FireRateEvent(Event):
     """fire rate"""
-    _intervals = None
-
-    def __str__(self):
-        return super().__str__() + f" | rounds: {self.rounds}"
 
     @staticmethod
     def get_display_value(value, rounds : int):
@@ -281,8 +279,8 @@ def process_rect(img):
         masks.extend(blob_masks)
 
     if None in digits:
-        # return None, reason, mask, morphed_mask, blob, *blob_masks
-        return -1, reason, mask, morphed_mask, blob, *blob_masks
+        return None, reason, mask, morphed_mask, blob, *blob_masks
+        # return -1, reason, mask, morphed_mask, blob, *blob_masks
     
     if len(blobs) != 1:
         reason = f"found {len(blobs)} blobs"

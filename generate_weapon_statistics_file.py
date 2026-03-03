@@ -561,7 +561,7 @@ class Weapon(_Weapon):
         if self.class_ not in self.classes:
             raise Exception(f"Weapon '{self.name}' has an invalid weapon class '{json_content["class"]}'.")
         
-        # correct reload times (for now)
+        # warning (for now)
         if not all(rt is not None for rt in self.reload_times): #[:2]
             logger.warning(f"Weapon '{self.name}' has invalid reload times '{self.reload_times}'")
 

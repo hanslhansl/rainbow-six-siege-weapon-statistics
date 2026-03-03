@@ -54,11 +54,11 @@
     "name": "M762",
     "pellets": 1,
     "reload_times": [
-        1.4,
+        1.41,
         2.64,
         null,
         null
     ],
-    "rpm": 730,
+    "rpm": 729,
     "has_angled_grip": true
 }
