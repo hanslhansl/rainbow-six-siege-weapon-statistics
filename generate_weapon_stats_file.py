@@ -1100,7 +1100,7 @@ def save_to_xlsx_file(ws : Weapons):
     
     return xlsx_output_file_path
 
-if __name__ == "__main__":
+def main():
 
     start = time.time()
 
@@ -1166,4 +1166,7 @@ if __name__ == "__main__":
     else:
         # we are local
         os.system(f"start {excel_file_name}")
+
+if __name__ == "__main__":
+    main()
 

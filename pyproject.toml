@@ -1,7 +1,7 @@
 [project]
 name = "rainbow-six-siege-weapon-statistics"
 version = "0.1.0"
-description = "Add your description here"
+description = "weapon statistics for rainbow six siege"
 readme = "README.md"
 requires-python = ">=3.13"
 dependencies = [
@@ -17,3 +17,6 @@ dependencies = [
     "pandas>=2.3.3",
     "scipy>=1.17.0",
 ]
+
+[tool.uv]
+managed = true

@@ -24,7 +24,7 @@ jobs:
       - name: Run Python Script
         env:
           GOOGLE_SERVICE_ACCOUNT_CREDENTIALS: ${{ secrets.GOOGLE_SERVICE_ACCOUNT_CREDENTIALS }}
-        run: uv run python generate_weapon_statistics_file.py ${{ github.event.inputs.tag_name }}
+        run: uv run python generate_weapon_stats_file.py ${{ github.event.inputs.tag_name }}
 
       - name: Create Release
         uses: softprops/action-gh-release@v2

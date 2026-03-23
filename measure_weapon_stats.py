@@ -658,4 +658,111 @@ if __name__ == "__main__":
 
     cv2.destroyAllWindows()
     # atexit.unregister(cb)
+
+
+def main():
+    global PATHS, WEAPON_SLOT, ASPECT_RATIO, LEFT_CROP, TOP_CROP, RIGHT_CROP, BOTTOM_CROP, DRY_RUN, ANGLED_GRIP, OVERWRITE_JSON, full_reload_to, tactical_reload_to
+    
+    cb = lambda: input("\npress enter to exit...")
+    atexit.register(cb)
+    args = parser.parse_args()
+    PATHS = args.paths
+    WEAPON_SLOT = args.weapon_slot
+    w, h = map(int, args.aspect_ratio.split(":"))
+    ASPECT_RATIO = w / h
+    LEFT_CROP = args.left_crop
+    TOP_CROP = args.top_crop
+    RIGHT_CROP = args.right_crop
+    BOTTOM_CROP = args.bottom_crop
+    DRY_RUN = args.dry_run
+    ANGLED_GRIP = args.angled_grip
+    OVERWRITE_JSON = args.overwrite_json
+
+    if len(PATHS) == 1 and (dir := PATHS[0]).is_dir():
+        video_paths = list(dir.iterdir())
+    else:
+        video_paths = PATHS
+    
+    for video_path in video_paths:
+        assert video_path.is_file(), f"Video file not found: {video_path}"
+        events = process_video(video_path)
+        results = analyze(events)
+        assert len({result[-1] for result in results}) == 3
+
+        if not DRY_RUN and len(results) != 0:
+            parent_path = pathlib.Path(__file__).parent
+            weapons_dict = {path.stem: path for path in (parent_path / "weapons").glob("*.json")}
+            
+            # Get weapon name from video file and update corresponding JSON
+            weapon_name = video_path.stem
+            weapon_json_path = weapons_dict[weapon_name]
+            with open(weapon_json_path, 'r') as f:
+                weapon_data = json.load(f)
+            
+            change_made = False
+
+            # Update capacity based on reload events, if available
+            if full_reload_to is not None:
+                current_value = weapon_data["capacity"][0]
+                new_value = full_reload_to
+                if current_value is None:
+                    change_made = True
+                    weapon_data["capacity"][0] = new_value
+                    print(f"setting magazine capacity for {weapon_name} to {new_value} (was {current_value})")
+                elif current_value == new_value:
+                    print(f"no change in magazine capacity for {weapon_name} (value is {current_value})")
+                elif OVERWRITE_JSON:
+                    change_made = True
+                    weapon_data["capacity"][0] = new_value
+                    print(f"overwriting magazine capacity for {weapon_name} to {new_value} (was {current_value})")
+                else:
+                    raise ValueError(f"new value for magazine capacity for {weapon_name} '{new_value}' unequal old value '{current_value}'")
+
+                if tactical_reload_to is not None:
+                    current_value = weapon_data["capacity"][1]
+                    new_value = tactical_reload_to - full_reload_to
+                    if current_value is None:
+                        change_made = True
+                        weapon_data["capacity"][1] = new_value
+                        print(f"setting chamber capacity for {weapon_name} to {new_value} (was {current_value})")
+                    elif current_value == new_value:
+                        print(f"no change in chamber capacity for {weapon_name} (value is {current_value})")
+                    elif OVERWRITE_JSON:
+                        change_made = True
+                        weapon_data["capacity"][1] = new_value
+                        print(f"overwriting chamber capacity for {weapon_name} to {new_value} (was {current_value})")
+                    else:
+                        raise ValueError(f"new value for chamber capacity for {weapon_name} '{new_value}' unequal old value '{current_value}'")
+
+            # Update reload_times based on results
+            for D_star, R_star, new_value, event_type in results:
+                current_value = event_type.get_json_value(weapon_data)
+                if current_value is None:
+                    change_made = True
+                    event_type.set_json_value(new_value, weapon_data)
+                    print(f"setting {event_type.__doc__} for {weapon_name} to {new_value} (was {current_value})")
+                elif current_value == new_value:
+                    print(f"no change in {event_type.__doc__} for {weapon_name} (value is {current_value})")
+                elif OVERWRITE_JSON:
+                    change_made = True
+                    event_type.set_json_value(new_value, weapon_data)
+                    print(f"overwriting {event_type.__doc__} for {weapon_name} to {new_value} (was {current_value})")
+                else:
+                    raise ValueError(f"new value for {event_type.__doc__} for {weapon_name} '{new_value}' unequal old value '{current_value}'")
+            
+            # Save the updated JSON file
+            if change_made:
+                with open(weapon_json_path, 'w') as f:
+                    json.dump(weapon_data, f, indent=4)
+            
+                print(f"Updated {weapon_json_path}")
+
+        print()
+
+    cv2.destroyAllWindows()
+    # atexit.unregister(cb)
+
+
+if __name__ == "__main__":
+    main()
     
