@@ -1111,17 +1111,36 @@ def main():
     ws = Weapons()
 
     # verify
-    # group weapons by class and by base damage
-    weapons_sorted = sorted((w for w in ws.base_weapons.values()), key=lambda w: (w.class_, ws._damages[0][w.name]))
-    grouped = [list(group) for key, group in itertools.groupby(weapons_sorted, key=lambda w: (w.class_, ws._damages[0][w.name]))]
-    # find all weapons with the same base damage but different damage drop-off
+    # group weapons by class, EB state and base damage
+    weapons_sorted = sorted(
+        ws.weapons.values(),
+        key=lambda w: (w.class_, w.is_extended_barrel, ws._damages[0][w.name]),
+    )
+    grouped = [
+        list(group)
+        for _, group in itertools.groupby(
+            weapons_sorted,
+            key=lambda w: (w.class_, w.is_extended_barrel, ws._damages[0][w.name]),
+        )
+    ]
+    # find all weapons in the same class+EB state with the same base damage but different damage drop-off
     failed = False
     for group in grouped:
         if len(group) > 1:
             for i, distance in enumerate(Weapon.distances):
                 if len(set(ws._damages[i][weapon.name] for weapon in group)) > 1:
-                    logger.error(f"These {group[0].class_}s have the a base damage of {ws._damages[0][group[0].name]} but different damages at {distance}m:\n%s",
-                                   "\n".join(f"  - {weapon.name}: {ws._damages[i][weapon.name]}" for weapon in group))
+                    damage_by_weapon = {weapon.name: ws._damages[i][weapon.name] for weapon in group}
+                    lowest_damage = min(damage_by_weapon.values())
+                    eb_suffix = " with EB" if group[0].is_extended_barrel else " without EB"
+                    logger.error(
+                        f"At a distance of {distance}m these {group[0].class_}s{eb_suffix} have different damages "
+                        f"even though their base damage is the same ({ws._damages[0][group[0].name]}).\n%s",
+                        "\n".join(
+                            f"  - {weapon.name}: {damage_by_weapon[weapon.name]} "
+                            f"{'  <-- probably incorrect' * int(damage_by_weapon[weapon.name] != lowest_damage)}"
+                            for weapon in group
+                        ),
+                    )
                     failed = True
     if failed: raise Exception(f"See above error messages.")
 
