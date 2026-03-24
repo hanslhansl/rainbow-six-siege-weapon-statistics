@@ -18,7 +18,12 @@ weapon_data_directory = "weapons"
 # the distance the weapon damage stats start at (usually 0)
 first_distance = 0
 # the distance the weapon damage stats end at (usually 40 because the of the Shooting Range limit)
-last_distance = 40 
+last_distance = 40
+
+# the hp levels of the different armor ratings
+hp_levels = (100, 110, 125)
+# the hp boost from rook armor
+rook_armor_hp_boost = 25
 
 # weapon type background colors
 weapon_colors = {"AR":"#5083EA",
@@ -43,6 +48,7 @@ weapon_colors = {"AR":"#5083EA",
 import os, json, typing, copy, sys, itertools, sys, colorsys, pandas as pd, numpy as np, io, math, colorlog, logging, pathlib
 import openpyxl, dataclasses_json, warnings, googleapiclient.http, googleapiclient.discovery, functools
 import google.oauth2.service_account, marshmallow.exceptions, time
+import pandas.io.formats.style as style
 from openpyxl.cell.text import InlineFont
 from openpyxl.cell.rich_text import TextBlock, CellRichText
 from openpyxl.styles import PatternFill, Border, Alignment, NamedStyle, Side, Font
@@ -82,10 +88,10 @@ github_link = "https://github.com/hanslhansl/Rainbow-Six-Siege-Weapon-Statistics
 google_sheets_link = "https://docs.google.com/spreadsheets/d/1QgbGALNZGLlvf6YyPLtywZnvgIHkstCwGl1tvCt875Q"
 google_drive_link = "https://docs.google.com/spreadsheets/d/e/2PACX-1vQ1KitQsZksdVP9YPDInxK3xE2gtu1mpUxV5_PNyE8sSm-vFINdbiL8vo9RA2CRSIbIUePLVA1GCTWZ/pubhtml"
 
-tdok_hp_levels = (100, 110, 125, 120, 130, 145)
-tdok_with_rook = (False, False, False, True, True, True)
-tdok_levels_descriptions = tuple(f"{int(i%3)+1} armor {'+ rook ' if with_rook else ''}({hp} hp)" for i, (hp, with_rook) in enumerate(zip(tdok_hp_levels, tdok_with_rook)))
-tdok_levels_descriptions_short = tuple(f"{int(i%3)+1}A{'+R' if with_rook else ''} ({hp})" for i, (hp, with_rook) in enumerate(zip(tdok_hp_levels, tdok_with_rook)))
+tdok_hp_levels = [hp + rook_armor_hp_boost * int(with_rook) for with_rook in (False, True) for hp in hp_levels]
+tdok_with_rook = [with_rook for with_rook in (False, True) for hp in hp_levels]
+tdok_levels_descriptions = [f"{int(i%len(hp_levels))+1} armor {'+ rook '*int(with_rook)}({hp} hp)" for i, (hp, with_rook) in enumerate(zip(tdok_hp_levels, tdok_with_rook))]
+tdok_levels_descriptions_short = [f"{int(i%len(hp_levels))+1}A{'+R'*int(with_rook)} ({hp})" for i, (hp, with_rook) in enumerate(zip(tdok_hp_levels, tdok_with_rook))]
 
 top_alignment = Alignment(vertical="top", wrapText=True)
 center_alignment = Alignment("center", wrapText=True)
@@ -249,7 +255,7 @@ class Weapons:
 
     def filter(self, df : pd.DataFrame, filter_func : typing.Callable[["Weapon"], bool]) -> pd.DataFrame:
         return df[df.apply(lambda row: filter_func(self.weapons[row.name[0]]), axis=1)]
-    def apply(self, df : pd.DataFrame | pd.io.formats.style.Styler, callback : typing.Callable[["Weapon", typing.Any, int, typing.Any], typing.Any]) -> pd.DataFrame | pd.io.formats.style.Styler:
+    def apply(self, df : pd.DataFrame | style.Styler, callback : typing.Callable[["Weapon", typing.Any, int, typing.Any], typing.Any]) -> pd.DataFrame | style.Styler:
         def cb(x):
             if df.index.nlevels == 1:
                 w_name, pi = x.name, None
@@ -264,7 +270,7 @@ class Weapons:
     def apply_style(self,
                     df : pd.DataFrame,
                     **callbacks : typing.Callable[["Weapon", typing.Any, int, typing.Any], str]
-                    ) -> pd.io.formats.style.Styler:
+                    ) -> style.Styler:
         cbs = [(name.replace("_", "-"), cb) for name, cb in callbacks.items()]
         def cb(*args):
             return "".join(f"{s}:{cb(*args)};" for s, cb in cbs)
@@ -463,8 +469,6 @@ class Weapons:
             tdok_levels_descriptions
             )
     
-    # illustrations helper
-
     # illustrations
     @illustration_method
     def damage_drop_off_coloring(self, stat : "Stat"):
@@ -726,8 +730,7 @@ class Stat:
     short_name : str
     name : str
     link : str
-    higher_is_better : bool
-    "True: higher values are better, False: lower values are better"
+    higher_is_better : bool # True: higher values are better, False: lower values are better
     data : pd.DataFrame
     additional_parameter_name : str
     additional_parameters : tuple[typing.Any,...] = None,
