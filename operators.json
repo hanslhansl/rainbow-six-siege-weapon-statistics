@@ -162,6 +162,7 @@
   },
   "Dokkaebi": {
     "weapons": [
+      "XK23",
       "Mk 14 EBR",
       "BOSG.12.2",
       "SMG-12",
@@ -293,6 +294,7 @@
     "weapons": [
       "POF-9",
       "417",
+      "XK23",
       "SDP 9mm"
     ],
     "side": "A"
@@ -335,6 +337,7 @@
     "weapons": [
       "417",
       "M249",
+      "XK23",
       "Reaper MK2",
       "GSH-18"
     ],
