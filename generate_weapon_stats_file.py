@@ -920,7 +920,6 @@ def add_extended_barrel_overview(worksheet : typing.Any, ws : Weapons, row : int
     # loop over stats, stdok and ttdok
     original_row = row
     for i, stat in enumerate(selected_stats):
-        print(f"stat {i}")
         row = original_row
         original_col = col
 
