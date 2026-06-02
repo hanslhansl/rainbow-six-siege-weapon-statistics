@@ -26,10 +26,17 @@ jobs:
           GOOGLE_SERVICE_ACCOUNT_CREDENTIALS: ${{ secrets.GOOGLE_SERVICE_ACCOUNT_CREDENTIALS }}
         run: uv run python generate_weapon_stats_file.py ${{ github.event.inputs.tag_name }}
 
+      - name: Sanitize Tag Name
+        id: sanitize_tag
+        run: |
+          echo "tag_name=${TAG_NAME// /_}" >> "$GITHUB_OUTPUT"
+        env:
+          TAG_NAME: ${{ github.event.inputs.tag_name }}
+
       - name: Create Release
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: ${{ github.event.inputs.tag_name }}
+          tag_name: ${{ steps.sanitize_tag.outputs.tag_name }}
           name: ${{ github.event.inputs.tag_name }}
           body: ${{ github.event.inputs.release_body }}
           files: rainbow-six-siege-weapon-statistics.xlsx
