@@ -890,7 +890,7 @@ def add_extended_barrel_overview(worksheet : typing.Any, ws : Weapons, row : int
 
     # stat name (stdok and ttdok)
     original_col = col = col + 1
-    for i, stat in enumerate(selected_stats):
+    for stat in selected_stats:
         worksheet.merge_cells(start_row=row, end_row=row, start_column=col, end_column=col+len(stat.additional_parameters)-1)
         c = worksheet.cell(row=row, column=col)
         c.alignment = center_alignment
@@ -920,20 +920,21 @@ def add_extended_barrel_overview(worksheet : typing.Any, ws : Weapons, row : int
     # loop over stats, stdok and ttdok
     original_row = row
     for i, stat in enumerate(selected_stats):
+        print(f"stat {i}")
         row = original_row
         original_col = col
 
         data = ws.extended_barrel_difference(stat).data
-        for (wname, pi), wdata in data.iterrows():
-            if pi in ("", None):
+        for (wname, parameter_index), wdata in data.iterrows():
+            if math.isnan(parameter_index):
                 continue
-            elif pi == 0:
+            elif parameter_index == 0:
                 col = original_col
 
             w = ws.base_weapons[wname]
                 
             # secondary weapon stats
-            if i == 0 and pi == 0:
+            if i == 0 and parameter_index == 0:
                 add_secondary_weapon_stats(worksheet, w, row, col-1, cols_inbetween)
 
             # data cell
@@ -944,7 +945,7 @@ def add_extended_barrel_overview(worksheet : typing.Any, ws : Weapons, row : int
             c.value = wdata[0]
             col += 1
 
-            if pi == len(stat.additional_parameters) - 1:
+            if parameter_index == len(stat.additional_parameters) - 1:
                 row += 1
 
         worksheet.column_dimensions[get_column_letter(col)].width = 3
