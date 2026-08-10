@@ -3,13 +3,13 @@ Provides detailed statistics for all weapons in Tom Clancy's Rainbow Six Siege.
 
 After every game patch a spreadsheet of the important stats is [released](https://github.com/hanslhansl/rainbow-six-siege-weapon-statistics/releases). The most recent version can be found on [Google Sheets](https://docs.google.com/spreadsheets/d/1QgbGALNZGLlvf6YyPLtywZnvgIHkstCwGl1tvCt875Q)/[Google Drive](https://docs.google.com/spreadsheets/d/e/2PACX-1vQ1KitQsZksdVP9YPDInxK3xE2gtu1mpUxV5_PNyE8sSm-vFINdbiL8vo9RA2CRSIbIUePLVA1GCTWZ/pubhtml).
 
-# About how the data is collected
+# About How the Data Is Collected
 Generally, I am trying to collect as much of the data myself and by hand because Ubisoft has proven to be an unreliable source for statistics. At the same time I am trying to cut corners where possible.
 
-## Time measuring
+## Time Measuring
 I am measuring time intervals by recording the game and going off of frame time. I am recording at 120 fps which means that, in theory, every time measurement can deviate up to $Δt={1\\over120} s\\approx0.0083 s$ from the actual value. In conclusion, this means that every time related stat (e.g. fire rate, dps, ads time, ...) should be taken with a grain of salt.
 
-## Damage per projectile
+## Damage per Projectile
 I am measuring the damage values in the in-game shooting range which limits my measurements to distances of 5 to 40 meters (thanks Ubi). This would mean that I need to measure 36 distinct damage values (from 5 to 40 meters) per weapon. However:
 * Damage in R6S never increases over distance. It only decreases or stagnates. Therefor, if the damage at distance A is equal to the damage at distance B the damage at all distances inbetween A and B is also equal. Because of this I don't have to measure at all distances.
 * Most weapons in R6S have exactly one damage drop-off interval. Up until drop-off start they deal the base damage. From drop-off start to drop-off end they progressively lose damage over distance. From drop-off end on they deal the final damage. Because of this the damage up until 5 meters (which can't be measured in the shooting range) can be assumed to equal the damage at 5 meters.
@@ -21,42 +21,53 @@ I am using the distance value displayed on the shooting range panel to measure t
 ### Shotguns
 Shotguns are the exception, they have two damage drop-off intervals, usually [5; 6] and [10; 12]. Because the first interval starts at 5 meters it is not possible to verify the damage below 5 meters in the Shooting Range. Therefor I have to trust Ubisoft on the ingame shotgun damage stats for distances less than 5 meters.
 
-### Hit areas
+### Hit Areas
 There are three body hit areas in R6S: the head, the torso and the limbs. The torso has a damage multiplier of 1 and therefor receives the base damage. This is the value I am measuring. Most weapons deal infinite damage to the head. The only exception are shotguns which deal 150% of the base damage to the head. Limb damage is a bit more complicated. As of now I believe most weapons deal 75% of the base damage to limbs. However, there exists at least one exception to this rule, Kali's CSRX 300, which deals 60% to limbs. At some point I will test all weapon's limb damage multiplier. soon (tm).
 
-## Projectiles per shot - Pellet count
+## Projectiles per Shot - Pellet Count
 This value differs from 1 only for shotguns, most of which shoot 8 projectiles per shot. For shotguns this metric is also called _pellet count_.
 
-## Damage per shot
+## Damage per Shot
 The damage per shot is calculated as $DamagePerShot = Damage \* Pellets$. No measuring necessary. Only for shotguns does this value differ from the damage per projectile.
 
-## Fire rate
+## Fire Rate
 After measuring the time t (in seconds) it takes to empty a weapon with $n$ rounds the fire rate is calculated as $60{n-1 \\over t} rpm$.
 
 As [already mentioned](#time-measuring) my time measurements can vary up to Δt from the real values. The actual fire rates are therefor in the interval defined by $60{n-1 \\over t \\pm Δt} rpm$. For example a measured fire rate of 800 rpm for a weapon with 31 rounds would mean an actual fire rate of something inbetween 797 rpm and 803 rpm. I am rounding the fire rate to a reasonable integer within said interval.
 
-## Damage per second - DPS
-The damage per second is calculated as $DPS = DamagePerShot \* RPS$. No measuring necessary.
+## Damage per Second - DPS
+The damage per second is calculated as $DPS = DamagePerShot \* RPS$.
 
-## Projectiles to down or kill - PTDOK
-For a target with x hp the PTDOK is calculated as $\\lceil {x \\over Damage} \\rceil$. No measuring necessary.
+## Theoretical Projectiles/Shots/Time to Down or Kill - Theoretical PTDOK/STDOK/TTDOK
+For a target with x hp the theoretical PTDOK is calculated as $x \\over DamagePerProjectile$. 
 
-## Shots to down or kill - STDOK
-For a target with x hp the STDOK is calculated as $\\lceil {x \\over DamagePerShot} \\rceil$. No measuring necessary.
+The theoretical STDOK is calculated as $x \\over DamagePerShot$.
 
-## Time to down or kill - TTDOK
-For a target with x hp the TTDOK in milliseconds is calculated as ${STDOK - 1 \\over rpms}$. No measuring necessary.
+The theoretical TTDOK in milliseconds is calculated as ${theoretical STDOK - 1 \\over rpms}$.
 
-## Magazine capacity
+## Projectiles/Shots/Time to Down or Kill - PTDOK/STDOK/TTDOK
+For a target with x hp the PTDOK is calculated as $\\lceil {x \\over DamagePerProjectile} \\rceil$. 
+
+The STDOK is calculated as $\\lceil {x \\over DamagePerShot} \\rceil$.
+
+The TTDOK in milliseconds is calculated as ${STDOK - 1 \\over rpms}$.
+
+## Projectiles/Shots/Time to Kill - PTK/STK/TTK
+For a target with x hp the PTK is calculated as $\\lceil {x + 20 \\over DamagePerProjectile} \\rceil$. 
+
+The STK is calculated as $\\lceil {x + 20 \\over DamagePerShot} \\rceil$.
+
+The TTK in milliseconds is calculated as ${STK - 1 \\over rpms}$.
+
+## Magazine Capacity
 Most weapons have, in addition to the rounds loaded in the magazine, one round loaded in the chamber. For those weapons this value is displayed as _Capacity+1_ (e.g. _30+1_). For weapons without a round loaded in the chamber this value is displayed as _Capacity+0_ (e.g. _100+0_).
 
-## Aim down sight time - ADS time
+## Aim Down Sight Time - ADS Time
 The time in seconds it takes to aim down sight while standing still. The laser attachment increases the ads speed by 10%. The reduced ads time with laser is calculated as $ads \\over 1.1$.
 
-## Reload time
+## Reload Time
 The time in seconds between the ammo counter reaching 0 (or 1 for a tactical reload with a round in the chamber) and displaying a new value (e.g. 30). _Full reload_ means reloading from empty state; _tactical reload_ means reloading with at least one round remaining. For tube-fed and break-action shotguns, _full reload_ means reloading from empty state to full capacity; _tactical reload_ means reloading the final round during a full reload.
 
 Reload times differ for tactical vs. full reload. The angled grip increases the reload speed. I couldn't figure out the mathematical correlation so I measured all 4 values per weapon (2 for weapons without grip) separately.
-
 
 Note: Ubisoft defines _reload time_ slightly different, they provide values for the duration of reload _animations_, i.e. the time between hitting the reload button and the operator returning to an idle position. However, this definition isn't really gameplay relevant and also much more difficult to automatically measure. Interestingly, but not surprisingly, the in-game values are incorrect under both definitions.

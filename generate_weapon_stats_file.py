@@ -330,8 +330,8 @@ class Weapons:
     @functools.cache
     def damage_per_projectile(self):
         return Stat(
-            "damage",
             "damage per projectile",
+            "",
             "damage-per-projectile",
             True,
             *self.nest(lambda x: self._damages),
@@ -341,7 +341,7 @@ class Weapons:
         pellets = {name : w.pellets for name, w in self.weapons.items()}
         return Stat(
             "damage per shot",
-            "damage per shot",
+            "",
             "damage-per-shot",
             True,
             *self.nest(lambda x: self._damages.mul(pellets, axis=0)),
@@ -372,7 +372,6 @@ class Weapons:
     @functools.cache
     def stdok(self):
         pellets = {name : w.pellets for name, w in self.weapons.items()}
-        pellets = [w.pellets for name, w in self.weapons.items()]
         return Stat(
             "stdok",
             "shots to down or kill",
