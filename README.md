@@ -38,24 +38,24 @@ As [already mentioned](#time-measuring) my time measurements can vary up to Δt 
 ## Damage per Second - DPS
 The damage per second is calculated as $DPS = DamagePerShot \* RPS$.
 
-## Theoretical Projectiles/Shots/Time to Down or Kill - Theoretical PTDOK/STDOK/TTDOK
+## Projectiles to (Down or) Kill - PTK/PTDOK
 For a target with x hp the theoretical PTDOK is calculated as $x \\over DamagePerProjectile$. 
 
-The theoretical STDOK is calculated as $x \\over DamagePerShot$.
+The PTDOK is calculated as $\\lceil {x \\over DamagePerProjectile} \\rceil$. 
 
-The theoretical TTDOK in milliseconds is calculated as ${theoretical STDOK - 1 \\over rpms}$.
+The PTK is calculated as $\\lceil {x + 20 \\over DamagePerProjectile} \\rceil$. 
 
-## Projectiles/Shots/Time to Down or Kill - PTDOK/STDOK/TTDOK
-For a target with x hp the PTDOK is calculated as $\\lceil {x \\over DamagePerProjectile} \\rceil$. 
+## Shots to (Down or) Kill - STK/STDOK
+For a target with x hp the theoretical STDOK is calculated as $x \\over DamagePerShot$.
 
 The STDOK is calculated as $\\lceil {x \\over DamagePerShot} \\rceil$.
 
-The TTDOK in milliseconds is calculated as ${STDOK - 1 \\over rpms}$.
-
-## Projectiles/Shots/Time to Kill - PTK/STK/TTK
-For a target with x hp the PTK is calculated as $\\lceil {x + 20 \\over DamagePerProjectile} \\rceil$. 
-
 The STK is calculated as $\\lceil {x + 20 \\over DamagePerShot} \\rceil$.
+
+## Time to (Down or) Kill - TTK/TTDOK
+For a target with x hp the theoretical TTDOK in milliseconds is calculated as ${theoretical STDOK - 1 \\over rpms}$.
+
+The TTDOK in milliseconds is calculated as ${STDOK - 1 \\over rpms}$.
 
 The TTK in milliseconds is calculated as ${STK - 1 \\over rpms}$.
 
