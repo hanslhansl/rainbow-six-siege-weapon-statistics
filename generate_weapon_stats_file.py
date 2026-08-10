@@ -331,7 +331,7 @@ class Weapons:
     def damage_per_projectile(self):
         return Stat(
             "damage per projectile",
-            "",
+            "damage per projectile",
             "damage-per-projectile",
             True,
             *self.nest(lambda x: self._damages),
@@ -341,7 +341,7 @@ class Weapons:
         pellets = {name : w.pellets for name, w in self.weapons.items()}
         return Stat(
             "damage per shot",
-            "",
+            "damage per shot",
             "damage-per-shot",
             True,
             *self.nest(lambda x: self._damages.mul(pellets, axis=0)),
@@ -363,7 +363,7 @@ class Weapons:
         return Stat(
             "ptdok",
             "projectiles to down or kill",
-            "projectiles-to-down-or-kill---ptdok",
+            "projectiles-to-down-or-kill---ptkptdok",
             False,
             *self.nest(lambda hp: np.ceil(hp / self._damages), tdok_hp_levels, "hp"),
             tdok_levels_descriptions_short,
@@ -375,7 +375,7 @@ class Weapons:
         return Stat(
             "stdok",
             "shots to down or kill",
-            "shots-to-down-or-kill---stdok",
+            "shots-to-down-or-kill---stkstdok",
             False,
             *self.nest(lambda hp: np.ceil((hp / self._damages).div(pellets, axis=0)), tdok_hp_levels, "hp"),
             tdok_levels_descriptions_short,
@@ -388,7 +388,7 @@ class Weapons:
         return Stat(
             "ttdok",
             "time to down or kill",
-            "time-to-down-or-kill---ttdok",
+            "time-to-down-or-kill---ttkttdok",
             False,
             *self.nest(lambda hp: (np.ceil((hp / self._damages).div(pellets, axis=0)) - 1).div(rpms, axis=0).round(), tdok_hp_levels, "hp"),
             tdok_levels_descriptions_short,
@@ -399,8 +399,8 @@ class Weapons:
     def theoretical_ptdok(self):
         return Stat(
             "theoretical ptdok",
-            "",
-            "projectiles-to-down-or-kill---ptdok",
+            "theoretical ptdok",
+            "projectiles-to-down-or-kill---ptkptdok",
             False,
             *self.nest(lambda hp: hp / self._damages, tdok_hp_levels, "hp"),
             tdok_levels_descriptions_short,
@@ -411,8 +411,8 @@ class Weapons:
         pellets = {name : w.pellets for name, w in self.weapons.items()}
         return Stat(
             "theoretical stdok",
-            "",
-            "shots-to-down-or-kill---stdok",
+            "theoretical stdok",
+            "shots-to-down-or-kill---stkstdok",
             False,
             *self.nest(lambda hp: (hp / self._damages).div(pellets, axis=0), tdok_hp_levels, "hp"),
             tdok_levels_descriptions_short,
@@ -423,8 +423,8 @@ class Weapons:
         pellets_rpms = {name : w.pellets * w.rpms for name, w in self.weapons.items()}
         return Stat(
             "theoretical ttdok",
-            "",
-            "time-to-down-or-kill---ttdok",
+            "theoretical ttdok",
+            "time-to-down-or-kill---ttkttdok",
             False,
             *self.nest(lambda hp: (hp / self._damages).div(pellets_rpms, axis=0), tdok_hp_levels, "hp"),
             tdok_levels_descriptions_short,
@@ -436,7 +436,7 @@ class Weapons:
         return Stat(
             "ptk",
             "projectiles to kill",
-            "projectiles-to-down-or-kill---ptdok",
+            "projectiles-to-down-or-kill---ptkptdok",
             False,
             *self.nest(lambda hp: np.ceil((hp + 20) / self._damages), tdok_hp_levels, "hp"),
             tdok_levels_descriptions_short,
@@ -448,7 +448,7 @@ class Weapons:
         return Stat(
             "stk",
             "shots to kill",
-            "shots-to-down-or-kill---stdok",
+            "shots-to-down-or-kill---stkstdok",
             False,
             *self.nest(lambda hp: np.ceil(((hp + 20) / self._damages).div(pellets, axis=0)), tdok_hp_levels, "hp"),
             tdok_levels_descriptions_short,
@@ -461,7 +461,7 @@ class Weapons:
         return Stat(
             "ttk",
             "time to kill",
-            "time-to-down-or-kill---ttdok",
+            "time-to-down-or-kill---ttkttdok",
             False,
             *self.nest(lambda hp: (np.ceil(((hp + 20) / self._damages).div(pellets, axis=0)) - 1).div(rpms, axis=0).round(), tdok_hp_levels, "hp"),
             tdok_levels_descriptions_short,
