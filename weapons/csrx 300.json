@@ -46,17 +46,17 @@
         "37": 115,
         "38": 112,
         "39": 109,
-        "40": 109
+        "40": 108
     },
     "extended_barrel": false,
-    "extra_ammo": 30,
+    "extra_ammo": 45,
     "has_laser": false,
     "name": "CSRX 300",
     "pellets": 1,
     "reload_times": [
-        1.1,
-        3.23
+        1.11,
+        3.24
     ],
-    "rpm": 52,
+    "rpm": 63,
     "has_angled_grip": false
 }
