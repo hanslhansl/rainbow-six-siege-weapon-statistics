@@ -25,7 +25,7 @@ PROGRESS_BAR_WIDTH = 30
 
 
 # --- CODE ---
-import cv2, numpy as np, sys, typing, av, atexit, pathlib, scipy.optimize, scipy.special, argparse, collections, json, itertools
+import cv2, numpy as np, sys, av, atexit, pathlib, scipy.optimize, scipy.special, argparse, collections, json, itertools
 from dataclasses import dataclass
 from decimal import Decimal, ROUND_HALF_UP
 

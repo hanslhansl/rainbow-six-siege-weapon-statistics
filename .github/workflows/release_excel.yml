@@ -4,7 +4,7 @@ on:
   workflow_dispatch:
     inputs:
       tag_name:
-        description: 'tag & release name (e.g. y9Ss.1)'
+        description: 'tag & release name (e.g. y9s3.1)'
         required: true
       release_body:
         description: 'release notes'
@@ -24,7 +24,8 @@ jobs:
       - name: Run Python Script
         env:
           GOOGLE_SERVICE_ACCOUNT_CREDENTIALS: ${{ secrets.GOOGLE_SERVICE_ACCOUNT_CREDENTIALS }}
-        run: uv run python generate_weapon_stats_file.py "${{ github.event.inputs.tag_name }}"
+        # The locked SciPy version has prebuilt wheels for Python 3.13.
+        run: uv run --locked --python 3.13 python generate_weapon_stats_file.py "${{ github.event.inputs.tag_name }}"
 
       - name: Sanitize Tag Name
         id: sanitize_tag

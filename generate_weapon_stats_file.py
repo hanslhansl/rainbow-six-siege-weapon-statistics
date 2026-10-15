@@ -45,7 +45,7 @@ weapon_colors = {"AR":"#5083EA",
 ###################################################
 
 #imports
-import os, json, typing, copy, sys, itertools, sys, colorsys, pandas as pd, numpy as np, io, math, colorlog, logging, pathlib
+import os, json, typing, copy, sys, itertools, colorsys, pandas as pd, numpy as np, io, math, colorlog, logging, pathlib
 import openpyxl, dataclasses_json, warnings, googleapiclient.http, googleapiclient.discovery, functools
 import google.oauth2.service_account, marshmallow.exceptions, time
 import pandas.io.formats.style as style
