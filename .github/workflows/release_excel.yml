@@ -15,7 +15,7 @@ jobs:
 
     steps:
       - name: Checkout Repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
 
       - name: Install uv
         run: |
@@ -35,7 +35,7 @@ jobs:
           TAG_NAME: ${{ github.event.inputs.tag_name }}
 
       - name: Create Release
-        uses: softprops/action-gh-release@v2
+        uses: softprops/action-gh-release@v3
         with:
           tag_name: ${{ steps.sanitize_tag.outputs.tag_name }}
           name: ${{ github.event.inputs.tag_name }}
