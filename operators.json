@@ -443,6 +443,7 @@
   "Jäger": {
     "weapons": [
       "M870",
+      "MBZ-19",
       "416-C CARBINE",
       "P12",
       "P-10C"
@@ -575,6 +576,7 @@
     "weapons": [
       "M590A1",
       "MPX",
+      "MBZ-19",
       "P-10C",
       "SMG-12"
     ],
@@ -629,6 +631,7 @@
     "weapons": [
       "SPEAR .308",
       "SPAS-15",
+      "MBZ-19",
       "Q-929",
       "BEARING 9",
       "ITA12S"
